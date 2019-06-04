@@ -626,7 +626,9 @@ if __name__ == '__main__':
                                                B0 = read.B0,
                                                omega = read.omega,
                                                # quaternion_B = read.quaternion_B,
-                                               quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B))) 
+                                               quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                                               omega_perp = read.omega_perp)
+  
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
   integrator.linear_operator = linear_operator_rigid

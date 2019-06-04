@@ -8,15 +8,15 @@ scheme                                   stochastic_Slip_Trapz
 # We recommend to use the C++ implementation which is faster,
 # see documentation
 mobility_blobs_implementation            python
-mobility_vector_prod_implementation      python
+mobility_vector_prod_implementation      numba
 
 # Select implementation to compute the blobs-blob interactions
-blob_blob_force_implementation           python
+blob_blob_force_implementation           numba
 
 # Set time step, number of steps and save frequency
-dt                                       0.001
-n_steps                                  1
-n_save                                   1
+dt                                       0.01
+n_steps                                  2000
+n_save                                   10
 initial_step                             0
 
 # Solver params
@@ -25,7 +25,7 @@ update_PC                                1
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
 eta                                      1e-03
-g                                        0.001
+g                                        0.003846154
 blob_radius                              0.4
 
 # Stochastic parameters
@@ -44,11 +44,14 @@ debye_length                             0.015
 # periodic_length                          12 25 0
 
 # Magnetic interactions
+quaternion_B                             0.923879532511287 0  0.38268343236509  0
 mu                                       1  1  1
+B0                                       0.0
+omega                                    62.83184
 
 
 # Set output name
-output_name                              data/run
+output_name                              data/run6
 save_clones                              one_file
 
 

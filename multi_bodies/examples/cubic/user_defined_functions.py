@@ -47,6 +47,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   B0 = kwargs.get('B0')
   omega = kwargs.get('omega')
   quaternion_B = kwargs.get('quaternion_B')
+  omega_perp = kwargs.get('omega_perp')
   step = kwargs.get('step')
   dt = kwargs.get('dt')
   time = step * dt
