@@ -64,8 +64,8 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   B = B0 * np.array([np.cos(omega * time), np.sin(omega * time), 0.0])
   B = np.dot(R_B, B)
 
-  #print('R_B = \n', R_B)
-  #print('B = ', B)
+  # print('R_B = \n', R_B)
+  # print('B = ', B)
   
   for k, b in enumerate(bodies):
     rotation_matrix = b.orientation.rotation_matrix()

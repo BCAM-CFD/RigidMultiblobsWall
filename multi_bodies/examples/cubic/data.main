@@ -14,9 +14,9 @@ mobility_vector_prod_implementation      numba
 blob_blob_force_implementation           numba
 
 # Set time step, number of steps and save frequency
-dt                                       0.01
-n_steps                                  2000
-n_save                                   10
+dt                                       0.001
+n_steps                                  5000
+n_save                                   100
 initial_step                             0
 
 # Solver params
@@ -25,12 +25,13 @@ update_PC                                1
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
 eta                                      1e-03
-g                                        0.003846154
-blob_radius                              0.4
+# g                                        0.003846154
+g                                        2.688426792e-04
+blob_radius                              0.065
 
 # Stochastic parameters
 # 300 Kelvin * k_B = 0.0041419464 in this units
-kT                                       0.00414194556
+kT                                       0 # 0.00414194556
 
 # Set interaction with the wall
 repulsion_strength_wall                  0.006
@@ -40,21 +41,20 @@ debye_length_wall                        0.015
 repulsion_strength                       0.006
 debye_length                             0.015
 
-# PBC
-# periodic_length                          12 25 0
-
 # Magnetic interactions
-quaternion_B                             0.923879532511287 0  0.38268343236509  0
-mu                                       1  1  1
-B0                                       0.0
-omega                                    62.83184
-
+# quaternion_B                             0.923879532511287 0  0.38268343236509  0
+quaternion_B                             1 0 0 0 
+mu                                       0  1  0
+B0                                       1.0
+omega                                    6.283184
+# domain                                   no_wall
 
 # Set output name
-output_name                              data/run6
+output_name                              data/run9
 save_clones                              one_file
 
 
-structure Structures/cubic.vertex Structures/cubic.clones
+# structure Structures/cubic.vertex Structures/cubic.clones
+structure Structures/rod_Lg_2_Rg_015_Nx_16_Ntheta_6.vertex Structures/cubic.clones
 
 
