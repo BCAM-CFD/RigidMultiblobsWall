@@ -1,0 +1,57 @@
+
+# Length, time and mass are given in units of microns, seconds and miligrams.
+
+# Select scheme to integrate Brownian equations
+scheme                                   stochastic_Slip_Trapz
+
+# Select implementation to compute M and M*f
+# We recommend to use the C++ implementation which is faster,
+# see documentation
+mobility_blobs_implementation            python
+mobility_vector_prod_implementation      python
+
+# Select implementation to compute the blobs-blob interactions
+blob_blob_force_implementation           python
+
+# Set time step, number of steps and save frequency
+dt                                       0.001
+n_steps                                  1
+n_save                                   1
+initial_step                             0
+
+# Solver params
+solver_tolerance                         1.0e-12
+update_PC                                1
+
+# Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
+eta                                      1e-03
+g                                        0.001
+blob_radius                              0.4
+
+# Stochastic parameters
+# 300 Kelvin * k_B = 0.0041419464 in this units
+kT                                       0.00414194556
+
+# Set interaction with the wall
+repulsion_strength_wall                  0.006
+debye_length_wall                        0.015
+
+# Define implementation to compute the blobs-blob force and pass its arguments
+repulsion_strength                       0.006
+debye_length                             0.015
+
+# PBC
+# periodic_length                          12 25 0
+
+# Magnetic interactions
+mu                                       1  1  1
+
+
+# Set output name
+output_name                              data/run
+save_clones                              one_file
+
+
+structure Structures/cubic.vertex Structures/cubic.clones
+
+
