@@ -79,7 +79,12 @@ class ReadInput(object):
     self.update_PC = int(self.options.get('update_PC') or 1)
     self.domain = str(self.options.get('domain') or 'single_wall')
     self.call_HydroGrid = str(self.options.get('call_HydroGrid') or 'False') == 'True'
+
     self.mu = np.fromstring(self.options.get('mu') or '1 0 0', sep=' ')
+    self.B0 = float(self.options.get('B0') or 0)
+    self.omega = float(self.options.get('omega') or 0)
+    self.quaternion_B = np.fromstring(self.options.get('quaternion_B') or '1 0 0 0', sep=' ')
+        
           
     # Create list with [vertex_file, clones_file] for each structure
     self.structures = []

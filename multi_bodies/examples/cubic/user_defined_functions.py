@@ -38,28 +38,42 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 
   mu = define in the body frame of reference and rotate to the
        lab frame of reference.
-  B = R_B * (cos(omega*time), sin(omega*time), 0)
+  B = R_B * B0 * (cos(omega*time), sin(omega*time), 0)
   R_B = rotation matrix associated with a quaternion_B.
 
   '''
+  force_torque = np.zeros((2*len(bodies), 3))
   mu = kwargs.get('mu')
   B0 = kwargs.get('B0')
   omega = kwargs.get('omega')
-  time = kwargs.get('time')
   quaternion_B = kwargs.get('quaternion_B')
+  step = kwargs.get('step')
+  dt = kwargs.get('dt')
+  time = step * dt
 
-  print('mu = ', mu)
-  print('B0 = ', B0)
-  print('omega = ', omega)
-  print('time = ', time)
-  print('quaternion_B = ', quaternion_B)
+  #print('mu           = ', mu)
+  #print('B0           = ', B0)
+  #print('omega        = ', omega)
+  #print('quaternion_B = ', quaternion_B)
+  #print('step         = ', step)
+  #print('dt           = ', dt)
+  #print('time         = ', time)  
+
+  R_B = quaternion_B.rotation_matrix()
+  B = B0 * np.array([np.cos(omega * time), np.sin(omega * time), 0.0])
+  B = np.dot(R_B, B)
+
+  #print('R_B = \n', R_B)
+  #print('B = ', B)
   
+  for k, b in enumerate(bodies):
+    rotation_matrix = b.orientation.rotation_matrix()
+    mu_body = np.dot(rotation_matrix, mu)
+    #print('rotation_matrix = \n', rotation_matrix)
+    #print('mu_body = ', mu_body)
+    force_torque[2*k+1] = np.cross(mu_body, B)
 
-  
-
-  
-
-  return np.zeros((2*len(bodies), 3))
+  return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
 
 

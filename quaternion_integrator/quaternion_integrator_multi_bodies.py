@@ -150,7 +150,7 @@ class QuaternionIntegrator(object):
       preprocess_result = self.preprocess(self.bodies)
 
       # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, step = kwargs.get('step'))
+      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, step = kwargs.get('step'), dt = dt)
 
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -843,7 +843,9 @@ class QuaternionIntegrator(object):
       sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
                                                 x0 = self.first_guess, 
                                                 save_first_guess = True,
-                                                PC_partial = PC_partial)
+                                                PC_partial = PC_partial,
+                                                step = kwargs.get('step'),
+                                                dt = dt)
       # Extract velocities
       velocities_1 = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
@@ -883,7 +885,9 @@ class QuaternionIntegrator(object):
                                                     noise_FT = rand_force_cor, 
                                                     x0 = self.first_guess, 
                                                     save_first_guess = True,
-                                                    PC_partial = PC_partial)
+                                                    PC_partial = PC_partial,
+                                                    step = kwargs.get('step') + 0.5,
+                                                    dt = dt)
 
       # Extract velocities
       velocities_2 = np.reshape(sol_precond_cor[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -1158,7 +1162,7 @@ class QuaternionIntegrator(object):
         else:
           slip = np.zeros((self.Nblobs, 3))
         # Calculate force-torque on bodies
-        force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+        force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, step = kwargs.get('step'), dt = kwargs.get('dt'))
         # Add noise to the force/torque
         if noise_FT is not None:
           force_torque += noise_FT
