@@ -54,7 +54,7 @@ output_name                              data/run9
 save_clones                              one_file
 
 
-# structure Structures/cubic.vertex Structures/cubic.clones
-structure Structures/rod_Lg_2_Rg_015_Nx_16_Ntheta_6.vertex Structures/cubic.clones
+
+structure Structures/superellipsoid_Lg_1.951_r_3.9_N_960.vertex Structures/superellipsoid.clones
 
 

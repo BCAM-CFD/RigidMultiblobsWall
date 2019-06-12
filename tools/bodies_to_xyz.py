@@ -16,6 +16,7 @@ import argparse
 import sys
 
 sys.path.append('../')
+sys.path.append('../../../')
 
 import multi_bodies 
 from quaternion_integrator.quaternion import Quaternion
@@ -35,7 +36,6 @@ if __name__ == '__main__':
   # Read input file
   read = read_input.ReadInput(input_file)
   a = read.blob_radius
-  structure_names = read.structure_names
   n_steps = read.n_steps
   n_save = read.n_save
 
