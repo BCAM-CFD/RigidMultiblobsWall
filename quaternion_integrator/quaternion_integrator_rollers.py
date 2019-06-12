@@ -10,7 +10,7 @@ import time
 
 from stochastic_forcing import stochastic_forcing as stochastic
 from mobility import mobility as mob
-import utils
+import general_application_utils as utils
 try:
   from quaternion import Quaternion
 except ImportError:
@@ -78,7 +78,15 @@ class QuaternionIntegratorRollers(object):
         self.mobility_rot_times_force = mob.no_wall_mobility_rot_times_force_numba
         self.mobility_rot_times_torque = mob.no_wall_mobility_rot_times_torque_numba
         # self.mobilit_trans_times_force_torque = mob.no_wall_mobility_trans_times_force_torque_numba
-
+    elif domain == 'in_plane':
+      if mobility_vector_prod_implementation.find('pycuda') > -1:
+        self.mobility_trans_times_force = mob.in_plane_mobility_trans_times_force_pycuda
+        self.mobility_trans_times_torque = mob.in_plane_mobility_trans_times_torque_pycuda
+      elif mobility_vector_prod_implementation.find('numba') > -1:
+        self.mobility_trans_times_force = mob.in_plane_mobility_trans_times_force_numba
+        self.mobility_trans_times_torque = mob.in_plane_mobility_trans_times_torque_numba
+	
+	
     # Optional variables
     self.build_stochastic_block_diagonal_preconditioner = None
     self.periodic_length = None
