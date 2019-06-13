@@ -42,6 +42,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   R_B = rotation matrix associated with a quaternion_B.
 
   '''
+  # Get parameters
   force_torque = np.zeros((2*len(bodies), 3))
   mu = kwargs.get('mu')
   B0 = kwargs.get('B0')
@@ -52,27 +53,19 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   dt = kwargs.get('dt')
   time = step * dt
 
-  #print('mu           = ', mu)
-  #print('B0           = ', B0)
-  #print('omega        = ', omega)
-  #print('quaternion_B = ', quaternion_B)
-  #print('step         = ', step)
-  #print('dt           = ', dt)
-  #print('time         = ', time)  
-
+  # Rotate magnetic field
   R_B = quaternion_B.rotation_matrix()
   B = B0 * np.array([np.cos(omega * time), np.sin(omega * time), 0.0])
   B = np.dot(R_B, B)
-
-  # print('R_B = \n', R_B)
-  # print('B = ', B)
   
   for k, b in enumerate(bodies):
+    # Rotate magnetic dipole
     rotation_matrix = b.orientation.rotation_matrix()
     mu_body = np.dot(rotation_matrix, mu)
-    #print('rotation_matrix = \n', rotation_matrix)
-    #print('mu_body = ', mu_body)
+
+    # Compute torque
     force_torque[2*k+1] = np.cross(mu_body, B)
+    # force_torque[2*k+1] = mu
 
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
