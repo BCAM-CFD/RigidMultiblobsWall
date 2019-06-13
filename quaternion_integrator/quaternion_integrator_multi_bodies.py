@@ -886,7 +886,7 @@ class QuaternionIntegrator(object):
                                                     x0 = self.first_guess, 
                                                     save_first_guess = True,
                                                     PC_partial = PC_partial,
-                                                    step = kwargs.get('step') + 0.5,
+                                                    step = kwargs.get('step') + 1,
                                                     dt = dt)
 
       # Extract velocities
