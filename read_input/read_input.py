@@ -86,6 +86,7 @@ class ReadInput(object):
     self.omega = float(self.options.get('omega') or 0)
     self.quaternion_B = np.fromstring(self.options.get('quaternion_B') or '1 0 0 0', sep=' ')
     self.omega_perp = np.fromstring(self.options.get('omega_perp') or '0 0 1', sep=' ')
+    self.vacuum_permeability = float(self.options.get('vacuum_permeability') or 0)
         
           
     # Create list with [vertex_file, clones_file] for each structure

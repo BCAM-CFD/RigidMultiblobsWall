@@ -21,9 +21,11 @@ see below.
 from __future__ import division, print_function
 import multi_bodies_functions
 from multi_bodies_functions import *
-
-
-
+# Try to import numba
+try:
+  from numba import njit, prange
+except ImportError:
+  print('numba not found')
 
 
 def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
@@ -71,6 +73,82 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
 
 
+def set_body_body_forces_torques_new(implementation):
+  '''
+  Set the function to compute the body-body forces
+  to the right function. 
+  '''
+  if implementation == 'None':
+    return default_zero_bodies
+  elif implementation == 'python':
+    return calc_body_body_forces_torques_python
+  elif implementation == 'numba':
+    return calc_body_body_forces_torques_numba
+multi_bodies_functions.set_body_body_forces_torques = set_body_body_forces_torques_new
 
 
+def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
+  '''
+  This function computes the body-body forces and torques and returns
+  an array with shape (2*Nblobs, 3).
+  '''
+  Nbodies = len(bodies)
+  force_torque_bodies = np.zeros((len(bodies), 6))
+  mu = kwargs.get('mu')
+  vacuum_permeability = kwargs.get('vacuum_permeability')
+  
+  # Extract body locations and dipoles
+  r_bodies = np.zeros((len(bodies), 3))
+  dipoles = np.zeros((len(bodies), 3))
+  for i, b in enumerate(bodies):
+    r_bodies[i] = b.location
+    dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
+  
+  # Compute forces and torques
+  force, torque = body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability)
+  force_torque_bodies[:,0:3] = force
+  force_torque_bodies[:,3:6] = torque
 
+  return force_torque_bodies.reshape((2*len(bodies),3))
+
+
+@njit(parallel=True, fastmath=True)
+def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
+  '''
+  This function compute the force between N bodies
+  with locations r and dipoles dipoles.
+  '''
+  N = r_bodies.size // 3
+  force = np.zeros_like(r_bodies)
+  torque = np.zeros_like(r_bodies)
+
+  # Loop over bodies
+  for i in prange(N):
+    mi = dipoles[i]
+    for j in range(N):
+      if i == j:
+        continue
+      mj = dipoles[j]
+      
+      # Distance between bodies
+      rij = r_bodies[i] - r_bodies[j]
+      r = np.sqrt(rij[0]*rij[0] + rij[1]*rij[1] + rij[2]*rij[2])
+      rij_hat = rij / r
+
+      # Compute force
+      Ai = np.dot(mi, rij_hat)
+      Aj = np.dot(mj, rij_hat)
+      force[i] += (mi * Aj + mj * Ai + rij_hat * np.dot(mi,mj) - 5 * rij_hat * Ai * Aj) / r**4
+
+      # Compute torque
+      torque[i,0] += (3*Aj * (mi[1] * rij_hat[2] - mi[2]*rij_hat[1]) - (mi[1] * mj[2] - mi[2]*mj[1])) / r**3
+      torque[i,1] += (3*Aj * (mi[2] * rij_hat[0] - mi[0]*rij_hat[2]) - (mi[2] * mj[0] - mi[0]*mj[2])) / r**3
+      torque[i,2] += (3*Aj * (mi[0] * rij_hat[1] - mi[1]*rij_hat[0]) - (mi[0] * mj[1] - mi[1]*mj[0])) / r**3
+
+  # Multiply by prefactors
+  force *= 0.75 * vacuum_permeability / np.pi
+  torque *= 0.25 * vacuum_permeability / np.pi 
+
+  # Return 
+  return force, torque
+  
