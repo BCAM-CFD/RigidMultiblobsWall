@@ -9,52 +9,56 @@ scheme                                   stochastic_Slip_Trapz
 # see documentation
 mobility_blobs_implementation            python
 mobility_vector_prod_implementation      numba
+domain                                   single_wall
 
 # Select implementation to compute the blobs-blob interactions
 blob_blob_force_implementation           numba
+body_body_force_torque_implementation    numba
 
 # Set time step, number of steps and save frequency
-dt                                       0.001
-n_steps                                  5000
-n_save                                   100
+dt                                       0.0005
+n_steps                                  2
+n_save                                   1
 initial_step                             0
 
 # Solver params
-solver_tolerance                         1.0e-12
+solver_tolerance                         1.0e-06
 update_PC                                1
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
 eta                                      1e-03
-# g                                        0.003846154
-g                                        2.688426792e-04
-blob_radius                              0.065
+g                                        0.00496293053622327
+blob_radius                              0.2612054951340682
 
 # Stochastic parameters
 # 300 Kelvin * k_B = 0.0041419464 in this units
-kT                                       0 # 0.00414194556
+kT                                       0.0041419464
+seed                                     1
 
 # Set interaction with the wall
-repulsion_strength_wall                  0.006
-debye_length_wall                        0.015
+repulsion_strength_wall                  0.2
+debye_length_wall                        0.02612
 
 # Define implementation to compute the blobs-blob force and pass its arguments
-repulsion_strength                       0.006
-debye_length                             0.015
+repulsion_strength                       0.2
+debye_length                             0.02612
 
 # Magnetic interactions
-# quaternion_B                             0.923879532511287 0  0.38268343236509  0
-quaternion_B                             1 0 0 0 
-mu                                       0  1  0
-B0                                       1.0
-omega                                    6.283184
-# domain                                   no_wall
+quaternion_B                             0.984807753012208 0.17364817766693 0 0
+mu                                       4.798541882470477860e-03 4.798541882470477860e-03 7.344929652784522034e-03
+vacuum_permeability                      1.25663706143592e+06
+B0                                       1e+03
+omega                                    62.8318530717959
+
+# Save stress field
+save_stress_field                        -10 10 4 -10 10 4 1 1 1
 
 # Set output name
-output_name                              data/run9
+output_name                              /mnt/home/fbalboausabiaga/symlinks/ceph/sfw/RigidMultiblobsWall/chiral/data/run
 save_clones                              one_file
 
 
 
-structure Structures/superellipsoid_Lg_1.951_r_3.9_N_960.vertex Structures/superellipsoid.clones
+structure Structures/superellipsoid_Lg_1.368_r_3.9_N_26.vertex Structures/superellipsoid.clones
 
 

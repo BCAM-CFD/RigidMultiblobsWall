@@ -738,6 +738,18 @@ if __name__ == '__main__':
             f.write('invalid_configuration_count    = ' + str(integrator.invalid_configuration_count) + '\n'
                     + 'deterministic_iterations_count = ' + str(integrator.det_iterations_count) + '\n'
                     + 'stochastic_iterations_count    = ' + str(integrator.stoch_iterations_count) + '\n')
+
+      if read.save_stress_field.size > 1:
+        # Save stress
+        r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
+        force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
+        multi_bodies_functions.save_stress_field(read.save_stress_field, 
+                                                 r_vectors_blobs, 
+                                                 force_blobs, 
+                                                 read.blob_radius, 
+                                                 step, 
+                                                 read.save_stress_step, 
+                                                 read.output_name)
         
     # Update HydroGrid
     if (step % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
@@ -830,6 +842,18 @@ if __name__ == '__main__':
         mobility_bodies = np.linalg.pinv(np.dot(K.T, np.dot(resistance_blobs, K)))
         name = output_name + '.body_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_bodies, delimiter='  ')
+
+    if read.save_stress_field.size > 1:
+      # Save stress
+      r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
+      force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
+      multi_bodies_functions.save_stress_field(read.save_stress_field, 
+                                               r_vectors_blobs, 
+                                               force_blobs, 
+                                               read.blob_radius, 
+                                               step, 
+                                               read.save_stress_step, 
+                                               read.output_name)
         
   # Update HydroGrid data
   if ((step+1) % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:

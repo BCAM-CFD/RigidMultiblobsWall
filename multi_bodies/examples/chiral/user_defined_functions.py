@@ -27,6 +27,13 @@ try:
 except ImportError:
   print('numba not found')
 
+# Try to import the visit_writer (boost implementation)
+try:
+  import visit.visit_writer as visit_writer
+except ImportError:
+  pass
+
+
 
 def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   '''
@@ -152,3 +159,102 @@ def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
   # Return 
   return force, torque
   
+
+@utils.static_var('counter', [])
+@utils.static_var('grid_coor', [])
+@utils.static_var('stress_avg', [])
+@utils.static_var('stress_deviation', [])
+def save_stress_field(grid, r_vectors_blobs, force_blobs, blob_radius, step, save_stress_step, output):
+  if len(save_stress_field.counter) == 0:
+    save_stress_field.counter.append(0)
+    print('Initializing')
+
+    # Prepare grid values
+    grid = np.reshape(grid, (3,3)).T
+    grid_length = grid[1] - grid[0]
+    grid_points = np.array(grid[2], dtype=np.int32)
+    num_points = grid_points[0] * grid_points[1] * grid_points[2]
+
+    # Set grid coordinates
+    dx_grid = grid_length / grid_points
+    grid_x = np.array([grid[0,0] + dx_grid[0] * (x+0.5) for x in range(grid_points[0])])
+    grid_y = np.array([grid[0,1] + dx_grid[1] * (x+0.5) for x in range(grid_points[1])])
+    grid_z = np.array([grid[0,2] + dx_grid[2] * (x+0.5) for x in range(grid_points[2])])
+    # Be aware, x is the fast axis.
+    zz, yy, xx = np.meshgrid(grid_z, grid_y, grid_x, indexing = 'ij')
+    grid_coor = np.zeros((num_points, 3))
+    grid_coor[:,0] = np.reshape(xx, xx.size)
+    grid_coor[:,1] = np.reshape(yy, yy.size)
+    grid_coor[:,2] = np.reshape(zz, zz.size)
+    
+    # Create stress 
+    stress_avg = np.zeros((num_points, 9))
+    stress_deviation = np.zeros((num_points, 9))
+
+    save_stress_field.grid_coor = grid_coor
+    save_stress_field.stress_avg = stress_avg
+    save_stress_field.stress_deviation = stress_deviation
+  
+  # Get stored variables
+  num_points = save_stress_field.grid_coor.size // 3
+  counter = save_stress_field.counter[0]
+  stress_avg = save_stress_field.stress_avg
+  stress_deviation = save_stress_field.stress_deviation
+
+  # Compute stress field
+  stress_field = np.random.randn(num_points, 9)
+
+  # Save stress
+  save_stress_field.stress_deviation += counter * (stress_field - stress_avg)**2 / (counter + 1)
+  save_stress_field.stress_avg += (stress_field - stress_avg) / (counter + 1)
+  print('save_stress_field = ', save_stress_field.counter[0], save_stress_field.stress_avg[0])
+
+  # Update counter
+  save_stress_field.counter[0] = save_stress_field.counter[0] + 1 
+
+  # Save stress tensor to vtk fields
+  if step % save_stress_step == 0:
+    # Compute stress variance
+    stress_variance = save_stress_field.stress_deviation / np.maximum(1.0, (save_stress_field.counter[0] - 1))
+
+    # Prepara data for VTK writer 
+    variables = [np.reshape(save_stress_field.stress_avg, save_stress_field.stress_avg.size), np.reshape(stress_variance, stress_variance.size)] 
+    dims = np.array([grid_points[0]+1, grid_points[1]+1, grid_points[2]+1], dtype=np.int32) 
+    nvars = 2
+    vardims = np.array([9,9])
+    centering = np.array([0])
+    varnames = ['stress\0', 'stress_variance\0']
+    name = output + '.stress_field.vtk'
+
+    # Prepare grid values
+    grid = np.reshape(grid, (3,3)).T
+    grid_length = grid[1] - grid[0]
+    grid_points = np.array(grid[2], dtype=np.int32)
+    # Set grid coordinates
+    dx_grid = grid_length / grid_points
+    grid_x = np.array([grid[0,0] + dx_grid[0] * (x+0.5) for x in range(grid_points[0])])
+    grid_y = np.array([grid[0,1] + dx_grid[1] * (x+0.5) for x in range(grid_points[1])])
+    grid_z = np.array([grid[0,2] + dx_grid[2] * (x+0.5) for x in range(grid_points[2])])
+    grid_x = grid_x - dx_grid[0] * 0.5
+    grid_y = grid_y - dx_grid[1] * 0.5
+    grid_z = grid_z - dx_grid[2] * 0.5
+    grid_x = np.concatenate([grid_x, [grid[1,0]]])
+    grid_y = np.concatenate([grid_y, [grid[1,1]]])
+    grid_z = np.concatenate([grid_z, [grid[1,2]]])
+
+    # Write velocity field
+    visit_writer.boost_write_rectilinear_mesh(name,      # File's name
+                                              0,         # 0=ASCII,  1=Binary
+                                              dims,      # {mx, my, mz}
+                                              grid_x,    # xmesh
+                                              grid_y,    # ymesh
+                                              grid_z,    # zmesh
+                                              nvars,     # Number of variables
+                                              vardims,   # Size of each variable, 1=scalar, velocity=3*scalars
+                                              centering, # Write to cell centers of corners
+                                              varnames,  # Variables' names
+                                              variables) # Variables
+    
+
+  return 
+multi_bodies_functions.save_stress_field = save_stress_field
