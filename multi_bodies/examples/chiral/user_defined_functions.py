@@ -164,13 +164,13 @@ def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
 @utils.static_var('grid_coor', [])
 @utils.static_var('stress_avg', [])
 @utils.static_var('stress_deviation', [])
-def save_stress_field(grid, r_vectors_blobs, force_blobs, blob_radius, step, save_stress_step, output):
+def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, save_stress_step, output):
   if len(save_stress_field.counter) == 0:
     save_stress_field.counter.append(0)
     print('Initializing')
 
     # Prepare grid values
-    grid = np.reshape(grid, (3,3)).T
+    grid = np.reshape(mesh, (3,3)).T
     grid_length = grid[1] - grid[0]
     grid_points = np.array(grid[2], dtype=np.int32)
     num_points = grid_points[0] * grid_points[1] * grid_points[2]
@@ -214,20 +214,14 @@ def save_stress_field(grid, r_vectors_blobs, force_blobs, blob_radius, step, sav
 
   # Save stress tensor to vtk fields
   if step % save_stress_step == 0:
-    # Compute stress variance
+    # Get stress and Compute stress variance
+    stress_field = save_stress_field.stress_avg
     stress_variance = save_stress_field.stress_deviation / np.maximum(1.0, (save_stress_field.counter[0] - 1))
 
-    # Prepara data for VTK writer 
-    variables = [np.reshape(save_stress_field.stress_avg, save_stress_field.stress_avg.size), np.reshape(stress_variance, stress_variance.size)] 
-    dims = np.array([grid_points[0]+1, grid_points[1]+1, grid_points[2]+1], dtype=np.int32) 
-    nvars = 2
-    vardims = np.array([9,9])
-    centering = np.array([0])
-    varnames = ['stress\0', 'stress_variance\0']
-    name = output + '.stress_field.vtk'
-
+    print('stress_field.shape = ', stress_field.shape)
+    
     # Prepare grid values
-    grid = np.reshape(grid, (3,3)).T
+    grid = np.reshape(mesh, (3,3)).T
     grid_length = grid[1] - grid[0]
     grid_points = np.array(grid[2], dtype=np.int32)
     # Set grid coordinates
@@ -242,6 +236,20 @@ def save_stress_field(grid, r_vectors_blobs, force_blobs, blob_radius, step, sav
     grid_y = np.concatenate([grid_y, [grid[1,1]]])
     grid_z = np.concatenate([grid_z, [grid[1,2]]])
 
+    # Prepara data for VTK writer 
+    # variables = [np.reshape(save_stress_field.stress_avg, save_stress_field.stress_avg.size), np.reshape(stress_variance, stress_variance.size)]
+    variables = [stress_avg[:,0], stress_avg[:,1]]
+    dims = np.array([grid_points[0]+1, grid_points[1]+1, grid_points[2]+1], dtype=np.int32) 
+    nvars = 2
+    vardims = np.array([1,1])
+    centering = np.array([0,0])
+    varnames = ['stress_XX\0', 'stress_XY\0']
+    name = output + '.stress_field.vtk'
+
+    print('dims    === ', dims)
+    print('vardims === ', vardims)
+    
+
     # Write velocity field
     visit_writer.boost_write_rectilinear_mesh(name,      # File's name
                                               0,         # 0=ASCII,  1=Binary
@@ -255,6 +263,6 @@ def save_stress_field(grid, r_vectors_blobs, force_blobs, blob_radius, step, sav
                                               varnames,  # Variables' names
                                               variables) # Variables
     
-
+    print('***********************************************************\n\n')
   return 
 multi_bodies_functions.save_stress_field = save_stress_field

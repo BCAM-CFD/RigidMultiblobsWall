@@ -60,6 +60,7 @@ class QuaternionIntegrator(object):
     self.mobility_vector_prod = None    
     if tolerance is not None:
       self.tolerance = tolerance
+    self.blobs_lambda = None
     return 
 
   def advance_time_step(self, dt, *args, **kwargs):
@@ -891,8 +892,10 @@ class QuaternionIntegrator(object):
 
       # Extract velocities
       velocities_2 = np.reshape(sol_precond_cor[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
-
       velocities_new = 0.5 * (velocities_1 + velocities_2)
+
+      # Save constraint forces to calculate stress
+      self.blobs_lambda = sol_precond_cor[0:3*self.Nblobs]
 
       # Update location orientation 
       for k, b in enumerate(self.bodies):

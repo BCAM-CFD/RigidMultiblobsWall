@@ -742,14 +742,16 @@ if __name__ == '__main__':
       if read.save_stress_field.size > 1:
         # Save stress
         r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
-        force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
-        multi_bodies_functions.save_stress_field(read.save_stress_field, 
-                                                 r_vectors_blobs, 
-                                                 force_blobs, 
-                                                 read.blob_radius, 
-                                                 step, 
-                                                 read.save_stress_step, 
-                                                 read.output_name)
+        # force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
+        force_blobs = integrator.blobs_lambda
+        if force_blobs is not None:
+          multi_bodies_functions.save_stress_field(read.save_stress_field, 
+                                                   r_vectors_blobs, 
+                                                   force_blobs, 
+                                                   read.blob_radius, 
+                                                   step, 
+                                                   read.save_stress_step, 
+                                                   read.output_name)
         
     # Update HydroGrid
     if (step % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
@@ -846,14 +848,16 @@ if __name__ == '__main__':
     if read.save_stress_field.size > 1:
       # Save stress
       r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
-      force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
-      multi_bodies_functions.save_stress_field(read.save_stress_field, 
-                                               r_vectors_blobs, 
-                                               force_blobs, 
-                                               read.blob_radius, 
-                                               step, 
-                                               read.save_stress_step, 
-                                               read.output_name)
+      # force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
+      force_blobs = integrator.blobs_lambda
+      if force_blobs is not None:
+        multi_bodies_functions.save_stress_field(read.save_stress_field, 
+                                                 r_vectors_blobs, 
+                                                 force_blobs, 
+                                                 read.blob_radius, 
+                                                 step, 
+                                                 read.save_stress_step, 
+                                                 read.output_name)
         
   # Update HydroGrid data
   if ((step+1) % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
