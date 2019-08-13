@@ -19,6 +19,9 @@ and it defines the new slip function slip_extensile_rod,
 see below.
 '''
 from __future__ import division, print_function
+import numpy as np
+import scipy.special as scsp
+import math
 import multi_bodies_functions
 from multi_bodies_functions import *
 # Try to import numba
@@ -165,6 +168,9 @@ def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
 @utils.static_var('stress_avg', [])
 @utils.static_var('stress_deviation', [])
 def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, save_stress_step, output):
+  '''
+  Save stress field and its variance to VTK files.
+  '''
   if len(save_stress_field.counter) == 0:
     save_stress_field.counter.append(0)
     print('Initializing')
@@ -202,20 +208,21 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
   stress_deviation = save_stress_field.stress_deviation
 
   # Compute stress field
-  stress_field = np.random.randn(num_points, 9)
+  # stress_field = np.random.randn(num_points, 9)
+  print('force_blobs = \n', force_blobs)
+  stress_field = calc_stress_tensor(r_vectors_blobs, save_stress_field.grid_coor, force_blobs, blob_radius)
+  print('stress_field = ', np.linalg.norm(stress_field))
 
   # Save stress
   save_stress_field.stress_deviation += counter * (stress_field - stress_avg)**2 / (counter + 1)
   save_stress_field.stress_avg += (stress_field - stress_avg) / (counter + 1)
-  # print('save_stress_field = ', save_stress_field.counter[0], save_stress_field.stress_avg[0])
 
   # Update counter
   save_stress_field.counter[0] = save_stress_field.counter[0] + 1 
 
   # Save stress tensor to vtk fields
   if step % save_stress_step == 0:
-    # Get stress and Compute stress variance
-    stress_field = save_stress_field.stress_avg
+    # Compute stress variance
     stress_variance = save_stress_field.stress_deviation / np.maximum(1.0, (save_stress_field.counter[0] - 1))
     
     # Prepare grid values
@@ -236,12 +243,12 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
     grid_z = np.concatenate([grid_z, [grid[1,2]]])
 
     # Prepara data for VTK writer 
-    variables = [stress_avg[:,0], stress_avg[:,1], stress_avg[:,2], stress_avg[:,3], stress_avg[:,4], stress_avg[:,5], stress_avg[:,6], stress_avg[:,7], stress_avg[:,8]]
+    variables = [stress_avg[:,0], stress_avg[:,1], stress_avg[:,2], stress_avg[:,3], stress_avg[:,4], stress_avg[:,5], stress_avg[:,6], stress_avg[:,7], stress_avg[:,8], stress_variance[:,0], stress_variance[:,1], stress_variance[:,2], stress_variance[:,3], stress_variance[:,4], stress_variance[:,5], stress_variance[:,6], stress_variance[:,7], stress_variance[:,8]]
     dims = np.array([grid_points[0]+1, grid_points[1]+1, grid_points[2]+1], dtype=np.int32) 
-    nvars = 9
-    vardims =   np.array([1,1,1,1,1,1,1,1,1], dtype=np.int32)
-    centering = np.array([0,0,0,0,0,0,0,0,0], dtype=np.int32)
-    varnames = ['stress_XX\0', 'stress_XY\0', 'stress_XZ\0', 'stress_YX\0', 'stress_YY\0', 'stress_YZ\0', 'stress_ZX\0', 'stress_ZY\0', 'stress_ZZ\0']
+    nvars = 18
+    vardims =   np.array([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], dtype=np.int32)
+    centering = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int32)
+    varnames = ['stress_XX\0', 'stress_XY\0', 'stress_XZ\0', 'stress_YX\0', 'stress_YY\0', 'stress_YZ\0', 'stress_ZX\0', 'stress_ZY\0', 'stress_ZZ\0', 'stress_variance_XX\0', 'stress_variance_XY\0', 'stress_variance_XZ\0', 'stress_variance_YX\0', 'stress_variance_YY\0', 'stress_variance_YZ\0', 'stress_variance_ZX\0', 'stress_variance_ZY\0', 'stress_variance_ZZ\0']
     name = output + '.stress_field.vtk'
 
     # Write velocity field
@@ -256,7 +263,89 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
                                               centering, # Write to cell centers of corners
                                               varnames,  # Variables' names
                                               variables) # Variables
-    
+   
     print('***********************************************************\n\n')
   return 
 multi_bodies_functions.save_stress_field = save_stress_field
+
+
+
+@njit(parallel=True, fastmath=True)
+def calc_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius):
+  '''
+  Compute stress like 
+
+  stress = (I(r) - beta * I(infinity)) / r**3 * (f \tensor_product r_vec)
+
+  with
+  r_vec = displacement vector from blob to node
+  I(r) = integral_0^{r} y**2 S(y) dy
+
+  where S(y) is the kernel. We assume that it is a Gaussian
+  S(y) = exp(-y**2 / (2*sigma**2)) / (2*pi*sigma**2)**1.5
+
+  sigma = blob_radius / sqrt(pi)
+
+  beta = 1 or 0 to make the stress calculation local or not.  
+  '''
+  # Variables
+  beta = 0
+  sigma = blob_radius / np.sqrt(np.pi)
+  Nblobs = r_vectors.size // 3
+  Nnodes = r_grid.size // 3
+  force_blobs = force_blobs.reshape((Nblobs, 3))
+  stress = np.zeros((Nnodes, 9))
+  factor_1 = 0.25 / np.pi
+  factor_2 = 1.0 / (np.sqrt(2.0) * sigma)
+  factor_3 = 1.0 / (np.power(2*np.pi, 1.5) * sigma)
+  factor_4 = 1.0 / (2.0 * sigma**2)
+  r = sigma * 100
+  I_inf = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
+  
+  rx_blobs = np.copy(r_vectors[:,0])
+  ry_blobs = np.copy(r_vectors[:,1])
+  rz_blobs = np.copy(r_vectors[:,2])
+  rx_grid = np.copy(r_grid[:,0])
+  ry_grid = np.copy(r_grid[:,1])
+  rz_grid = np.copy(r_grid[:,2])
+
+  for i in prange(Nnodes):
+    rxi = rx_grid[i]
+    ryi = ry_grid[i]
+    rzi = rz_grid[i]
+    for j in range(Nblobs):
+      # Compute displacement vector and distance
+      rx = rxi - rx_blobs[j]
+      ry = ryi - ry_blobs[j] 
+      rz = rzi - rz_blobs[j]
+      r2 = rx*rx + ry*ry + rz*rz
+      r = np.sqrt(r2)
+      if r == 0:
+        continue
+      
+      # Compute kernel integral
+      I = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
+      
+      # Compute stress
+      factor_5 = (I - beta * I_inf) / r**3
+
+      if r < 0.5:
+        print('r = ', r, I, I - I_inf, factor_5 * force_blobs[j,0] * rx)
+
+
+      # print(factor_5)
+      stress[i,0] += factor_5 * force_blobs[j,0] * rx
+      stress[i,1] += factor_5 * force_blobs[j,0] * ry
+      stress[i,2] += factor_5 * force_blobs[j,0] * rz
+      stress[i,3] += factor_5 * force_blobs[j,1] * rx
+      stress[i,4] += factor_5 * force_blobs[j,1] * ry
+      stress[i,5] += factor_5 * force_blobs[j,1] * rz
+      stress[i,6] += factor_5 * force_blobs[j,2] * rx
+      stress[i,7] += factor_5 * force_blobs[j,2] * ry
+      stress[i,8] += factor_5 * force_blobs[j,2] * rz
+    
+  return stress
+
+
+
+
