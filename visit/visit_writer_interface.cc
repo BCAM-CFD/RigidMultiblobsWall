@@ -31,28 +31,32 @@ void visitWriterInterface(std::string name,
   int *vardims_array = reinterpret_cast<int *>(vardims.get_data());
   int *centering_array = reinterpret_cast<int *>(centering.get_data());
 
-  std::string varnames_array[1];
-  varnames_array[0] = bp::extract<std::string>(varnames[0]);
-  int sizeNameVelocity = varnames_array[0].size();
-  char nameVelocity[sizeNameVelocity]; 
-  varnames_array[0].copy(nameVelocity, sizeNameVelocity);
-  char **varnames_char = new char* [1];
-  varnames_char[0] = &nameVelocity[0];
+  // Copy names
+  std::string varnames_array[nvars_array[0]];
+  char **varnames_char = new char* [nvars_array[0]];
+  char nameVar[nvars_array[0]][50]; 
+  for(int i=0; i<nvars_array[0]; i++){
+    varnames_array[i] = bp::extract<std::string>(varnames[i]);
+    int sizeName = varnames_array[i].size();
+    varnames_array[i].copy(nameVar[i], sizeName);
+    varnames_char[i] = &nameVar[i][0];
+  }
 
-  np::ndarray variables_velocity = bp::extract<np::ndarray>(variables[0]);
-  double *velocity = reinterpret_cast<double *>(variables_velocity.get_data());
-
+  // Copy variables
   double **vars;
-  vars = new double* [1];
-  vars[0] = velocity;
-  
+  vars = new double* [nvars_array[0]];
+  for(int i=0; i<nvars_array[0]; i++){
+    np::ndarray variables_i = bp::extract<np::ndarray>(variables[i]);
+    vars[i] = reinterpret_cast<double *>(variables_i.get_data());
+  }
+
+  // Copy mesh
   double* xmesh = reinterpret_cast<double *>(x.get_data());
   double* ymesh = reinterpret_cast<double *>(y.get_data());
   double* zmesh = reinterpret_cast<double *>(z.get_data());
-    
-
+  
   // Print variables
-  if(1){
+  if(0){
     std::cout << std::endl << "visitWriterInterface " << std::endl;
     std::cout << "name: " << name << std::endl;
     std::cout << "format: " << format_array[0] << std::endl;
@@ -67,12 +71,12 @@ void visitWriterInterface(std::string name,
   // Call visit_writer
   /*Use visit_writer to write a regular mesh with data. */
   write_rectilinear_mesh(name.c_str(),    // Output file
-                         format_array[0],          // 0=ASCII,  1=Binary
+                         format_array[0], // 0=ASCII,  1=Binary
                          dims_array,      // {mx, my, mz}
                          xmesh,           
                          ymesh,
                          zmesh,
-                         nvars_array[0],           // number of variables
+                         nvars_array[0],  // number of variables
                          vardims_array,   // Size of each variable, 1=scalar, velocity=3*scalars
                          centering_array,  
                          varnames_char,   

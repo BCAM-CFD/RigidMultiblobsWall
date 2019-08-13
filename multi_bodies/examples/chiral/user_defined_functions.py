@@ -207,7 +207,7 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
   # Save stress
   save_stress_field.stress_deviation += counter * (stress_field - stress_avg)**2 / (counter + 1)
   save_stress_field.stress_avg += (stress_field - stress_avg) / (counter + 1)
-  print('save_stress_field = ', save_stress_field.counter[0], save_stress_field.stress_avg[0])
+  # print('save_stress_field = ', save_stress_field.counter[0], save_stress_field.stress_avg[0])
 
   # Update counter
   save_stress_field.counter[0] = save_stress_field.counter[0] + 1 
@@ -217,13 +217,12 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
     # Get stress and Compute stress variance
     stress_field = save_stress_field.stress_avg
     stress_variance = save_stress_field.stress_deviation / np.maximum(1.0, (save_stress_field.counter[0] - 1))
-
-    print('stress_field.shape = ', stress_field.shape)
     
     # Prepare grid values
     grid = np.reshape(mesh, (3,3)).T
     grid_length = grid[1] - grid[0]
     grid_points = np.array(grid[2], dtype=np.int32)
+
     # Set grid coordinates
     dx_grid = grid_length / grid_points
     grid_x = np.array([grid[0,0] + dx_grid[0] * (x+0.5) for x in range(grid_points[0])])
@@ -237,18 +236,13 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
     grid_z = np.concatenate([grid_z, [grid[1,2]]])
 
     # Prepara data for VTK writer 
-    # variables = [np.reshape(save_stress_field.stress_avg, save_stress_field.stress_avg.size), np.reshape(stress_variance, stress_variance.size)]
-    variables = [stress_avg[:,0], stress_avg[:,1]]
+    variables = [stress_avg[:,0], stress_avg[:,1], stress_avg[:,2], stress_avg[:,3], stress_avg[:,4], stress_avg[:,5], stress_avg[:,6], stress_avg[:,7], stress_avg[:,8]]
     dims = np.array([grid_points[0]+1, grid_points[1]+1, grid_points[2]+1], dtype=np.int32) 
-    nvars = 2
-    vardims = np.array([1,1])
-    centering = np.array([0,0])
-    varnames = ['stress_XX\0', 'stress_XY\0']
+    nvars = 9
+    vardims =   np.array([1,1,1,1,1,1,1,1,1], dtype=np.int32)
+    centering = np.array([0,0,0,0,0,0,0,0,0], dtype=np.int32)
+    varnames = ['stress_XX\0', 'stress_XY\0', 'stress_XZ\0', 'stress_YX\0', 'stress_YY\0', 'stress_YZ\0', 'stress_ZX\0', 'stress_ZY\0', 'stress_ZZ\0']
     name = output + '.stress_field.vtk'
-
-    print('dims    === ', dims)
-    print('vardims === ', vardims)
-    
 
     # Write velocity field
     visit_writer.boost_write_rectilinear_mesh(name,      # File's name

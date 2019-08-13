@@ -742,7 +742,6 @@ if __name__ == '__main__':
       if read.save_stress_field.size > 1:
         # Save stress
         r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
-        # force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
         force_blobs = integrator.blobs_lambda
         if force_blobs is not None:
           multi_bodies_functions.save_stress_field(read.save_stress_field, 
@@ -848,14 +847,13 @@ if __name__ == '__main__':
     if read.save_stress_field.size > 1:
       # Save stress
       r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
-      # force_torque, force_blobs = integrator.force_torque_calculator(bodies, r_vectors_blobs, step = step, dt = dt)
       force_blobs = integrator.blobs_lambda
       if force_blobs is not None:
         multi_bodies_functions.save_stress_field(read.save_stress_field, 
                                                  r_vectors_blobs, 
                                                  force_blobs, 
                                                  read.blob_radius, 
-                                                 step, 
+                                                 step+1, 
                                                  read.save_stress_step, 
                                                  read.output_name)
         
