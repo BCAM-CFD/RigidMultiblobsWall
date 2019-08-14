@@ -750,6 +750,7 @@ if __name__ == '__main__':
                                                    read.blob_radius, 
                                                    step, 
                                                    read.save_stress_step, 
+                                                   read.save_stress_inf,
                                                    read.output_name)
         
     # Update HydroGrid
@@ -855,6 +856,7 @@ if __name__ == '__main__':
                                                  read.blob_radius, 
                                                  step+1, 
                                                  read.save_stress_step, 
+                                                 read.save_stress_inf,
                                                  read.output_name)
         
   # Update HydroGrid data

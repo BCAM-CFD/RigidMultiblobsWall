@@ -167,7 +167,7 @@ def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
 @utils.static_var('grid_coor', [])
 @utils.static_var('stress_avg', [])
 @utils.static_var('stress_deviation', [])
-def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, save_stress_step, output):
+def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, save_stress_step, save_stress_inf, output):
   '''
   Save stress field and its variance to VTK files.
   '''
@@ -209,7 +209,7 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
 
   # Compute stress field
   # stress_field = np.random.randn(num_points, 9)
-  stress_field = calc_stress_tensor(r_vectors_blobs, save_stress_field.grid_coor, force_blobs, blob_radius)
+  stress_field = calc_stress_tensor(r_vectors_blobs, save_stress_field.grid_coor, force_blobs, blob_radius, save_stress_inf)
   
   # Save stress
   save_stress_field.stress_deviation += counter * (stress_field - stress_avg)**2 / (counter + 1)
@@ -269,7 +269,7 @@ multi_bodies_functions.save_stress_field = save_stress_field
 
 
 @njit(parallel=True, fastmath=True)
-def calc_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius):
+def calc_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius, beta):
   '''
   Compute stress like 
 
@@ -287,7 +287,9 @@ def calc_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius):
   beta = 1 or 0 to make the stress calculation local or not.  
   '''
   # Variables
-  beta = 0
+  Lx = 0
+  Ly = 0 
+  Lz = 0
   sigma = blob_radius / np.sqrt(np.pi)
   Nblobs = r_vectors.size // 3
   Nnodes = r_grid.size // 3
@@ -316,6 +318,16 @@ def calc_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius):
       rx = rxi - rx_blobs[j]
       ry = ryi - ry_blobs[j] 
       rz = rzi - rz_blobs[j]
+
+      # Compute displacement with PBC
+      if Lx > 0:
+        rx = rx - int(rx / Lx + 0.5 * (int(rx>0) - int(rx<0))) * Lx
+      if Ly > 0:
+        ry = ry - int(ry / Ly + 0.5 * (int(ry>0) - int(ry<0))) * Ly
+      if Lz > 0:
+        rz = rz - int(rz / Lz + 0.5 * (int(rz>0) - int(rz<0))) * Lz
+
+      # Compute distance
       r2 = rx*rx + ry*ry + rz*rz
       r = np.sqrt(r2)
       if r == 0:
