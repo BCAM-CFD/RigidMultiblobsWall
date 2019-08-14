@@ -209,10 +209,8 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
 
   # Compute stress field
   # stress_field = np.random.randn(num_points, 9)
-  print('force_blobs = \n', force_blobs)
   stress_field = calc_stress_tensor(r_vectors_blobs, save_stress_field.grid_coor, force_blobs, blob_radius)
-  print('stress_field = ', np.linalg.norm(stress_field))
-
+  
   # Save stress
   save_stress_field.stress_deviation += counter * (stress_field - stress_avg)**2 / (counter + 1)
   save_stress_field.stress_avg += (stress_field - stress_avg) / (counter + 1)
@@ -243,7 +241,7 @@ def save_stress_field(mesh, r_vectors_blobs, force_blobs, blob_radius, step, sav
     grid_z = np.concatenate([grid_z, [grid[1,2]]])
 
     # Prepara data for VTK writer 
-    variables = [stress_avg[:,0], stress_avg[:,1], stress_avg[:,2], stress_avg[:,3], stress_avg[:,4], stress_avg[:,5], stress_avg[:,6], stress_avg[:,7], stress_avg[:,8], stress_variance[:,0], stress_variance[:,1], stress_variance[:,2], stress_variance[:,3], stress_variance[:,4], stress_variance[:,5], stress_variance[:,6], stress_variance[:,7], stress_variance[:,8]]
+    variables = [np.copy(stress_avg[:,0]), np.copy(stress_avg[:,1]), np.copy(stress_avg[:,2]), np.copy(stress_avg[:,3]), np.copy(stress_avg[:,4]), np.copy(stress_avg[:,5]), np.copy(stress_avg[:,6]), np.copy(stress_avg[:,7]), np.copy(stress_avg[:,8]), np.copy(stress_variance[:,0]), np.copy(stress_variance[:,1]), np.copy(stress_variance[:,2]), np.copy(stress_variance[:,3]), np.copy(stress_variance[:,4]), np.copy(stress_variance[:,5]), np.copy(stress_variance[:,6]), np.copy(stress_variance[:,7]), np.copy(stress_variance[:,8])]
     dims = np.array([grid_points[0]+1, grid_points[1]+1, grid_points[2]+1], dtype=np.int32) 
     nvars = 18
     vardims =   np.array([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], dtype=np.int32)
@@ -328,10 +326,6 @@ def calc_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius):
       
       # Compute stress
       factor_5 = (I - beta * I_inf) / r**3
-
-      if r < 0.5:
-        print('r = ', r, I, I - I_inf, factor_5 * force_blobs[j,0] * rx)
-
 
       # print(factor_5)
       stress[i,0] += factor_5 * force_blobs[j,0] * rx
