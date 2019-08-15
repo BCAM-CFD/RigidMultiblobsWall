@@ -77,7 +77,10 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 
     # Compute torque
     force_torque[2*k+1] = np.cross(mu_body, B)
-    # force_torque[2*k+1] = mu
+
+    # Add harmonic potential
+    # force_torque[2*k,2] = -0.41419464 * b.location[2]
+
 
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
@@ -145,10 +148,14 @@ def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
       r = np.sqrt(rij[0]*rij[0] + rij[1]*rij[1] + rij[2]*rij[2])
       rij_hat = rij / r
 
+      #if r > 2.4:
+      #  continue
+
       # Compute force
       Ai = np.dot(mi, rij_hat)
       Aj = np.dot(mj, rij_hat)
       force[i] += (mi * Aj + mj * Ai + rij_hat * np.dot(mi,mj) - 5 * rij_hat * Ai * Aj) / r**4
+      # force[i] += -(1e-04 / r**4) * rij_hat
 
       # Compute torque
       torque[i,0] += (3*Aj * (mi[1] * rij_hat[2] - mi[2]*rij_hat[1]) - (mi[1] * mj[2] - mi[2]*mj[1])) / r**3
