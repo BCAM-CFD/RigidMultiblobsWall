@@ -11,12 +11,13 @@ class fields(object):
   '''
 
   '''
-  def __init__(self, grid_options, save_density = False):
+  def __init__(self, grid_options, save_density = False, save_velocity = False):
     '''
     
     '''
     # Save general options
     self.save_density = save_density
+    self.save_velocity = save_velocity
     
     # Save grid options
     grid = np.reshape(grid_options, (3,3)).T
@@ -44,27 +45,37 @@ class fields(object):
     if self.save_density:
       self.density_avg = np.zeros(self.num_points)
       self.density_var = np.zeros(self.num_points)
+    if self.save_velocity:
+      self.velocity_avg = np.zeros((self.num_points,3))
+      self.velocity_var = np.zeros((self.num_points, 3))
+
     
     return
 
 
 
-  def save(self, bodies):
+  def save(self, bodies, v = None):
     '''
 
     '''
     # Get bodies coordinates
     q = np.zeros((len(bodies), 3))
     b_length = np.zeros(len(bodies))
+    if v is None:
+      v = np.zeros_like(q)
 
     for i, b in enumerate(bodies):
       q[i] = np.copy(b.location)
       b_length[i] = b.body_length
       
-    if self.save_density:
-      density = self.compute_density(q, b_length, self.mesh_x, self.mesh_y, self.mesh_z, self.lower_corner, self.length_mesh, self.mesh_points)
-      self.density_avg += (density - self.density_avg) / (self.counter + 1)
-      self.density_var += (density - self.density_avg)**2 * (self.counter / (self.counter+1)) 
+    if self.save_density or save_velocity:
+      density, velocity = self.compute_density_velocity(q, v, b_length, self.mesh_x, self.mesh_y, self.mesh_z, self.lower_corner, self.length_mesh, self.mesh_points)
+      if self.save_density:
+        self.density_avg += (density - self.density_avg) / (self.counter + 1)
+        self.density_var += (density - self.density_avg)**2 * (self.counter / (self.counter+1)) 
+      if self.save_velocity:
+        self.velocity_avg += (velocity - self.velocity_avg) / (self.counter + 1)
+        self.velocity_var += (velocity - self.velocity_avg)**2 * (self.counter / (self.counter+1)) 
       
     self.counter += 1
     return
@@ -78,6 +89,9 @@ class fields(object):
     if save_density:
       self.density_avg[:] = 0
       self.density_var[:] = 0
+    if save_velocity:
+      self.velocity_avg[:] = 0
+      self.velocity_var[:] = 0
     return
 
 
@@ -115,13 +129,35 @@ class fields(object):
                                                 varnames,  # Variables' names
                                                 variables) # Variables
 
+    if self.save_velocity:
+      variables = [np.copy(self.velocity_avg[:,0]), np.copy(self.velocity_avg[:,1]), np.copy(self.velocity_avg[:,2]), np.copy(self.velocity_var[:,0]), np.copy(self.velocity_var[:,1]), np.copy(self.velocity_var[:,2])]
+      dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
+      nvars = 6
+      vardims =   np.array([1,1,1,1,1,1], dtype=np.int32)
+      centering = np.array([0,0,0,0,0,0], dtype=np.int32)
+      varnames = ['velocity_X\0', 'velocity_Y\0', 'velocity_Z\0', 'velocity_variance_X\0', 'velocity_variance_Y\0', 'velocity_variance_Z\0']
+      name = name_output + '.velocity_field.vtk'
+
+      # Write field
+      visit_writer.boost_write_rectilinear_mesh(name,      # File's name
+                                                0,         # 0=ASCII,  1=Binary
+                                                dims,      # {mx, my, mz}
+                                                mesh_x,    # xmesh
+                                                mesh_y,    # ymesh
+                                                mesh_z,    # zmesh
+                                                nvars,     # Number of variables
+                                                vardims,   # Size of each variable, 1=scalar, velocity=3*scalars
+                                                centering, # Write to cell centers of corners
+                                                varnames,  # Variables' names
+                                                variables) # Variables
+
       
     return
 
 
   @staticmethod
   @njit(parallel=True, fastmath=True)
-  def compute_density(q, b_length, mesh_x, mesh_y, mesh_z, lower_corner, length_mesh, mesh_points):
+  def compute_density_velocity(q, v, b_length, mesh_x, mesh_y, mesh_z, lower_corner, length_mesh, mesh_points):
     '''
 
     '''
@@ -132,6 +168,7 @@ class fields(object):
     dy = length_mesh[1] / mesh_points[1]
     dz = length_mesh[2] / mesh_points[2]
     density = np.zeros(M)
+    velocity = np.zeros((M, 3))
 
     # Loop over bodies
     for i in range(N):
@@ -188,4 +225,5 @@ class fields(object):
               if volume_overlap > 0:
                 k = ix + iy * mesh_points[0] + iz * mesh_points[0] * mesh_points[1]
                 density[k] += volume_overlap / volume_body
-    return density
+                velocity[k] += (volume_overlap / volume_body) * v[i]
+    return density, velocity
