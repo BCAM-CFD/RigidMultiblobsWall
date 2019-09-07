@@ -617,4 +617,10 @@ def gmres(A, b, x0=None, tol=1e-05, restart=None, maxiter=None, xtype=None, M=No
   return x, info
 
 
-
+def str_to_bool(s):
+  if s == 'True':
+    return True
+  elif s == 'False':
+    return False
+  else:
+    raise ValueError 

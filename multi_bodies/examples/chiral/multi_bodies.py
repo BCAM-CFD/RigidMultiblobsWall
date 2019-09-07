@@ -33,6 +33,7 @@ while found_functions is False:
     from read_input import read_vertex_file
     from read_input import read_clones_file
     from read_input import read_slip_file
+    from fields import fields
     import general_application_utils as utils
     try:
       import libCallHydroGrid as cc
@@ -673,6 +674,10 @@ if __name__ == '__main__':
       f = open(name, 'w', buffering=buffering)
       f_ID.append(f)
 
+  # Create fields
+  if read.save_density or read.save_velocity or read.save_stress:
+    fields_obj = fields.fields(read.mesh_fields, read.save_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+      
   # Loop over time steps
   start_time = time.time()  
   for step in range(read.initial_step, n_steps):
@@ -739,20 +744,23 @@ if __name__ == '__main__':
                     + 'deterministic_iterations_count = ' + str(integrator.det_iterations_count) + '\n'
                     + 'stochastic_iterations_count    = ' + str(integrator.stoch_iterations_count) + '\n')
 
-      if read.save_stress_field.size > 1:
+      if read.save_density or read.save_velocity or read.save_stress:
         # Save stress
         r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
         force_blobs = integrator.blobs_lambda
-        if force_blobs is not None:
-          multi_bodies_functions.save_stress_field(read.save_stress_field, 
-                                                   r_vectors_blobs, 
-                                                   force_blobs, 
-                                                   read.blob_radius, 
-                                                   step, 
-                                                   read.save_stress_step, 
-                                                   read.save_stress_inf,
-                                                   read.periodic_length,
-                                                   read.output_name)
+        fields_obj.save(bodies, None, r_vectors_blobs, force_blobs)
+        if (step % read.save_fields_step) == 0:
+          fields_obj.print_files(read.output_name)
+        # if force_blobs is not None:
+        #   multi_bodies_functions.save_stress_field(read.save_stress_field, 
+        #                                            r_vectors_blobs, 
+        #                                            force_blobs, 
+        #                                            read.blob_radius, 
+        #                                            step, 
+        #                                            read.save_stress_step, 
+        #                                            read.save_stress_inf,
+        #                                            read.periodic_length,
+        #                                            read.output_name)
         
     # Update HydroGrid
     if (step % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
@@ -846,20 +854,23 @@ if __name__ == '__main__':
         name = output_name + '.body_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_bodies, delimiter='  ')
 
-    if read.save_stress_field.size > 1:
+    if read.save_density or read.save_velocity or read.save_stress:
       # Save stress
       r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs)
       force_blobs = integrator.blobs_lambda
-      if force_blobs is not None:
-        multi_bodies_functions.save_stress_field(read.save_stress_field, 
-                                                 r_vectors_blobs, 
-                                                 force_blobs, 
-                                                 read.blob_radius, 
-                                                 step+1, 
-                                                 read.save_stress_step, 
-                                                 read.save_stress_inf,
-                                                 read.periodic_length,
-                                                 read.output_name)
+      fields_obj.save(bodies, None, r_vectors_blobs, force_blobs)
+      if ((step+1) % read.save_fields_step) == 0:
+        fields_obj.print_files(read.output_name)
+      # if force_blobs is not None:
+      #   multi_bodies_functions.save_stress_field(read.save_stress_field, 
+      #                                            r_vectors_blobs, 
+      #                                            force_blobs, 
+      #                                            read.blob_radius, 
+      #                                            step+1, 
+      #                                            read.save_stress_step, 
+      #                                            read.save_stress_inf,
+      #                                            read.periodic_length,
+      #                                            read.output_name)
         
   # Update HydroGrid data
   if ((step+1) % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:

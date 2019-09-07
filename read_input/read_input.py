@@ -87,9 +87,12 @@ class ReadInput(object):
     self.quaternion_B = np.fromstring(self.options.get('quaternion_B') or '1 0 0 0', sep=' ')
     self.omega_perp = np.fromstring(self.options.get('omega_perp') or '0 0 1', sep=' ')
     self.vacuum_permeability = float(self.options.get('vacuum_permeability') or 0)
-    self.save_stress_field = np.fromstring(self.options.get('save_stress_field') or 'None', sep=' ')
-    self.save_stress_step = int(self.options.get('save_stress_step') or 1)
-    self.save_stress_inf = int(self.options.get('save_stress_inf') or 0)
+    self.save_density = str(self.options.get('save_density') or 'False') == 'True'
+    self.save_velocity = str(self.options.get('save_velocity') or 'False') == 'True'
+    self.save_stress = str(self.options.get('save_stress') or 'False') == 'True'
+    self.mesh_fields = np.fromstring(self.options.get('mesh_fields') or 'None', sep=' ')
+    self.save_fields_step = int(self.options.get('save_fields_step') or 1)
+    self.stress_inf_correction = int(self.options.get('stress_inf_correction') or 0)
           
     # Create list with [vertex_file, clones_file] for each structure
     self.structures = []

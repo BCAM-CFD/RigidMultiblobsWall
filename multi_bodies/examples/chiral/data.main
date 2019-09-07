@@ -7,9 +7,9 @@ scheme                                   stochastic_Slip_Trapz
 # Select implementation to compute M and M*f
 # We recommend to use the C++ implementation which is faster,
 # see documentation
-mobility_blobs_implementation            python
-mobility_vector_prod_implementation      numba
-domain                                   single_wall
+mobility_blobs_implementation            python_no_wall
+mobility_vector_prod_implementation      numba_no_wall
+domain                                   no_wall
 
 # Select implementation to compute the blobs-blob interactions
 blob_blob_force_implementation           numba
@@ -17,9 +17,9 @@ body_body_force_torque_implementation    numba
 
 # Set time step, number of steps and save frequency
 dt                                       0.0005
-n_steps                                  2
-n_save                                   1
-initial_step                             0
+n_steps                                  200
+n_save                                   10
+initial_step                             -10
 
 # Solver params
 solver_tolerance                         1.0e-06
@@ -32,7 +32,7 @@ blob_radius                              0.2612054951340682
 
 # Stochastic parameters
 # 300 Kelvin * k_B = 0.0041419464 in this units
-kT                                       0.0041419464
+kT                                       0
 seed                                     1
 
 # Set interaction with the wall
@@ -44,17 +44,20 @@ repulsion_strength                       0.2
 debye_length                             0.02612
 
 # Magnetic interactions
-quaternion_B                             0.984807753012208 0.17364817766693 0 0
+quaternion_B                             1 0 0 0
 mu                                       4.798541882470477860e-03 4.798541882470477860e-03 7.344929652784522034e-03
 vacuum_permeability                      1.25663706143592e+06
 B0                                       1e+03
 omega                                    62.8318530717959
 
-# Save stress field
-save_stress_field                        -10 10 4 -10 10 4 1 1 1
+# Save fields
+save_density                             True
+save_stress                              True
+save_fields_step                         100
+mesh_fields                              -40 40 20 -40 40 20 1 1 1
 
 # Set output name
-output_name                              /mnt/home/fbalboausabiaga/symlinks/ceph/sfw/RigidMultiblobsWall/chiral/data/run
+output_name                              data/run1
 save_clones                              one_file
 
 

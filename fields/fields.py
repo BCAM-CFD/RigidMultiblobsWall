@@ -82,6 +82,8 @@ class fields(object):
         self.velocity_avg += (velocity - self.velocity_avg) / (self.counter + 1)
         self.velocity_var += (velocity - self.velocity_avg)**2 * (self.counter / (self.counter+1)) 
     if self.save_stress:
+      if force_blobs is None:
+        force_blobs = np.zeros_like(r_vectors_blobs)
       stress = self.compute_stress_tensor(r_vectors_blobs.reshape(r_vectors_blobs.size // 3, 3),
                                           self.mesh_coor,
                                           force_blobs.reshape(force_blobs.size // 3, 3),
@@ -124,7 +126,7 @@ class fields(object):
     mesh_z = np.concatenate([mesh_z, [self.upper_corner[2]]])
     
     if self.save_density:
-      density_variance = self.density_var / np.max(1.0, self.counter - 1)
+      density_variance = self.density_var / max(1.0, self.counter - 1)
       variables = [self.density_avg, density_variance]
       dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
       nvars = 2
