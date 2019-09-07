@@ -1,5 +1,6 @@
 import numpy as np
 from numba import njit, prange
+import math
 # Try to import the visit_writer (boost implementation)
 try:
   import visit.visit_writer as visit_writer
@@ -11,13 +12,16 @@ class fields(object):
   '''
 
   '''
-  def __init__(self, grid_options, save_density = False, save_velocity = False):
+  def __init__(self, grid_options, save_density = False, save_velocity = False, save_stress = False, stress_inf_correction = 0, blob_radius = None):
     '''
     
     '''
     # Save general options
     self.save_density = save_density
     self.save_velocity = save_velocity
+    self.save_stress = save_stress
+    self.stress_inf_correction = stress_inf_correction
+    self.blob_radius = blob_radius
     
     # Save grid options
     grid = np.reshape(grid_options, (3,3)).T
@@ -48,13 +52,14 @@ class fields(object):
     if self.save_velocity:
       self.velocity_avg = np.zeros((self.num_points,3))
       self.velocity_var = np.zeros((self.num_points, 3))
-
-    
+    if self.save_stress:
+      self.stress_avg = np.zeros((self.num_points, 9))
+      self.stress_var = np.zeros((self.num_points, 9))
     return
 
 
 
-  def save(self, bodies, v = None):
+  def save(self, bodies, v = None, r_vectors_blobs = None, force_blobs = None):
     '''
 
     '''
@@ -76,7 +81,15 @@ class fields(object):
       if self.save_velocity:
         self.velocity_avg += (velocity - self.velocity_avg) / (self.counter + 1)
         self.velocity_var += (velocity - self.velocity_avg)**2 * (self.counter / (self.counter+1)) 
-      
+    if self.save_stress:
+      stress = self.compute_stress_tensor(r_vectors_blobs.reshape(r_vectors_blobs.size // 3, 3),
+                                          self.mesh_coor,
+                                          force_blobs.reshape(force_blobs.size // 3, 3),
+                                          self.blob_radius,
+                                          self.stress_inf_correction)
+      self.stress_avg += (stress - self.stress_avg) / (self.counter + 1)
+      self.stress_var += (stress - self.stress_avg)**2 * (self.counter / (self.counter+1)) 
+        
     self.counter += 1
     return
 
@@ -92,6 +105,9 @@ class fields(object):
     if save_velocity:
       self.velocity_avg[:] = 0
       self.velocity_var[:] = 0
+    if save_stress:
+      self.stress_avg[:] = 0
+      self.stress_var[:] = 0
     return
 
 
@@ -108,7 +124,8 @@ class fields(object):
     mesh_z = np.concatenate([mesh_z, [self.upper_corner[2]]])
     
     if self.save_density:
-      variables = [self.density_avg, self.density_var]
+      density_variance = self.density_var / np.max(1.0, self.counter - 1)
+      variables = [self.density_avg, density_variance]
       dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
       nvars = 2
       vardims =   np.array([1,1], dtype=np.int32)
@@ -130,13 +147,14 @@ class fields(object):
                                                 variables) # Variables
 
     if self.save_velocity:
-      variables = [np.copy(self.velocity_avg[:,0]), np.copy(self.velocity_avg[:,1]), np.copy(self.velocity_avg[:,2]), np.copy(self.velocity_var[:,0]), np.copy(self.velocity_var[:,1]), np.copy(self.velocity_var[:,2])]
+      velocity_variance = self.velocity_var / np.max(1.0, self.counter - 1)
+      variables = [np.copy(self.velocity_avg[:,0]), np.copy(self.velocity_avg[:,1]), np.copy(self.velocity_avg[:,2]), np.copy(velocity_variance[:,0]), np.copy(velocity_variance[:,1]), np.copy(velocity_variance[:,2])]
       dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
       nvars = 6
       vardims =   np.array([1,1,1,1,1,1], dtype=np.int32)
       centering = np.array([0,0,0,0,0,0], dtype=np.int32)
       varnames = ['velocity_X\0', 'velocity_Y\0', 'velocity_Z\0', 'velocity_variance_X\0', 'velocity_variance_Y\0', 'velocity_variance_Z\0']
-      name = name_output + '.velocity_field.vtk'
+      name = name_output + '.bodies_velocity_field.vtk'
 
       # Write field
       visit_writer.boost_write_rectilinear_mesh(name,      # File's name
@@ -151,7 +169,28 @@ class fields(object):
                                                 varnames,  # Variables' names
                                                 variables) # Variables
 
-      
+    if self.save_stress:
+      stress_variance = self.stress_var / np.maximum(1.0, (self.counter - 1))
+      variables = [np.copy(self.stress_avg[:,0]), np.copy(self.stress_avg[:,1]), np.copy(self.stress_avg[:,2]), np.copy(self.stress_avg[:,3]), np.copy(self.stress_avg[:,4]), np.copy(self.stress_avg[:,5]), np.copy(self.stress_avg[:,6]), np.copy(self.stress_avg[:,7]), np.copy(self.stress_avg[:,8]), np.copy(stress_variance[:,0]), np.copy(stress_variance[:,1]), np.copy(stress_variance[:,2]), np.copy(stress_variance[:,3]), np.copy(stress_variance[:,4]), np.copy(stress_variance[:,5]), np.copy(stress_variance[:,6]), np.copy(stress_variance[:,7]), np.copy(stress_variance[:,8])]
+      dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
+      nvars = 18
+      vardims =   np.array([1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1], dtype=np.int32)
+      centering = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int32)
+      varnames = ['stress_XX\0', 'stress_XY\0', 'stress_XZ\0', 'stress_YX\0', 'stress_YY\0', 'stress_YZ\0', 'stress_ZX\0', 'stress_ZY\0', 'stress_ZZ\0', 'stress_variance_XX\0', 'stress_variance_XY\0', 'stress_variance_XZ\0', 'stress_variance_YX\0', 'stress_variance_YY\0', 'stress_variance_YZ\0', 'stress_variance_ZX\0', 'stress_variance_ZY\0', 'stress_variance_ZZ\0']
+      name = name_output + '.stress_field.vtk'
+    
+      # Write velocity field
+      visit_writer.boost_write_rectilinear_mesh(name,      # File's name
+                                                0,         # 0=ASCII,  1=Binary
+                                                dims,      # {mx, my, mz}
+                                                mesh_x,    # xmesh
+                                                mesh_y,    # ymesh
+                                                mesh_z,    # zmesh
+                                                nvars,     # Number of variables
+                                                vardims,   # Size of each variable, 1=scalar, velocity=3*scalars
+                                                centering, # Write to cell centers of corners
+                                                varnames,  # Variables' names
+                                                variables) # Variables
     return
 
 
@@ -185,13 +224,13 @@ class fields(object):
         y_body = b_length[i]
       else:
         ky = 0
-        y_body = 0
+        y_body = 1.0
       if mesh_points[2] > 1:
         kz = int((q[i,2] - lower_corner[2]) / dz)
         z_body = b_length[i]
       else:
         kz = 0
-        z_body = b_length[i]
+        z_body = 1.0
       volume_body = x_body * y_body * z_body
 
       # Spread density field in first neighbors' cells
@@ -227,3 +266,75 @@ class fields(object):
                 density[k] += volume_overlap / volume_body
                 velocity[k] += (volume_overlap / volume_body) * v[i]
     return density, velocity
+
+  
+  @staticmethod
+  @njit(parallel=True, fastmath=True)
+  def compute_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius, beta):
+    '''
+    Compute stress like 
+    
+    stress = (I(r) - beta * I(infinity)) / r**3 * (f \tensor_product r_vec)
+    
+    with
+    r_vec = displacement vector from blob to node
+    I(r) = integral_0^{r} y**2 S(y) dy
+    
+    where S(y) is the kernel. We assume that it is a Gaussian
+    S(y) = exp(-y**2 / (2*sigma**2)) / (2*pi*sigma**2)**1.5
+    
+    sigma = blob_radius / sqrt(pi)
+    
+    beta = 1 or 0 to make the stress calculation local or not.  
+    '''
+    # Variables
+    sigma = blob_radius / np.sqrt(np.pi)
+    Nblobs = r_vectors.size // 3
+    Nnodes = r_grid.size // 3
+    force_blobs = force_blobs.reshape((Nblobs, 3))
+    stress = np.zeros((Nnodes, 9))
+    factor_1 = 0.25 / np.pi
+    factor_2 = 1.0 / (np.sqrt(2.0) * sigma)
+    factor_3 = 1.0 / (np.power(2*np.pi, 1.5) * sigma)
+    factor_4 = 1.0 / (2.0 * sigma**2)
+    r = sigma * 100
+    I_inf = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
+  
+    rx_blobs = np.copy(r_vectors[:,0])
+    ry_blobs = np.copy(r_vectors[:,1])
+    rz_blobs = np.copy(r_vectors[:,2])
+    rx_grid = np.copy(r_grid[:,0])
+    ry_grid = np.copy(r_grid[:,1])
+    rz_grid = np.copy(r_grid[:,2])
+
+    for i in prange(Nnodes):
+      rxi = rx_grid[i]
+      ryi = ry_grid[i]
+      rzi = rz_grid[i]
+      for j in range(Nblobs):
+        # Compute displacement vector and distance
+        rx = rxi - rx_blobs[j]
+        ry = ryi - ry_blobs[j] 
+        rz = rzi - rz_blobs[j]
+
+        # Compute distance
+        r2 = rx*rx + ry*ry + rz*rz
+        r = np.sqrt(r2)
+        if r == 0:
+          continue
+      
+        # Compute kernel integral
+        I = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
+      
+        # Compute stress
+        factor_5 = (I - beta * I_inf) / r**3
+        stress[i,0] += factor_5 * force_blobs[j,0] * rx
+        stress[i,1] += factor_5 * force_blobs[j,0] * ry
+        stress[i,2] += factor_5 * force_blobs[j,0] * rz
+        stress[i,3] += factor_5 * force_blobs[j,1] * rx
+        stress[i,4] += factor_5 * force_blobs[j,1] * ry
+        stress[i,5] += factor_5 * force_blobs[j,1] * rz
+        stress[i,6] += factor_5 * force_blobs[j,2] * rx
+        stress[i,7] += factor_5 * force_blobs[j,2] * ry
+        stress[i,8] += factor_5 * force_blobs[j,2] * rz
+    return stress
