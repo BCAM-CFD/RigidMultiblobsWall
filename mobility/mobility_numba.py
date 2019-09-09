@@ -9,7 +9,7 @@ except ImportError:
   print('numba not found')
 
 
-@njit(parallel=True)
+@njit(parallel=True, fastmath=True)
 def no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, L):
   ''' 
   Returns the product of the mobility at the blob level to the force 
