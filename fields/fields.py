@@ -36,6 +36,19 @@ class fields(object):
     self.mesh_x = np.array([grid[0,0] + self.dx_mesh[0] * (x+0.5) for x in range(self.mesh_points[0])])
     self.mesh_y = np.array([grid[0,1] + self.dx_mesh[1] * (x+0.5) for x in range(self.mesh_points[1])])
     self.mesh_z = np.array([grid[0,2] + self.dx_mesh[2] * (x+0.5) for x in range(self.mesh_points[2])])
+    if self.mesh_points[0] > 1:
+      dx = self.dx_mesh[0]
+    else:
+      dx = 1.0
+    if self.mesh_points[1] > 1:
+      dy = self.dx_mesh[1]
+    else:
+      dy = 1.0
+    if self.mesh_points[2] > 1:
+      dz = self.dx_mesh[2]
+    else:
+      dz = 1.0
+    self.volume_cell = dx * dy * dz
 
     # Be aware, x is the fast axis.
     zz, yy, xx = np.meshgrid(self.mesh_z, self.mesh_y, self.mesh_x, indexing = 'ij')
@@ -82,7 +95,8 @@ class fields(object):
                                                         self.mesh_z, 
                                                         self.lower_corner, 
                                                         self.length_mesh, 
-                                                        self.mesh_points)
+                                                        self.mesh_points,
+                                                        self.volume_cell)
 
       if self.save_density:
         self.density_avg += (density - self.density_avg) / (self.counter + 1)
@@ -218,7 +232,7 @@ class fields(object):
 
   @staticmethod
   @njit(parallel=True, fastmath=True)
-  def compute_density_velocity(q, vw, b_length, mesh_x, mesh_y, mesh_z, lower_corner, length_mesh, mesh_points):
+  def compute_density_velocity(q, vw, b_length, mesh_x, mesh_y, mesh_z, lower_corner, length_mesh, mesh_points, volume_cell):
     '''
 
     '''
@@ -285,8 +299,8 @@ class fields(object):
               # Save density
               if volume_overlap > 0:
                 k = ix + iy * mesh_points[0] + iz * mesh_points[0] * mesh_points[1]
-                density[k] += volume_overlap / volume_body
-                velocity[k] += (volume_overlap / volume_body) * vw[i]
+                density[k] += volume_overlap / volume_cell
+                velocity[k] += (volume_overlap / volume_cell) * vw[i]
 
     sel = density > 0
     velocity[sel, 0] = velocity[sel, 0] / density[sel]
