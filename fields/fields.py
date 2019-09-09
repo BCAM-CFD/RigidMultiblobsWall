@@ -50,8 +50,8 @@ class fields(object):
       self.density_avg = np.zeros(self.num_points)
       self.density_var = np.zeros(self.num_points)
     if self.save_velocity:
-      self.velocity_avg = np.zeros((self.num_points,3))
-      self.velocity_var = np.zeros((self.num_points, 3))
+      self.velocity_avg = np.zeros((self.num_points,6))
+      self.velocity_var = np.zeros((self.num_points, 6))
     if self.save_stress:
       self.stress_avg = np.zeros((self.num_points, 9))
       self.stress_var = np.zeros((self.num_points, 9))
@@ -59,22 +59,31 @@ class fields(object):
 
 
 
-  def save(self, bodies, v = None, r_vectors_blobs = None, force_blobs = None):
+  def save(self, bodies, vw = None, r_vectors_blobs = None, force_blobs = None):
     '''
 
     '''
-    # Get bodies coordinates
+    # Get bodies variables
     q = np.zeros((len(bodies), 3))
     b_length = np.zeros(len(bodies))
-    if v is None:
-      v = np.zeros_like(q)
+    if vw is None:
+      vw = np.zeros((len(bodies), 6))
 
     for i, b in enumerate(bodies):
       q[i] = np.copy(b.location)
       b_length[i] = b.body_length
       
     if self.save_density or save_velocity:
-      density, velocity = self.compute_density_velocity(q, v, b_length, self.mesh_x, self.mesh_y, self.mesh_z, self.lower_corner, self.length_mesh, self.mesh_points)
+      density, velocity = self.compute_density_velocity(q, 
+                                                        vw, 
+                                                        b_length, 
+                                                        self.mesh_x, 
+                                                        self.mesh_y, 
+                                                        self.mesh_z, 
+                                                        self.lower_corner, 
+                                                        self.length_mesh, 
+                                                        self.mesh_points)
+
       if self.save_density:
         self.density_avg += (density - self.density_avg) / (self.counter + 1)
         self.density_var += (density - self.density_avg)**2 * (self.counter / (self.counter+1)) 
@@ -149,13 +158,24 @@ class fields(object):
                                                 variables) # Variables
 
     if self.save_velocity:
-      velocity_variance = self.velocity_var / np.max(1.0, self.counter - 1)
-      variables = [np.copy(self.velocity_avg[:,0]), np.copy(self.velocity_avg[:,1]), np.copy(self.velocity_avg[:,2]), np.copy(velocity_variance[:,0]), np.copy(velocity_variance[:,1]), np.copy(velocity_variance[:,2])]
+      velocity_variance = self.velocity_var / max(1.0, self.counter - 1)
+      variables = [np.copy(self.velocity_avg[:,0]), 
+                   np.copy(self.velocity_avg[:,1]), 
+                   np.copy(self.velocity_avg[:,2]), 
+                   np.copy(self.velocity_avg[:,3]), 
+                   np.copy(self.velocity_avg[:,4]), 
+                   np.copy(self.velocity_avg[:,5]), 
+                   np.copy(velocity_variance[:,0]), 
+                   np.copy(velocity_variance[:,1]), 
+                   np.copy(velocity_variance[:,2]), 
+                   np.copy(velocity_variance[:,3]), 
+                   np.copy(velocity_variance[:,4]), 
+                   np.copy(velocity_variance[:,5])]
       dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
-      nvars = 6
-      vardims =   np.array([1,1,1,1,1,1], dtype=np.int32)
-      centering = np.array([0,0,0,0,0,0], dtype=np.int32)
-      varnames = ['velocity_X\0', 'velocity_Y\0', 'velocity_Z\0', 'velocity_variance_X\0', 'velocity_variance_Y\0', 'velocity_variance_Z\0']
+      nvars = 12
+      vardims =   np.array([1,1,1,1,1,1,1,1,1,1,1,1], dtype=np.int32)
+      centering = np.array([0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int32)
+      varnames = ['velocity_X\0', 'velocity_Y\0', 'velocity_Z\0', 'omega_X\0', 'omega_Y\0', 'omega_Z\0', 'velocity_variance_X\0', 'velocity_variance_Y\0', 'velocity_variance_Z\0', 'omega_variance_X\0', 'omega_variance_Y\0', 'omega_variance_Z\0']
       name = name_output + '.bodies_velocity_field.vtk'
 
       # Write field
@@ -172,7 +192,7 @@ class fields(object):
                                                 variables) # Variables
 
     if self.save_stress:
-      stress_variance = self.stress_var / np.maximum(1.0, (self.counter - 1))
+      stress_variance = self.stress_var / max(1.0, self.counter - 1)
       variables = [np.copy(self.stress_avg[:,0]), np.copy(self.stress_avg[:,1]), np.copy(self.stress_avg[:,2]), np.copy(self.stress_avg[:,3]), np.copy(self.stress_avg[:,4]), np.copy(self.stress_avg[:,5]), np.copy(self.stress_avg[:,6]), np.copy(self.stress_avg[:,7]), np.copy(self.stress_avg[:,8]), np.copy(stress_variance[:,0]), np.copy(stress_variance[:,1]), np.copy(stress_variance[:,2]), np.copy(stress_variance[:,3]), np.copy(stress_variance[:,4]), np.copy(stress_variance[:,5]), np.copy(stress_variance[:,6]), np.copy(stress_variance[:,7]), np.copy(stress_variance[:,8])]
       dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
       nvars = 18
@@ -198,7 +218,7 @@ class fields(object):
 
   @staticmethod
   @njit(parallel=True, fastmath=True)
-  def compute_density_velocity(q, v, b_length, mesh_x, mesh_y, mesh_z, lower_corner, length_mesh, mesh_points):
+  def compute_density_velocity(q, vw, b_length, mesh_x, mesh_y, mesh_z, lower_corner, length_mesh, mesh_points):
     '''
 
     '''
@@ -209,7 +229,7 @@ class fields(object):
     dy = length_mesh[1] / mesh_points[1]
     dz = length_mesh[2] / mesh_points[2]
     density = np.zeros(M)
-    velocity = np.zeros((M, 3))
+    velocity = np.zeros((M, 6))
 
     # Loop over bodies
     for i in range(N):
@@ -266,7 +286,15 @@ class fields(object):
               if volume_overlap > 0:
                 k = ix + iy * mesh_points[0] + iz * mesh_points[0] * mesh_points[1]
                 density[k] += volume_overlap / volume_body
-                velocity[k] += (volume_overlap / volume_body) * v[i]
+                velocity[k] += (volume_overlap / volume_body) * vw[i]
+
+    sel = density > 0
+    velocity[sel, 0] = velocity[sel, 0] / density[sel]
+    velocity[sel, 1] = velocity[sel, 1] / density[sel]
+    velocity[sel, 2] = velocity[sel, 2] / density[sel]
+    velocity[sel, 3] = velocity[sel, 3] / density[sel]
+    velocity[sel, 4] = velocity[sel, 4] / density[sel]
+    velocity[sel, 5] = velocity[sel, 5] / density[sel]
     return density, velocity
 
   
