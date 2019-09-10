@@ -675,8 +675,8 @@ if __name__ == '__main__':
       f_ID.append(f)
 
   # Create fields
-  if read.save_density or read.save_velocity or read.save_stress:
-    fields_obj = fields.fields(read.mesh_fields, read.save_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+  if read.save_number_density or read.save_velocity or read.save_stress:
+    fields_obj = fields.fields(read.mesh_fields, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
       
   # Loop over time steps
   start_time = time.time()  
@@ -744,7 +744,7 @@ if __name__ == '__main__':
                     + 'deterministic_iterations_count = ' + str(integrator.det_iterations_count) + '\n'
                     + 'stochastic_iterations_count    = ' + str(integrator.stoch_iterations_count) + '\n')
 
-      if read.save_density or read.save_velocity or read.save_stress:
+      if read.save_number_density or read.save_velocity or read.save_stress:
         # Save stress
         fields_obj.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
         if (step % read.save_fields_step) == 0:
@@ -842,7 +842,7 @@ if __name__ == '__main__':
         name = output_name + '.body_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_bodies, delimiter='  ')
 
-    if read.save_density or read.save_velocity or read.save_stress:
+    if read.save_number_density or read.save_velocity or read.save_stress:
       # Save stress
       fields_obj.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
       if ((step+1) % read.save_fields_step) == 0:

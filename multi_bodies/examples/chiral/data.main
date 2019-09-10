@@ -16,10 +16,10 @@ blob_blob_force_implementation           numba
 body_body_force_torque_implementation    numba
 
 # Set time step, number of steps and save frequency
-dt                                       0.0005
-n_steps                                  200
-n_save                                   10
-initial_step                             -10
+dt                                       1e-10
+n_steps                                  1
+n_save                                   1
+initial_step                             0
 
 # Solver params
 solver_tolerance                         1.0e-06
@@ -27,16 +27,15 @@ update_PC                                1
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
 eta                                      1e-03
-g                                        0.00496293053622327
+g                                        0
 blob_radius                              0.2612054951340682
 
 # Stochastic parameters
 # 300 Kelvin * k_B = 0.0041419464 in this units
-kT                                       0
-seed                                     1
+kT                                       0.0041419464
 
 # Set interaction with the wall
-repulsion_strength_wall                  0.2
+repulsion_strength_wall                  0
 debye_length_wall                        0.02612
 
 # Define implementation to compute the blobs-blob force and pass its arguments
@@ -51,17 +50,20 @@ B0                                       1e+03
 omega                                    62.8318530717959
 
 # Save fields
-save_density                             True
+save_number_density                      True
+save_velocity                            True
 save_stress                              True
-save_fields_step                         100
-mesh_fields                              -40 40 20 -40 40 20 1 1 1
+stress_inf_correction                    0
+save_fields_step                         1
+mesh_fields                              -30 30 20 -30 30 20 1e-10 1e-10 1
+
 
 # Set output name
-output_name                              data/run1
+output_name                              /mnt/home/fbalboausabiaga/symlinks/ceph/sfw/RigidMultiblobsWall/chiral/data/run
 save_clones                              one_file
 
 
 
-structure Structures/superellipsoid_Lg_1.368_r_3.9_N_26.vertex Structures/superellipsoid.clones
+structure Structures/superellipsoid_Lg_1.368_r_3.9_N_26.vertex Structures/superellipsoid_run711.0.0.0.clones
 
 
