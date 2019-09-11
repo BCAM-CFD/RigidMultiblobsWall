@@ -569,6 +569,7 @@ if __name__ == '__main__':
       b = body.Body(struct_locations[i], struct_orientations[i], struct_ref_config, a)
       b.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
       b.ID = structures_ID[ID]
+      b.mu = read.mu
       # Calculate body length for the RFD
       if i == 0:
         b.calc_body_length()

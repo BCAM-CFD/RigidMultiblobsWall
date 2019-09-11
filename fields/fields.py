@@ -63,8 +63,8 @@ class fields(object):
       self.number_density_avg = np.zeros(self.num_points)
       self.number_density_var = np.zeros(self.num_points)
     if self.save_velocity:
-      self.velocity_avg = np.zeros((self.num_points,6))
-      self.velocity_var = np.zeros((self.num_points, 6))
+      self.velocity_avg = np.zeros((self.num_points, 7))
+      self.velocity_var = np.zeros((self.num_points, 7))
     if self.save_stress:
       self.stress_avg = np.zeros((self.num_points, 9))
       self.stress_var = np.zeros((self.num_points, 9))
@@ -80,13 +80,18 @@ class fields(object):
     q = np.zeros((len(bodies), 3))
     b_length = np.zeros(len(bodies))
     if vw is None:
-      vw = np.zeros((len(bodies), 6))
+      vw = np.zeros((len(bodies), 7))
+    else:
+      vwx = np.zeros((len(bodies), 7))
+      vwx[:,0:6] = vw
+      vw = vwx
 
     for i, b in enumerate(bodies):
       q[i] = np.copy(b.location)
-      # b_length[i] = b.body_length 
-      b_length[i] = 1e-03
-      
+      b_length[i] = b.body_length 
+      mu = np.dot(b.orientation.rotation_matrix(), b.mu) / np.linalg.norm(b.mu)
+      vw[i,6] = np.linalg.norm(np.cross(vw[i,3:6], mu))
+
     if self.save_number_density or self.save_velocity:
       number_density, velocity = self.compute_number_density_velocity(q, 
                                                                       vw, 
@@ -100,11 +105,11 @@ class fields(object):
                                                                       self.volume_cell)
 
       if self.save_number_density:
-        self.number_density_avg += (number_density - self.number_density_avg) / (self.counter + 1)
         self.number_density_var += (number_density - self.number_density_avg)**2 * (self.counter / (self.counter+1)) 
+        self.number_density_avg += (number_density - self.number_density_avg) / (self.counter + 1)
       if self.save_velocity:
-        self.velocity_avg += (velocity - self.velocity_avg) / (self.counter + 1)
         self.velocity_var += (velocity - self.velocity_avg)**2 * (self.counter / (self.counter+1)) 
+        self.velocity_avg += (velocity - self.velocity_avg) / (self.counter + 1)
     if self.save_stress:
       if force_blobs is None:
         force_blobs = np.zeros_like(r_vectors_blobs)
@@ -113,8 +118,8 @@ class fields(object):
                                           force_blobs.reshape(force_blobs.size // 3, 3),
                                           self.blob_radius,
                                           self.stress_inf_correction)
-      self.stress_avg += (stress - self.stress_avg) / (self.counter + 1)
       self.stress_var += (stress - self.stress_avg)**2 * (self.counter / (self.counter+1)) 
+      self.stress_avg += (stress - self.stress_avg) / (self.counter + 1)
         
     self.counter += 1
     return
@@ -180,17 +185,19 @@ class fields(object):
                    np.copy(self.velocity_avg[:,3]), 
                    np.copy(self.velocity_avg[:,4]), 
                    np.copy(self.velocity_avg[:,5]), 
+                   np.copy(self.velocity_avg[:,6]), 
                    np.copy(velocity_variance[:,0]), 
                    np.copy(velocity_variance[:,1]), 
                    np.copy(velocity_variance[:,2]), 
                    np.copy(velocity_variance[:,3]), 
                    np.copy(velocity_variance[:,4]), 
-                   np.copy(velocity_variance[:,5])]
+                   np.copy(velocity_variance[:,5]),
+                   np.copy(velocity_variance[:,6])]
       dims = np.array([self.mesh_points[0]+1, self.mesh_points[1]+1, self.mesh_points[2]+1], dtype=np.int32)
-      nvars = 12
-      vardims =   np.array([1,1,1,1,1,1,1,1,1,1,1,1], dtype=np.int32)
-      centering = np.array([0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int32)
-      varnames = ['velocity_X\0', 'velocity_Y\0', 'velocity_Z\0', 'omega_X\0', 'omega_Y\0', 'omega_Z\0', 'velocity_variance_X\0', 'velocity_variance_Y\0', 'velocity_variance_Z\0', 'omega_variance_X\0', 'omega_variance_Y\0', 'omega_variance_Z\0']
+      nvars = 14
+      vardims =   np.array([1,1,1,1,1,1,1,1,1,1,1,1,1,1], dtype=np.int32)
+      centering = np.array([0,0,0,0,0,0,0,0,0,0,0,0,0,0], dtype=np.int32)
+      varnames = ['velocity_X\0', 'velocity_Y\0', 'velocity_Z\0', 'omega_X\0', 'omega_Y\0', 'omega_Z\0', 'omega_eff\0', 'velocity_variance_X\0', 'velocity_variance_Y\0', 'velocity_variance_Z\0', 'omega_variance_X\0', 'omega_variance_Y\0', 'omega_variance_Z\0', 'omega_variance_eff\0']
       name = name_output + '.bodies_velocity_field.vtk'
 
       # Write field
@@ -244,7 +251,7 @@ class fields(object):
     dy = length_mesh[1] / mesh_points[1]
     dz = length_mesh[2] / mesh_points[2]
     number_density = np.zeros(M)
-    velocity = np.zeros((M, 6))
+    velocity = np.zeros((M, 7))
 
     # Loop over bodies
     for i in range(N):
@@ -310,6 +317,7 @@ class fields(object):
     velocity[sel, 3] = velocity[sel, 3] / number_density[sel]
     velocity[sel, 4] = velocity[sel, 4] / number_density[sel]
     velocity[sel, 5] = velocity[sel, 5] / number_density[sel]
+    velocity[sel, 6] = velocity[sel, 6] / number_density[sel]
     return number_density, velocity
 
   
