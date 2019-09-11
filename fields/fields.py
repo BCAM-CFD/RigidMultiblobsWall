@@ -84,9 +84,10 @@ class fields(object):
 
     for i, b in enumerate(bodies):
       q[i] = np.copy(b.location)
-      b_length[i] = b.body_length
+      # b_length[i] = b.body_length 
+      b_length[i] = 1e-03
       
-    if self.save_number_density or save_velocity:
+    if self.save_number_density or self.save_velocity:
       number_density, velocity = self.compute_number_density_velocity(q, 
                                                                       vw, 
                                                                       b_length, 
@@ -124,13 +125,13 @@ class fields(object):
 
     '''
     self.counter = 0
-    if save_number_density:
+    if self.save_number_density:
       self.number_density_avg[:] = 0
       self.number_density_var[:] = 0
-    if save_velocity:
+    if self.save_velocity:
       self.velocity_avg[:] = 0
       self.velocity_var[:] = 0
-    if save_stress:
+    if self.save_stress:
       self.stress_avg[:] = 0
       self.stress_var[:] = 0
     return
