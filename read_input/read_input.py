@@ -93,6 +93,9 @@ class ReadInput(object):
     self.mesh_fields = np.fromstring(self.options.get('mesh_fields') or 'None', sep=' ')
     self.save_fields_step = int(self.options.get('save_fields_step') or 1)
     self.stress_inf_correction = int(self.options.get('stress_inf_correction') or 0)
+    self.mesh_fields_opt1 = np.fromstring(self.options.get('mesh_fields_opt1') or 'None', sep=' ')
+    self.mesh_fields_opt2 = np.fromstring(self.options.get('mesh_fields_opt2') or 'None', sep=' ')
+    self.mesh_fields_opt3 = np.fromstring(self.options.get('mesh_fields_opt3') or 'None', sep=' ')
           
     # Create list with [vertex_file, clones_file] for each structure
     self.structures = []

@@ -678,6 +678,12 @@ if __name__ == '__main__':
   # Create fields
   if read.save_number_density or read.save_velocity or read.save_stress:
     fields_obj = fields.fields(read.mesh_fields, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+    if read.mesh_fields_opt1 is not None:
+      fields_obj_opt1 = fields.fields(read.mesh_fields_opt1, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+    if read.mesh_fields_opt2 is not None:
+      fields_obj_opt2 = fields.fields(read.mesh_fields_opt2, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+    if read.mesh_fields_opt3 is not None:
+      fields_obj_opt3 = fields.fields(read.mesh_fields_opt3, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
       
   # Loop over time steps
   start_time = time.time()  
@@ -748,8 +754,20 @@ if __name__ == '__main__':
       if read.save_number_density or read.save_velocity or read.save_stress:
         # Save stress
         fields_obj.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+        if read.mesh_fields_opt1 is not None:
+          fields_obj_opt1.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+        if read.mesh_fields_opt2 is not None:
+          fields_obj_opt2.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)        
+        if read.mesh_fields_opt3 is not None:
+          fields_obj_opt3.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
         if (step % read.save_fields_step) == 0:
           fields_obj.print_files(read.output_name)
+          if read.mesh_fields_opt1 is not None:
+            fields_obj_opt1.print_files(read.output_name + '.opt1.')
+          if read.mesh_fields_opt2 is not None:
+            fields_obj_opt2.print_files(read.output_name + '.opt2.')
+          if read.mesh_fields_opt3 is not None:
+            fields_obj_opt3.print_files(read.output_name + '.opt3.')
         
     # Update HydroGrid
     if (step % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
@@ -846,8 +864,20 @@ if __name__ == '__main__':
     if read.save_number_density or read.save_velocity or read.save_stress:
       # Save stress
       fields_obj.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+      if read.mesh_fields_opt1 is not None:
+        fields_obj_opt1.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+      if read.mesh_fields_opt2 is not None:
+        fields_obj_opt2.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)        
+      if read.mesh_fields_opt3 is not None:
+        fields_obj_opt3.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
       if ((step+1) % read.save_fields_step) == 0:
         fields_obj.print_files(read.output_name)
+        if read.mesh_fields_opt1 is not None:
+          fields_obj_opt1.print_files(read.output_name + '.opt1.')
+        if read.mesh_fields_opt2 is not None:
+          fields_obj_opt2.print_files(read.output_name + '.opt2.')
+        if read.mesh_fields_opt3 is not None:
+          fields_obj_opt3.print_files(read.output_name + '.opt3.')
         
   # Update HydroGrid data
   if ((step+1) % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
