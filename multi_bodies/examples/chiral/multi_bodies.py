@@ -763,11 +763,11 @@ if __name__ == '__main__':
         if (step % read.save_fields_step) == 0:
           fields_obj.print_files(read.output_name)
           if read.mesh_fields_opt1 is not None:
-            fields_obj_opt1.print_files(read.output_name + '.opt1.')
+            fields_obj_opt1.print_files(read.output_name + '.opt1')
           if read.mesh_fields_opt2 is not None:
-            fields_obj_opt2.print_files(read.output_name + '.opt2.')
+            fields_obj_opt2.print_files(read.output_name + '.opt2')
           if read.mesh_fields_opt3 is not None:
-            fields_obj_opt3.print_files(read.output_name + '.opt3.')
+            fields_obj_opt3.print_files(read.output_name + '.opt3')
         
     # Update HydroGrid
     if (step % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
@@ -873,11 +873,11 @@ if __name__ == '__main__':
       if ((step+1) % read.save_fields_step) == 0:
         fields_obj.print_files(read.output_name)
         if read.mesh_fields_opt1 is not None:
-          fields_obj_opt1.print_files(read.output_name + '.opt1.')
+          fields_obj_opt1.print_files(read.output_name + '.opt1')
         if read.mesh_fields_opt2 is not None:
-          fields_obj_opt2.print_files(read.output_name + '.opt2.')
+          fields_obj_opt2.print_files(read.output_name + '.opt2')
         if read.mesh_fields_opt3 is not None:
-          fields_obj_opt3.print_files(read.output_name + '.opt3.')
+          fields_obj_opt3.print_files(read.output_name + '.opt3')
         
   # Update HydroGrid data
   if ((step+1) % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
