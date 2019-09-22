@@ -44,6 +44,12 @@ try:
   import mobility_fmm as fmm
 except ImportError:
   pass
+# Try to import stkfmm library
+try:
+  import stkfmm 
+except ImportError:
+  pass
+
 
 def shift_heights(r_vectors, blob_radius, *args, **kwargs):
   '''
@@ -1349,4 +1355,55 @@ def single_wall_mobility_rot_times_torque_numba(r_vectors, torque, eta, a, *args
   return rot
 
 
+def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, **kwargs):
+  ''' 
+  Returns the product of the mobility at the blob level to the force 
+  on the blobs. Mobility for particles in an unbounded domain, it uses
+  the standard RPY tensor.
+  
+  This function uses the stkfmm library.
+  '''
+  # Get fmm
+  fmm_PVelLaplacian = kwargs.get('fmm_PVelLaplacian')
+  set_tree = kwargs.get('set_tree')
+  N = r_vectors.size // 3
 
+  # Set tree if necessary
+  if set_tree:
+    x_min = np.min(r_vectors[:,0])
+    x_max = np.max(r_vectors[:,0])
+    y_min = np.min(r_vectors[:,1])
+    y_max = np.max(r_vectors[:,1])
+    z_min = np.min(r_vectors[:,2])
+    z_max = np.max(r_vectors[:,2])
+    Lx = x_max - x_min
+    Ly = y_max - y_min
+    Lz = z_max - z_min 
+    stkfmm.setBox(fmm_PVelLaplacian, x_min-0.1*Lx, x_max+0.1*Lx, y_min-0.1*Ly, y_max+0.1*Ly, z_min-0.1*Lz, z_max+0.1*Lz)
+    stkfmm.setPoints(fmm_PVelLaplacian, N, r_vectors, 0, np.zeros(0), N, r_vectors)
+    stkfmm.setupTree(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
+
+  # Set force with right format (single layer potential)
+  trg_value = np.zeros((N, 7))
+  src_SL_value = np.zeros((N, 4))
+  src_SL_value[:,0:3] = np.copy(force)
+    
+  # Evaluate fmm
+  stkfmm.clearFMM(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
+  stkfmm.evaluateFMM(fmm_PVelLaplacian, N, src_SL_value, 0, np.zeros(0), N, trg_value, stkfmm.KERNEL.PVelLaplacian)
+
+  # Extract pressure, velocity and laplacian
+  # p = trg_value[:,0]
+  # v = trg_value[:,1:4]
+  # Lap = trg_value[:,4:]
+
+  # Compute RPY mobility
+  # 1. Self mobility
+  vel = (1.0 / (6.0 * np.pi * eta * a)) * force
+  # 2. Stokeslet
+  vel += trg_value[:,1:4] / (eta)
+  # 3. Laplacian
+  vel += (a**2 / (3.0 * eta)) * trg_value[:,4:]
+  # 4. Double laplacian = zero with PBC
+
+  return vel.flatten()
