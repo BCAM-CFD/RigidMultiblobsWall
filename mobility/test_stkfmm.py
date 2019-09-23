@@ -81,10 +81,11 @@ if __name__ == '__main__':
   timer('stkfmm')
 
 
-  # Compute distance between points
-  dr_min = distance(r_vectors)
   print('\n\n')
-  print('dr_min = ', dr_min)
+  # Compute distance between points
+  if N <= N_max:
+    dr_min = distance(r_vectors)
+    print('dr_min = ', dr_min)
 
   # Compute errors
   if N <= N_max:
@@ -96,8 +97,8 @@ if __name__ == '__main__':
     print('Linf error        (2) = ', np.linalg.norm(diff.flatten(), ord=np.inf))
     print('\n\n')
   else:
-    diff = v_stkfmm_tree - v_stkfm
-    print('relative L2 error (fmm) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
+    diff = v_stkfmm_tree - v_stkfmm
+    print('relative L2 error (fmm) = ', np.linalg.norm(diff) / np.linalg.norm(v_stkfmm_tree))
     print('Linf error        (fmm) = ', np.linalg.norm(diff.flatten(), ord=np.inf))
 
   
@@ -106,7 +107,8 @@ if __name__ == '__main__':
   else:
     N_min = 6
   print('diff = \n', diff[0:3*N_min])
-  print('v_numba = \n', v_numba[0:3*N_min])
+  if N <= N_max:
+    print('v_numba = \n', v_numba[0:3*N_min])
   print('v_stkfmm = \n', v_stkfmm[0:3*N_min])
  
   timer(' ', print_all=True)
