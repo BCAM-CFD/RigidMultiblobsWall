@@ -2,11 +2,19 @@ from __future__ import division, print_function
 import numpy as np
 import sys
 import stkfmm
-import mobility as mob
 sys.path.append('..')
+import mobility as mob
 from general_application_utils import timer 
 from mpi4py import MPI
 from numba import njit, prange
+
+try:
+  import mobility_fmm as fmm
+  fortran_fmm_found = True
+except ImportError:
+  fortran_fmm_found = False
+fortran_fmm_found = False
+print('fortran_fmm_found = ', fortran_fmm_found)
 
 
 @njit(parallel=True, fastmath=True)
@@ -36,11 +44,14 @@ if __name__ == '__main__':
   # Set parameters
   N = 131072
   a = 1e-0
-  L = 20000.0
+  phi = 1e-03
+  L = np.power(4*np.pi * N / (3 * phi), 1.0/3.0) * a
   eta = 1.0
   mult_order = 8
   max_pts = 512
   N_max = 262144
+
+  print('L = ', L)
 
   # Create random blobs
   r_vectors = np.random.rand(N, 3) * L
@@ -80,6 +91,12 @@ if __name__ == '__main__':
                                                            set_tree=False)
   timer('stkfmm')
 
+  # Compute velocities with rpyfmm
+  if fortran_fmm_found:
+    timer('rpyfmm')
+    v_rpyfmm = mob.fmm_rpy(r_vectors, forces, eta, a)
+    timer('rpyfmm')
+
 
   print('\n\n')
   # Compute distance between points
@@ -95,11 +112,26 @@ if __name__ == '__main__':
     print('Linf error        (1) = ', np.linalg.norm(diff_tree.flatten(), ord=np.inf))
     print('relative L2 error (2) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
     print('Linf error        (2) = ', np.linalg.norm(diff.flatten(), ord=np.inf))
-    print('\n\n')
+    if fortran_fmm_found:
+      print('fortran_rpy_fmm errors:')
+      diff = v_rpyfmm - v_numba
+      diff = v_rpyfmm - v_numba
+      print('relative L2 error (3) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
+      print('Linf error        (3) = ', np.linalg.norm(diff.flatten(), ord=np.inf))   
   else:
     diff = v_stkfmm_tree - v_stkfmm
     print('relative L2 error (fmm) = ', np.linalg.norm(diff) / np.linalg.norm(v_stkfmm_tree))
     print('Linf error        (fmm) = ', np.linalg.norm(diff.flatten(), ord=np.inf))
+    if fortran_fmm_found:
+      print('fortran_rpy_fmm errors:')
+      diff = v_rpyfmm - v_vtkfmm
+      diff = v_rpyfmm - v_vtkfmm
+      print('relative L2 error (3) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
+      print('Linf error        (3) = ', np.linalg.norm(diff.flatten(), ord=np.inf))   
+  print('\n\n')
+
+
+
 
   
   if N < 6:

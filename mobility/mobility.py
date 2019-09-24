@@ -2,9 +2,11 @@
 from __future__ import division, print_function
 import numpy as np
 import scipy.sparse
+import scipy.spatial as scsp
 import sys
 import time
 import imp
+import general_application_utils as utils
 
 # Try to import the mobility boost implementation
 try:
@@ -35,6 +37,7 @@ try:
 except ImportError:
   found_numba = False
 if found_numba:
+  from numba import njit, prange
   try:
     import mobility_numba
   except ImportError:
@@ -804,7 +807,7 @@ def fmm_rpy(r_vectors, force, eta, a, *args, **kwargs):
   '''
   num_particles = r_vectors.size // 3
   ier = 0
-  iprec = 1
+  iprec = 3
   r_vectors_fortran = np.copy(r_vectors.T, order='F')
   force_fortran = np.copy(np.reshape(force, (num_particles, 3)).T, order='F')
   u_fortran = np.empty_like(r_vectors_fortran, order='F')
@@ -1355,8 +1358,104 @@ def single_wall_mobility_rot_times_torque_numba(r_vectors, torque, eta, a, *args
   return rot
 
 
+@njit(parallel=True, fastmath=True)
+def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets):
+  ''' 
+  Returns the blob-blob overlap correction for unbound fluids using the
+  RPY mobility. It subtract the uncorrected value for r<2*a and it adds
+  the corrected value.
+
+  This function uses numba.
+  '''
+  # Variables
+  N = r_vectors.size // 3
+  r_vectors = r_vectors.reshape(N, 3)
+  force = force.reshape(N, 3)
+  u = np.zeros((N, 3))
+  fourOverThree = 4.0 / 3.0
+  inva = 1.0 / a
+  norm_fact_f = 1.0 / (8.0 * np.pi * eta * a)
+    
+  rx_vec = np.copy(r_vectors[:,0])
+  ry_vec = np.copy(r_vectors[:,1])
+  rz_vec = np.copy(r_vectors[:,2])
+  fx_vec = np.copy(force[:,0])
+  fy_vec = np.copy(force[:,1])
+  fz_vec = np.copy(force[:,2])
+  
+  # Loop over image boxes and then over particles
+  for i in prange(N):
+    rxi = rx_vec[i]
+    ryi = ry_vec[i]
+    rzi = rz_vec[i]
+    ux = 0
+    uy = 0
+    uz = 0
+    for k in range(offsets[i+1] - offsets[i]):
+      j = list_of_neighbors[offsets[i] + k]
+      if i == j:
+        continue
+      # Compute vector between particles i and j
+      rx = rxi - rx_vec[j]
+      ry = ryi - ry_vec[j]
+      rz = rzi - rz_vec[j]
+      
+      # Normalize distance with hydrodynamic radius
+      rx = rx * inva 
+      ry = ry * inva
+      rz = rz * inva
+      r2 = rx*rx + ry*ry + rz*rz
+      r = np.sqrt(r2)
+        
+      # TODO: We should not divide by zero 
+      invr = 1.0 / r
+      invr2 = invr * invr
+        
+      if r > 2:
+        Mxx = 0
+        Mxy = 0
+        Mxz = 0
+        Myy = 0
+        Myz = 0
+        Mzz = 0
+      else:
+        c1 = fourOverThree * (1.0 - 0.28125 * r) # 9/32 = 0.28125
+        c2 = fourOverThree * 0.09375 * invr      # 3/32 = 0.09375
+        Mxx = c1 + c2 * rx*rx 
+        Mxy =      c2 * rx*ry 
+        Mxz =      c2 * rx*rz 
+        Myy = c1 + c2 * ry*ry 
+        Myz =      c2 * ry*rz 
+        Mzz = c1 + c2 * rz*rz 
+        c1 = 1.0 + 2.0 / (3.0 * r2)
+        c2 = (1.0 - 2.0 * invr2) * invr2
+        Mxx -= (c1 + c2*rx*rx) * invr
+        Mxy -= (     c2*rx*ry) * invr
+        Mxz -= (     c2*rx*rz) * invr
+        Myy -= (c1 + c2*ry*ry) * invr
+        Myz -= (     c2*ry*rz) * invr
+        Mzz -= (c1 + c2*rz*rz) * invr                     
+      Myx = Mxy
+      Mzx = Mxz
+      Mzy = Myz
+	  
+      # 2. Compute product M_ij * F_j           
+      ux += (Mxx * fx_vec[j] + Mxy * fy_vec[j] + Mxz * fz_vec[j]) 
+      uy += (Myx * fx_vec[j] + Myy * fy_vec[j] + Myz * fz_vec[j]) 
+      uz += (Mzx * fx_vec[j] + Mzy * fy_vec[j] + Mzz * fz_vec[j]) 
+    u[i,0] = ux * norm_fact_f
+    u[i,1] = uy * norm_fact_f
+    u[i,2] = uz * norm_fact_f          
+  return u.flatten()
+
+
+@utils.static_var('r_vectors_old', [])
+@utils.static_var('list_of_neighbors', [])
+@utils.static_var('offsets', [])
 def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, **kwargs):
   ''' 
+  WARNING: overlap correction is not implemented!
+
   Returns the product of the mobility at the blob level to the force 
   on the blobs. Mobility for particles in an unbounded domain, it uses
   the standard RPY tensor.
@@ -1365,11 +1464,17 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
   '''
   # Get fmm
   fmm_PVelLaplacian = kwargs.get('fmm_PVelLaplacian')
-  set_tree = kwargs.get('set_tree')
   N = r_vectors.size // 3
 
   # Set tree if necessary
-  if set_tree:
+  build_tree = True
+  if len(no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors) > 0:
+    if np.array_equal(no_wall_mobility_trans_times_force_stkfmm.r_vectors_old, r_vectors):
+      build_tree = False
+      list_of_neighbors = no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors
+      offsets = no_wall_mobility_trans_times_force_stkfmm.offsets
+  if build_tree:
+    # Build tree in STKFMM
     x_min = np.min(r_vectors[:,0])
     x_max = np.max(r_vectors[:,0])
     y_min = np.min(r_vectors[:,1])
@@ -1382,20 +1487,27 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
     stkfmm.setBox(fmm_PVelLaplacian, x_min-0.1*Lx, x_max+0.1*Lx, y_min-0.1*Ly, y_max+0.1*Ly, z_min-0.1*Lz, z_max+0.1*Lz)
     stkfmm.setPoints(fmm_PVelLaplacian, N, r_vectors, 0, np.zeros(0), N, r_vectors)
     stkfmm.setupTree(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
+    
+    # Build tree in python
+    d_max = 2 * a
+    tree = scsp.cKDTree(r_vectors)
+    pairs = tree.query_ball_tree(tree, d_max)
+    offsets = np.zeros(len(pairs)+1, dtype=int)
+    for i in range(len(pairs)):
+      offsets[i+1] = offsets[i] + len(pairs[i])
+    list_of_neighbors = np.concatenate(pairs).ravel()
+    no_wall_mobility_trans_times_force_stkfmm.offsets = np.copy(offsets)
+    no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors = np.copy(list_of_neighbors)
+    no_wall_mobility_trans_times_force_stkfmm.r_vectors_old = np.copy(r_vectors)
 
   # Set force with right format (single layer potential)
   trg_value = np.zeros((N, 7))
   src_SL_value = np.zeros((N, 4))
   src_SL_value[:,0:3] = np.copy(force)
     
-  # Evaluate fmm
+  # Evaluate fmm; format p = trg_value[:,0], v = trg_value[:,1:4], Lap = trg_value[:,4:]
   stkfmm.clearFMM(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
   stkfmm.evaluateFMM(fmm_PVelLaplacian, N, src_SL_value, 0, np.zeros(0), N, trg_value, stkfmm.KERNEL.PVelLaplacian)
-
-  # Extract pressure, velocity and laplacian
-  # p = trg_value[:,0]
-  # v = trg_value[:,1:4]
-  # Lap = trg_value[:,4:]
 
   # Compute RPY mobility
   # 1. Self mobility
@@ -1404,6 +1516,10 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
   vel += trg_value[:,1:4] / (eta)
   # 3. Laplacian
   vel += (a**2 / (3.0 * eta)) * trg_value[:,4:]
-  # 4. Double laplacian = zero with PBC
+  # 4. Double Laplacian
+  #    it is zero with PBC
+  # 5. Add blob-blob overlap correction
+  v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets)
+  vel += v_overlap.reshape((N, 3))
 
   return vel.flatten()

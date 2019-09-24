@@ -7,7 +7,7 @@ try:
   from numba import njit, prange
 except ImportError:
   print('numba not found')
-
+import general_application_utils as utils
 
 @njit(parallel=True, fastmath=True)
 def blob_blob_force_numba(r_vectors, L, eps, b, a):
@@ -159,20 +159,20 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
   # Build tree and find neighbors
   build_tree = True
   if len(calc_blob_blob_forces_tree_numba.list_of_neighbors) > 0:
-    if np.array_equal(calc_blob_blob_forces_tree_numba.r_vectors_old[0], r_vectors):
+    if np.array_equal(calc_blob_blob_forces_tree_numba.r_vectors_old, r_vectors):
       build_tree = False
-      list_of_neighbors = calc_blob_blob_forces_tree_numba.list_of_neighbors[0]
-      offsets = calc_blob_blob_forces_tree_numba.offsets[0]
+      list_of_neighbors = calc_blob_blob_forces_tree_numba.list_of_neighbors
+      offsets = calc_blob_blob_forces_tree_numba.offsets
   if build_tree:  
     tree = scsp.cKDTree(r_vectors)
     pairs = tree.query_ball_tree(tree, d_max)
-    calc_blob_blob_forces_tree_numba.r_vectors_old.append(np.copy(r_vectors))
     offsets = np.zeros(len(pairs)+1, dtype=int)
     for i in range(len(pairs)):
       offsets[i+1] = offsets[i] + len(pairs[i])
     list_of_neighbors = np.concatenate(pairs).ravel()
-    calc_blob_blob_forces_tree_numba.offsets.append(offsets)
-    calc_blob_blob_forces_tree_numba.list_of_neighbors.append(list_of_neighbors)
+    calc_blob_blob_forces_tree_numba.offsets = np.copy(offsets)
+    calc_blob_blob_forces_tree_numba.list_of_neighbors = np.copy(list_of_neighbors)
+    calc_blob_blob_forces_tree_numba.r_vectors_old = np.copy(r_vectors)
   
   # Compute forces
   force_blobs = blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offsets)
