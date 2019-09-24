@@ -42,14 +42,14 @@ def distance(r_vectors):
 if __name__ == '__main__':
   print('# Start')
   # Set parameters
-  N = 131072
+  N = 1048576
   a = 1e-0
   phi = 1e-03
   L = np.power(4*np.pi * N / (3 * phi), 1.0/3.0) * a
   eta = 1.0
   mult_order = 8
-  max_pts = 512
-  N_max = 262144
+  max_pts = 1000
+  N_max = 300000
 
   print('L = ', L)
 
@@ -61,19 +61,22 @@ if __name__ == '__main__':
   #r_vectors[:,:] = 0
   #r_vectors[1,0] = L 
 
-  # Compute velocities with numba (no wall)
-  if N <= N_max:
-    v_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, forces, eta, a)
-  timer('numba')
-  if N <= N_max:
-    v_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, forces, eta, a)
-  timer('numba')  
 
   # Compute velocities with stkfmm
   timer('stkfmm_create_fmm')
   fmm_PVelLaplacian = None
   fmm_PVelLaplacian = stkfmm.STKFMM(mult_order, max_pts, stkfmm.PAXIS.NONE, stkfmm.KERNEL.PVelLaplacian)
   timer('stkfmm_create_fmm')
+  v_stkfmm_tree = mob.no_wall_mobility_trans_times_force_stkfmm(r_vectors, 
+                                                                forces, 
+                                                                eta, 
+                                                                a, 
+                                                                fmm_PVelLaplacian=fmm_PVelLaplacian,
+                                                                set_tree=True)
+  timer(' ')
+  timer(' ', clean_all=True)
+  r_vectors = np.random.rand(N, 3) * L
+
   timer('stkfmm_setting_tree')
   v_stkfmm_tree = mob.no_wall_mobility_trans_times_force_stkfmm(r_vectors, 
                                                                 forces, 
@@ -90,6 +93,16 @@ if __name__ == '__main__':
                                                            fmm_PVelLaplacian=fmm_PVelLaplacian,
                                                            set_tree=False)
   timer('stkfmm')
+
+  # Compute velocities with numba (no wall)
+  if N <= N_max:
+    v_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, forces, eta, a)
+  timer('numba')
+  if N <= N_max:
+    v_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, forces, eta, a)
+  timer('numba')  
+
+
 
   # Compute velocities with rpyfmm
   if fortran_fmm_found:
