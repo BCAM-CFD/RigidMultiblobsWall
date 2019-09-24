@@ -32,7 +32,7 @@ except ImportError:
 if __name__ == '__main__':
   print('# Start')
 
-  N = 10000
+  N = 100000
   a = 1.1
   b = 0.01
   eps = 3.92
@@ -44,16 +44,18 @@ if __name__ == '__main__':
     timer('pycuda')
     force_pycuda = forces_pycuda.calc_blob_blob_forces_pycuda(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
     timer('pycuda')
+
+  force_numba_tree = forces_numba.calc_blob_blob_forces_tree_numba(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
+  timer(' ')
+  timer(' ', clean_all=True)
+  timer('numba_tree')
+  force_numba_tree = forces_numba.calc_blob_blob_forces_tree_numba(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
+  timer('numba_tree')
     
   force_numba = forces_numba.calc_blob_blob_forces_numba(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
   timer('numba')
   force_numba = forces_numba.calc_blob_blob_forces_numba(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
   timer('numba')
-
-  force_numba_tree = forces_numba.calc_blob_blob_forces_numba_tree(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
-  timer('numba_tree')
-  force_numba_tree = forces_numba.calc_blob_blob_forces_numba_tree(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
-  timer('numba_tree')
 
   if N < 2000:
     timer('python')
