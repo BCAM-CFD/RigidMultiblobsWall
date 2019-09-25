@@ -484,27 +484,32 @@ def vector_cross_tensor(v, T):
   return result
 
 @static_var('timers', {})   
-def timer(name, print_one = False, print_all = False, clean_all = False):
+def timer(name, print_one = False, print_all = False, clean_all = False, file_name = None):
   '''
   Timer to profile the code. It measures the time elapsed between successive
   calls and it prints the total time elapsed after sucesive calls.  
   '''
-  if name not in timer.timers:
-    timer.timers[name] = (0, time.time())
-  elif timer.timers[name][1] is None:
-    time_tuple = (timer.timers[name][0],  time.time())
-    timer.timers[name] = time_tuple
-  else:
-    time_tuple = (timer.timers[name][0] + (time.time() - timer.timers[name][1]), None)
-    timer.timers[name] = time_tuple
-    if print_one is True:
-      print(name, ' = ', timer.timers[name][0])
+  if name is not None:
+    if name not in timer.timers:
+      timer.timers[name] = (0, time.time())
+    elif timer.timers[name][1] is None:
+      time_tuple = (timer.timers[name][0],  time.time())
+      timer.timers[name] = time_tuple
+    else:
+      time_tuple = (timer.timers[name][0] + (time.time() - timer.timers[name][1]), None)
+      timer.timers[name] = time_tuple
+      if print_one is True:
+        print(name, ' = ', timer.timers[name][0])
 
-  if print_all is True:
+  if print_all is True and len(timer.timers) > 0:
     print('\n')
     col_width = max(len(key) for key in timer.timers)
     for key in sorted(timer.timers):
       print("".join(key.ljust(col_width)), ' = ', timer.timers[key][0])
+    if file_name is not None:
+      with open(file_name, 'w') as f_handle:
+        for key in sorted(timer.timers):
+          f_handle.write("".join(key.ljust(col_width)) + ' = ' + str(timer.timers[key][0]) + '\n')
       
   if clean_all:
     timer.timers = {}

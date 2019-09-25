@@ -117,7 +117,7 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
   
   # Compute forces and torques
-  force, torque = body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability)
+  force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
   force_torque_bodies[:,0:3] = force
   force_torque_bodies[:,3:6] = torque
 
@@ -164,6 +164,73 @@ def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
   # Multiply by prefactors
   force *= 0.75 * vacuum_permeability / np.pi
   torque *= 0.25 * vacuum_permeability / np.pi 
+
+  # Return 
+  return force, torque
+
+
+@njit(parallel=True, fastmath=True)
+def body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability):
+  '''
+  This function compute the force between N bodies
+  with locations r and dipoles dipoles.
+  '''
+  N = r_bodies.size // 3
+  force = np.zeros_like(r_bodies)
+  torque = np.zeros_like(r_bodies)
+  mx = np.copy(dipoles[:,0])
+  my = np.copy(dipoles[:,1])
+  mz = np.copy(dipoles[:,2])
+  rx = np.copy(r_bodies[:,0])
+  ry = np.copy(r_bodies[:,1])
+  rz = np.copy(r_bodies[:,2])
+
+  # Loop over bodies
+  for i in prange(N):
+    mxi = mx[i]
+    myi = my[i]
+    mzi = mz[i]
+    rxi = rx[i]
+    ryi = ry[i]
+    rzi = rz[i]
+    for j in range(N):
+      if i == j:
+        continue
+      mxj = mx[j]
+      myj = my[j]
+      mzj = mz[j]
+      
+      # Distance between bodies
+      rxij = rxi - rx[j]
+      ryij = ryi - ry[j]
+      rzij = rzi - rz[j]
+      r2 = (rxij*rxij + ryij*ryij + rzij*rzij)
+      r = np.sqrt(r2)
+      r3_inv = 1.0 / (r * r2)
+      r4_inv = 1.0 / (r2 * r2)
+      rxij_hat = rxij / r
+      ryij_hat = ryij / r
+      rzij_hat = rzij / r
+
+      #if r > 2.4:
+      #  continue
+
+      # Compute force
+      Ai = mxi * rxij_hat + myi * ryij_hat + mzi * rzij_hat
+      Aj = mxj * rxij_hat + myj * ryij_hat + mzj * rzij_hat
+      mimj = mxi * mxj + myi * myj + mzi * mzj
+      force[i,0] += (mxi * Aj + mxj * Ai + rxij_hat * mimj - 5 * rxij_hat * Ai * Aj) * r4_inv
+      force[i,1] += (myi * Aj + myj * Ai + ryij_hat * mimj - 5 * ryij_hat * Ai * Aj) * r4_inv
+      force[i,2] += (mzi * Aj + mzj * Ai + rzij_hat * mimj - 5 * rzij_hat * Ai * Aj) * r4_inv
+
+      # Compute torque
+      torque[i,0] += (3*Aj * (myi * rzij_hat - mzi*ryij_hat) - (myi * mzj - mzi*myj)) * r3_inv
+      torque[i,1] += (3*Aj * (mzi * rxij_hat - mxi*rzij_hat) - (mzi * mxj - mxi*mzj)) * r3_inv
+      torque[i,2] += (3*Aj * (mxi * ryij_hat - myi*rxij_hat) - (mxi * myj - myi*mxj)) * r3_inv
+
+  # Multiply by prefactors
+  force *= (0.75 * vacuum_permeability / np.pi)
+  torque *= (0.25 * vacuum_permeability / np.pi)
 
   # Return 
   return force, torque
