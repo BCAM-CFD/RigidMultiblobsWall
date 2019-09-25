@@ -40,6 +40,14 @@ while found_functions is False:
       found_HydroGrid = True
     except ImportError:
       found_HydroGrid = False
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      pass
+    try:
+      import stkfmm
+    except ImportError:
+      pass
     found_functions = True
   except ImportError:
     path_to_append += '../'
@@ -129,6 +137,14 @@ def set_mobility_vector_prod(implementation):
     return mb.single_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba':
     return mb.single_wall_mobility_trans_times_force_numba
+  elif implementation == 'stkfmm':
+    mult_order = 8
+    max_pts = 2048
+    fmm_PVelLaplacian = stkfmm.STKFMM(mult_order, max_pts, stkfmm.PAXIS.NONE, stkfmm.KERNEL.PVelLaplacian)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm,
+                                                                fmm_PVelLaplacian=fmm_PVelLaplacian)
+    # return mb.no_wall_mobility_trans_times_force_stkfmm
+    return no_wall_mobility_trans_times_force_stkfmm_partial
 
 
 def calc_K_matrix(bodies, Nblobs):

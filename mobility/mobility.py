@@ -1503,7 +1503,7 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
   # Set force with right format (single layer potential)
   trg_value = np.zeros((N, 7))
   src_SL_value = np.zeros((N, 4))
-  src_SL_value[:,0:3] = np.copy(force)
+  src_SL_value[:,0:3] = np.copy(force.reshape((N, 3)))
     
   # Evaluate fmm; format p = trg_value[:,0], v = trg_value[:,1:4], Lap = trg_value[:,4:]
   stkfmm.clearFMM(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
@@ -1511,7 +1511,7 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
 
   # Compute RPY mobility
   # 1. Self mobility
-  vel = (1.0 / (6.0 * np.pi * eta * a)) * force
+  vel = (1.0 / (6.0 * np.pi * eta * a)) * force.reshape((N,3))
   # 2. Stokeslet
   vel += trg_value[:,1:4] / (eta)
   # 3. Laplacian
