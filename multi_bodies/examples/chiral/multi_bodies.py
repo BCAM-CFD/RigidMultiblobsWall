@@ -304,11 +304,12 @@ def build_block_diagonal_preconditioners_det_stoch(bodies, r_vectors, Nblobs, et
       M_factorization_blobs.append(L.T)
       # 3. Compute inverse of L
       utils.timer('inverse_of_L')
-      M_factorization_blobs_inv.append(scipy.linalg.solve_triangular(L, np.eye(b.Nblobs * 3), check_finite=False))
+      Linv = scipy.linalg.solve_triangular(L, np.eye(b.Nblobs * 3), check_finite=False)
+      M_factorization_blobs_inv.append(Linv)
       utils.timer('inverse_of_L')
       # 4. Compute inverse mobility blobs
       utils.timer('inverse_of_M')
-      mobility_inv_blobs.append(scipy.linalg.solve_triangular(L, scipy.linalg.solve_triangular(L, np.eye(b.Nblobs * 3), trans='T', check_finite=False), check_finite=False))
+      mobility_inv_blobs.append(np.dot(Linv, Linv.T))
       utils.timer('inverse_of_M')
       # 5. Compute geometric matrix K
       utils.timer('calc_K')
