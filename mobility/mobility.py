@@ -1000,7 +1000,7 @@ def rotne_prager_tensor(r_vectors, eta, a, *args, **kwargs):
   dx = x - x[:, None]
   dy = y - y[:, None]
   dz = z - z[:, None]
-  dr = np.sqrt(dx**2 + dy**2 + dz**2)
+  dr = np.sqrt(dx*dx + dy*dy + dz*dz)
 
   # Compute scalar functions f(r) and g(r)
   factor = 1.0 / (6.0 * np.pi * eta)
@@ -1011,12 +1011,12 @@ def rotne_prager_tensor(r_vectors, eta, a, *args, **kwargs):
   sel_zero = dr == 0.
   nsel[sel_zero] = False
 
-  fr[sel] = factor * (0.75 / dr[sel] + a**2 / (2.0 * dr[sel]**3))
-  gr[sel] = factor * (0.75 / dr[sel]**3 - 1.5 * a**2 / dr[sel]**5)
+  fr[sel] = factor * (0.75 / dr[sel] + a*a / (2.0 * dr[sel]*dr[sel]*dr[sel]))
+  gr[sel] = factor * (0.75 / (dr[sel]*dr[sel]*dr[sel]) - 1.5 * a*a / (dr[sel]*dr[sel]*dr[sel]*dr[sel]*dr[sel]))
 
   fr[sel_zero] = (factor / a)
-  fr[nsel] = factor * (1.0 / a - 0.28125 * dr[nsel] / a**2)
-  gr[nsel] = factor * (3.0 / (32.0 * a**2 * dr[nsel]))
+  fr[nsel] = factor * (1.0 / a - 0.28125 * dr[nsel] / (a*a))
+  gr[nsel] = factor * (3.0 / (32.0 * a*a * dr[nsel]))
 
   # Build mobility matrix of size 3N \times 3N
   M = np.zeros((r_vectors.size, r_vectors.size))
@@ -1484,18 +1484,28 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
     Lx = x_max - x_min
     Ly = y_max - y_min
     Lz = z_max - z_min 
+    utils.timer('set_fmm_tree')
     stkfmm.setBox(fmm_PVelLaplacian, x_min-0.1*Lx, x_max+0.1*Lx, y_min-0.1*Ly, y_max+0.1*Ly, z_min-0.1*Lz, z_max+0.1*Lz)
     stkfmm.setPoints(fmm_PVelLaplacian, N, r_vectors, 0, np.zeros(0), N, r_vectors)
     stkfmm.setupTree(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
+    utils.timer('set_fmm_tree')
     
     # Build tree in python
     d_max = 2 * a
+    utils.timer('cKDTree')
     tree = scsp.cKDTree(r_vectors)
+    utils.timer('cKDTree')
+    utils.timer('query_ball_tree')
     pairs = tree.query_ball_tree(tree, d_max)
+    utils.timer('query_ball_tree')
+    utils.timer('set_offset')
     offsets = np.zeros(len(pairs)+1, dtype=int)
     for i in range(len(pairs)):
       offsets[i+1] = offsets[i] + len(pairs[i])
+    utils.timer('set_offset')
+    utils.timer('set_neighbors')
     list_of_neighbors = np.concatenate(pairs).ravel()
+    utils.timer('set_neighbors')
     no_wall_mobility_trans_times_force_stkfmm.offsets = np.copy(offsets)
     no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors = np.copy(list_of_neighbors)
     no_wall_mobility_trans_times_force_stkfmm.r_vectors_old = np.copy(r_vectors)
@@ -1506,8 +1516,10 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
   src_SL_value[:,0:3] = np.copy(force.reshape((N, 3)))
     
   # Evaluate fmm; format p = trg_value[:,0], v = trg_value[:,1:4], Lap = trg_value[:,4:]
+  utils.timer('evaluate_fmm')
   stkfmm.clearFMM(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
   stkfmm.evaluateFMM(fmm_PVelLaplacian, N, src_SL_value, 0, np.zeros(0), N, trg_value, stkfmm.KERNEL.PVelLaplacian)
+  utils.timer('evaluate_fmm')
 
   # Compute RPY mobility
   # 1. Self mobility
@@ -1519,7 +1531,9 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
   # 4. Double Laplacian
   #    it is zero with PBC
   # 5. Add blob-blob overlap correction
+  utils.timer('evaluate_correction')
   v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets)
+  utils.timer('evaluate_correction')
   vel += v_overlap.reshape((N, 3))
 
   return vel.flatten()

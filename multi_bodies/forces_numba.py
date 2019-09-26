@@ -92,9 +92,6 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
   rx_vec = np.copy(r_vectors[:,0])
   ry_vec = np.copy(r_vectors[:,1])
   rz_vec = np.copy(r_vectors[:,2])
-  Lx = L[0]
-  Ly = L[1]
-  Lz = L[2]
 
   for i in prange(N):
     for k in range(offsets[i+1] - offsets[i]):
@@ -105,19 +102,12 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
       ry = ry_vec[j] - ry_vec[i]
       rz = rz_vec[j] - rz_vec[i]
 
-      if Lx > 0:
-        rx = rx - int(rx / Lx + 0.5 * (int(rx>0) - int(rx<0))) * Lx
-      if Ly > 0:
-        ry = ry - int(ry / Ly + 0.5 * (int(ry>0) - int(ry<0))) * Ly
-      if Lz > 0:
-        rz = rz - int(rz / Lz + 0.5 * (int(rz>0) - int(rz<0))) * Lz
-
       # Compute force
       r_norm = np.sqrt(rx*rx + ry*ry + rz*rz)
       if r_norm > 2*a:
         f0 = -((eps / b) * np.exp(-(r_norm - 2.0*a) / b) / r_norm)
       else:
-        f0 = -((eps / b) / np.maximum(r_norm, 1e-25)) 
+        f0 = -((eps / b) / np.maximum(r_norm, 1e-25))
       force[i, 0] += f0 * rx
       force[i, 1] += f0 * ry
       force[i, 2] += f0 * rz
@@ -131,12 +121,14 @@ def calc_blob_blob_forces_numba(r_vectors, *args, **kwargs):
   '''
     
   # Get parameters from arguments
+  utils.timer('calc_blob_blob_force')
   L = kwargs.get('periodic_length')
   eps = kwargs.get('repulsion_strength')
   b = kwargs.get('debye_length')
   a = kwargs.get('blob_radius')
 
   force_blobs = blob_blob_force_numba(r_vectors, L, eps, b, a)
+  utils.timer('calc_blob_blob_force')
   return force_blobs
 
 
@@ -154,7 +146,7 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
   eps = kwargs.get('repulsion_strength')
   b = kwargs.get('debye_length')
   a = kwargs.get('blob_radius')
-  d_max = 2 * a + 40 * b
+  d_max = 2 * a + 30 * b
 
   # Build tree and find neighbors
   build_tree = True
@@ -164,6 +156,7 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
       list_of_neighbors = calc_blob_blob_forces_tree_numba.list_of_neighbors
       offsets = calc_blob_blob_forces_tree_numba.offsets
   if build_tree:  
+    utils.timer('calc_blob_blob_force_tree_build')
     tree = scsp.cKDTree(r_vectors)
     pairs = tree.query_ball_tree(tree, d_max)
     offsets = np.zeros(len(pairs)+1, dtype=int)
@@ -173,7 +166,10 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
     calc_blob_blob_forces_tree_numba.offsets = np.copy(offsets)
     calc_blob_blob_forces_tree_numba.list_of_neighbors = np.copy(list_of_neighbors)
     calc_blob_blob_forces_tree_numba.r_vectors_old = np.copy(r_vectors)
+    utils.timer('calc_blob_blob_force_tree_build')
   
   # Compute forces
+  utils.timer('calc_blob_blob_force_tree_numba')
   force_blobs = blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offsets)
+  utils.timer('calc_blob_blob_force_tree_numba')
   return force_blobs

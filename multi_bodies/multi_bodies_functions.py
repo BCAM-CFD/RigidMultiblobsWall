@@ -196,11 +196,29 @@ def calc_one_blob_forces(r_vectors, *args, **kwargs):
   Nblobs = r_vectors.size // 3
   force_blobs = np.zeros((Nblobs, 3))
   r_vectors = np.reshape(r_vectors, (Nblobs, 3))
+  blob_mass = kwargs.get('blob_mass')
+  blob_radius = kwargs.get('blob_radius')
+  g = kwargs.get('g')
+  repulsion_strength_wall = kwargs.get('repulsion_strength_wall') 
+  debye_length_wall = kwargs.get('debye_length_wall')
   
-  # Loop over blobs
-  for blob in range(Nblobs):
-    force_blobs[blob] += blob_external_force(r_vectors[blob], *args, **kwargs)   
+  # Get heights
+  z = r_vectors[:,2]
 
+  # Add non-overlap force
+  sel = z > blob_radius
+  force_blobs[sel,2] = (repulsion_strength_wall / debye_length_wall) * np.exp(-(z[sel]-blob_radius)/debye_length_wall)
+
+  # Add overlap force
+  sel = z <= blob_radius
+  force_blobs[sel,2] = (repulsion_strength_wall / debye_length_wall)
+
+  # Add gravity
+  force_blobs[:,2] += - g * blob_mass
+
+  # # Loop over blobs
+  # for blob in range(Nblobs):
+  #   force_blobs[blob] += blob_external_force(r_vectors[blob], *args, **kwargs)   
   return force_blobs
 
 
@@ -227,7 +245,6 @@ def set_blob_blob_forces(implementation):
     return forces_numba.calc_blob_blob_forces_numba
   elif implementation == 'tree_numba':
     return forces_numba.calc_blob_blob_forces_tree_numba
-
 
 
 def blob_blob_force(r, *args, **kwargs):
@@ -378,26 +395,36 @@ def force_torque_calculator_sort_by_bodies(bodies, r_vectors, *args, **kwargs):
   blob_radius = bodies[0].blob_radius
 
   # Compute one-blob forces (same function for all blobs)
+  utils.timer('force_blobs_one')
   force_blobs += calc_one_blob_forces(r_vectors, blob_radius = blob_radius, blob_mass = blob_mass, *args, **kwargs)
+  utils.timer('force_blobs_one')
 
   # Compute blob-blob forces (same function for all pair of blobs)
+  utils.timer('force_blobs_pair')
   force_blobs += calc_blob_blob_forces(r_vectors, blob_radius = blob_radius, *args, **kwargs)  
+  utils.timer('force_blobs_pair')
 
   # Compute body force-torque forces from blob forces
+  utils.timer('force_blobs_to_body')
   offset = 0
   for k, b in enumerate(bodies):
     # Add force to the body
-    force_torque_bodies[2*k:(2*k+1)] += sum(force_blobs[offset:(offset+b.Nblobs)])
+    force_torque_bodies[2*k:(2*k+1)] += np.sum(force_blobs[offset:(offset+b.Nblobs)], axis=0)
     # Add torque to the body
     R = b.calc_rot_matrix()  
     force_torque_bodies[2*k+1:2*k+2] += np.dot(R.T, np.reshape(force_blobs[offset:(offset+b.Nblobs)], 3*b.Nblobs))
     offset += b.Nblobs
+  utils.timer('force_blobs_to_body')
 
   # Add one-body external force-torque
+  utils.timer('force_body_one')
   force_torque_bodies += bodies_external_force_torque(bodies, r_vectors, *args, **kwargs)
+  utils.timer('force_body_one')
 
   # Add body-body forces (same for all pair of bodies)
+  utils.timer('force_body_pair')
   force_torque_bodies += calc_body_body_forces_torques(bodies, r_vectors, *args, **kwargs)
+  utils.timer('force_body_pair')
   return force_torque_bodies
 
 

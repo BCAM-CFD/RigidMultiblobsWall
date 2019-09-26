@@ -24,6 +24,7 @@ import scipy.special as scsp
 import math
 import multi_bodies_functions
 from multi_bodies_functions import *
+import general_application_utils as utils
 # Try to import numba
 try:
   from numba import njit, prange
@@ -79,7 +80,6 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 
     # Add harmonic potential
     # force_torque[2*k,2] = -0.41419464 * b.location[2]
-
 
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
