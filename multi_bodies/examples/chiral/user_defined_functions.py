@@ -80,7 +80,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 
     # Add harmonic potential
     # force_torque[2*k,2] = -0.41419464 * b.location[2]
-
+    
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
 
@@ -117,6 +117,7 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
   
   # Compute forces and torques
+  # force, torque = body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability)
   force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
   force_torque_bodies[:,0:3] = force
   force_torque_bodies[:,3:6] = torque
@@ -231,6 +232,53 @@ def body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability):
   # Multiply by prefactors
   force *= (0.75 * vacuum_permeability / np.pi)
   torque *= (0.25 * vacuum_permeability / np.pi)
+
+  # Return 
+  return force, torque
+
+
+@njit(parallel=True, fastmath=True)
+def body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability):
+  '''
+  This function compute the force between N bodies
+  with locations r and isotropic dipoles dipoles.
+  '''
+  N = r_bodies.size // 3
+  force = np.zeros_like(r_bodies)
+  torque = np.zeros_like(r_bodies)
+  mx = np.copy(dipoles[:,0])
+  my = np.copy(dipoles[:,1])
+  mz = np.copy(dipoles[:,2])
+  rx = np.copy(r_bodies[:,0])
+  ry = np.copy(r_bodies[:,1])
+  rz = np.copy(r_bodies[:,2])
+
+  # Loop over bodies
+  for i in prange(N):
+    mi = np.sqrt(mx[i] * mx[i] + my[i] * my[i] + mz[i] * mz[i])
+    rxi = rx[i]
+    ryi = ry[i]
+    rzi = rz[i]
+    for j in range(N):
+      if i == j:
+        continue
+      mj = np.sqrt(mx[j] * mx[j] + my[j] * my[j] + mz[j] * mz[j])
+      
+      # Distance between bodies
+      rxij = rxi - rx[j]
+      ryij = ryi - ry[j]
+      rzij = rzi - rz[j]
+      r2 = (rxij*rxij + ryij*ryij + rzij*rzij)
+      r = np.sqrt(r2)
+      r5_inv = 1.0 / (r * r2 * r2)
+
+      # Compute force
+      force[i,0] += mi * mj * rxij * r5_inv
+      force[i,1] += mi * mj * ryij * r5_inv
+      force[i,2] += mi * mj * rzij * r5_inv
+
+  # Multiply by prefactors
+  force *= (0.25 * vacuum_permeability / np.pi)
 
   # Return 
   return force, torque
