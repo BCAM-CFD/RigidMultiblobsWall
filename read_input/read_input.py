@@ -96,6 +96,10 @@ class ReadInput(object):
     self.mesh_fields_opt1 = np.fromstring(self.options.get('mesh_fields_opt1') or 'None', sep=' ')
     self.mesh_fields_opt2 = np.fromstring(self.options.get('mesh_fields_opt2') or 'None', sep=' ')
     self.mesh_fields_opt3 = np.fromstring(self.options.get('mesh_fields_opt3') or 'None', sep=' ')
+
+    # Some extra inputs for the potentials of chiral particles
+    self.harmonic_confinement = float(self.options.get('harmonic_confinement') or 0.0)
+    self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
           
     # Create list with [vertex_file, clones_file] for each structure
     self.structures = []

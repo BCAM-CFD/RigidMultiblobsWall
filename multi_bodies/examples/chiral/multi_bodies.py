@@ -700,6 +700,8 @@ if __name__ == '__main__':
   integrator.update_PC = read.update_PC
   integrator.print_residual = args.print_residual
   integrator.rf_delta = read.rf_delta
+  integrator.harmonic_confinement = read.harmonic_confinement
+  integrator.dipole_dipole = read.dipole_dipole
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:

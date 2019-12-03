@@ -64,6 +64,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   step = kwargs.get('step')
   dt = kwargs.get('dt')
   time = step * dt
+  harmonic_confinement = kwargs.get('harmonic_confinement')
 
   # Rotate magnetic field
   R_B = quaternion_B.rotation_matrix()
@@ -79,7 +80,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
     force_torque[2*k+1] = np.cross(mu_body, B)
 
     # Add harmonic potential
-    # force_torque[2*k,2] = -0.41419464 * b.location[2]
+    force_torque[2*k,2] = -harmonic_confinement * b.location[2]
     
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
@@ -108,6 +109,7 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
   force_torque_bodies = np.zeros((len(bodies), 6))
   mu = kwargs.get('mu')
   vacuum_permeability = kwargs.get('vacuum_permeability')
+  dipole_dipole = kwargs.get('dipole_dipole')
   
   # Extract body locations and dipoles
   r_bodies = np.zeros((len(bodies), 3))
@@ -117,8 +119,13 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
   
   # Compute forces and torques
-  # force, torque = body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability)
-  force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
+  if dipole_dipole == 'True':
+    force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
+  elif dipole_dipole == 'isotropic':
+    force, torque = body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability)
+  else:
+    force = np.zeros((Nbodies, 3))
+    torque = np.zeros((Nbodies, 3))
   force_torque_bodies[:,0:3] = force
   force_torque_bodies[:,3:6] = torque
 
