@@ -280,9 +280,9 @@ def body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeabilit
       r5_inv = 1.0 / (r * r2 * r2)
 
       # Compute force
-      force[i,0] += mi * mj * rxij * r5_inv
-      force[i,1] += mi * mj * ryij * r5_inv
-      force[i,2] += mi * mj * rzij * r5_inv
+      force[i,0] -= mi * mj * rxij * r5_inv
+      force[i,1] -= mi * mj * ryij * r5_inv
+      force[i,2] -= mi * mj * rzij * r5_inv
 
   # Multiply by prefactors
   force *= (0.25 * vacuum_permeability / np.pi)
