@@ -27,13 +27,19 @@ except ImportError:
   except ImportError:
     found_boost = False
 
+try:
+  import forces_cpp
+  found_cpp = True
+except ImportError:
+  found_cpp = False
+  pass
 
 
 if __name__ == '__main__':
   print('# Start')
 
   N = 100000
-  a = 1.1
+  a = 0.13
   b = 0.01
   eps = 3.92
   L = np.array([0.0, 0.0, 0.0])
@@ -45,7 +51,7 @@ if __name__ == '__main__':
     force_pycuda = forces_pycuda.calc_blob_blob_forces_pycuda(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
     timer('pycuda')
 
-  force_numba_tree = forces_numba.calc_blob_blob_forces_tree_numba(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
+  force_numba_tree = forces_numba.calc_blob_blob_forces_tree_numba(r_vectors+1, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
   timer(' ')
   timer(' ', clean_all=True)
   timer('numba_tree')
@@ -67,6 +73,12 @@ if __name__ == '__main__':
     force_boost = mbf.calc_blob_blob_forces_boost(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
     timer('boost')
 
+  if found_cpp:
+    timer('cpp')
+    force_cpp = mbf.calc_blob_blob_forces_cpp(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
+    timer('cpp')
+
+
 
   if N < 3:
     if found_pycuda:
@@ -85,6 +97,8 @@ if __name__ == '__main__':
     print('|f_numba - f_pycuda| / |f_pycuda| = ', np.linalg.norm(force_numba - force_pycuda) / np.linalg.norm(force_pycuda))
   if found_boost:
     print('|f_boost - f_python| / |f_python| = ', np.linalg.norm(force_boost - force_python) / np.linalg.norm(force_python))
+  if found_cpp:
+    print('|f_cpp - f_numba| / |f_numba| = ', np.linalg.norm(force_cpp - force_numba) / np.linalg.norm(force_numba))
 
 
 

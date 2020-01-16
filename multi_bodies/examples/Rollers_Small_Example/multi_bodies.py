@@ -34,7 +34,7 @@ while found_functions is False:
     from read_input import read_vertex_file
     from read_input import read_clones_file
     from read_input import read_slip_file
-    import general_application_utils as utils
+    import utils
     try:
       import libCallHydroGrid as cc
       found_HydroGrid = True
@@ -96,8 +96,6 @@ def set_mobility_blobs(implementation):
     return mb.single_wall_fluid_mobility
   elif implementation == 'C++':
     return  mb.boosted_single_wall_fluid_mobility
-  elif implementation == 'C++-alt':
-    return mb.single_wall_fluid_mobility_cpp
 
 
 def set_mobility_vector_prod(implementation):
@@ -127,8 +125,6 @@ def set_mobility_vector_prod(implementation):
     return mb.single_wall_fluid_mobility_product
   elif implementation == 'C++':
     return mb.boosted_mobility_vector_product
-  elif implementation == 'C++-alt':
-    return mb.single_wall_mobility_trans_times_force_cpp
   elif implementation == 'pycuda':
     return mb.single_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba':
@@ -540,8 +536,8 @@ if __name__ == '__main__':
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
   # Copy input file to output
-  # subprocess.call(["cp", input_file, output_name + '.inputfile'])
-  copyfile(input_file,output_name + '.inputfile')
+  #subprocess.call(["cp", input_file, output_name + '.inputfile'])
+  copyfile(input_file, output_name + '.inputfile')
 
   # Set random generator state
   if read.random_state is not None:
@@ -663,7 +659,6 @@ if __name__ == '__main__':
                                Nblobs, 
                                0, 
                                get_blobs_r_vectors(bodies, Nblobs))
-
 
   # Loop over time steps
   start_time = time.time()
