@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 import scipy.linalg
 import subprocess
+from shutil import copyfile
 from functools import partial
 import sys
 import time
@@ -104,6 +105,8 @@ def set_mobility_blobs(implementation):
     return mb.single_wall_fluid_mobility
   elif implementation == 'C++':
     return  mb.boosted_single_wall_fluid_mobility
+  elif implementation == 'C++-alt':
+    return mb.single_wall_fluid_mobility_cpp
 
 
 def set_mobility_vector_prod(implementation):
@@ -133,6 +136,8 @@ def set_mobility_vector_prod(implementation):
     return mb.single_wall_fluid_mobility_product
   elif implementation == 'C++':
     return mb.boosted_mobility_vector_product
+  elif implementation == 'C++-alt':
+    return mb.single_wall_mobility_trans_times_force_cpp
   elif implementation == 'pycuda':
     return mb.single_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba':
@@ -143,7 +148,6 @@ def set_mobility_vector_prod(implementation):
     fmm_PVelLaplacian = stkfmm.STKFMM(mult_order, max_pts, stkfmm.PAXIS.NONE, stkfmm.KERNEL.PVelLaplacian)
     no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm,
                                                                 fmm_PVelLaplacian=fmm_PVelLaplacian)
-    # return mb.no_wall_mobility_trans_times_force_stkfmm
     return no_wall_mobility_trans_times_force_stkfmm_partial
 
 
@@ -586,7 +590,8 @@ if __name__ == '__main__':
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
   # Copy input file to output
-  subprocess.call(["cp", input_file, output_name + '.inputfile'])
+  # subprocess.call(["cp", input_file, output_name + '.inputfile'])
+  copyfile(input_file,output_name + '.inputfile')
 
   # Set random generator state
   if read.random_state is not None:
@@ -718,14 +723,6 @@ if __name__ == '__main__':
                                0, 
                                get_blobs_r_vectors(bodies, Nblobs))
 
-  # Open config files
-  if read.save_clones == 'one_file':
-    buffering = max(1, min(body_types) * n_steps // n_save // 200)
-    f_ID = []
-    for i, ID in enumerate(structures_ID):
-      name = output_name + '.' + ID + '.config'
-      f = open(name, 'w', buffering=buffering)
-      f_ID.append(f)
 
   # Create fields
   if read.save_number_density or read.save_velocity or read.save_stress:
@@ -739,6 +736,12 @@ if __name__ == '__main__':
       
   # Loop over time steps
   start_time = time.time()  
+  if read.save_clones == 'one_file':
+    output_files = []
+    for i, ID in enumerate(structures_ID):
+      name = output_name + '.' + ID + '.config'
+      output_files.append(open(name, 'w'))
+
   for step in range(read.initial_step, n_steps):
     if step == 0:
       start_time = time.time()  
@@ -765,17 +768,17 @@ if __name__ == '__main__':
                                                      orientation[3]))
             body_offset += body_types[i]
       elif read.save_clones == 'one_file':
-        for i, ID in enumerate(structures_ID):
-          f_ID[i].write(str(body_types[i]) + '\n')
+        for i, f_ID in enumerate(output_files):
+          f_ID.write(str(body_types[i]) + '\n')
           for j in range(body_types[i]):
             orientation = bodies[body_offset + j].orientation.entries
-            f_ID[i].write('%s %s %s %s %s %s %s\n' % (bodies[body_offset + j].location[0], 
-                                                      bodies[body_offset + j].location[1], 
-                                                      bodies[body_offset + j].location[2], 
-                                                      orientation[0], 
-                                                      orientation[1], 
-                                                      orientation[2], 
-                                                      orientation[3]))
+            f_ID.write('%s %s %s %s %s %s %s\n' % (bodies[body_offset + j].location[0], 
+                                                   bodies[body_offset + j].location[1], 
+                                                   bodies[body_offset + j].location[2], 
+                                                   orientation[0], 
+                                                   orientation[1], 
+                                                   orientation[2], 
+                                                   orientation[3]))
           body_offset += body_types[i]
       else:
         print('Error, save_clones =', read.save_clones, 'is not implemented.')
@@ -881,26 +884,21 @@ if __name__ == '__main__':
           body_offset += body_types[i]
       
     elif read.save_clones == 'one_file':
-      for i, ID in enumerate(structures_ID):
-        f_ID[i].write(str(body_types[i]) + '\n')
+      for i, f_ID in enumerate(output_files):
+        f_ID.write(str(body_types[i]) + '\n')
         for j in range(body_types[i]):
           orientation = bodies[body_offset + j].orientation.entries
-          f_ID[i].write('%s %s %s %s %s %s %s\n' % (bodies[body_offset + j].location[0], 
-                                                    bodies[body_offset + j].location[1], 
-                                                    bodies[body_offset + j].location[2], 
-                                                    orientation[0], 
-                                                    orientation[1], 
-                                                    orientation[2], 
-                                                    orientation[3]))
+          f_ID.write('%s %s %s %s %s %s %s\n' % (bodies[body_offset + j].location[0], 
+                                                 bodies[body_offset + j].location[1], 
+                                                 bodies[body_offset + j].location[2], 
+                                                 orientation[0], 
+                                                 orientation[1], 
+                                                 orientation[2], 
+                                                 orientation[3]))
         body_offset += body_types[i]
     else:
       print('Error, save_clones =', read.save_clones, 'is not implemented.')
       print('Use \"one_file_per_step\" or \"one_file\". \n')
-
-
-    # Close config files
-    for f in f_ID:
-      f.close()
 
     # Save mobilities
     if read.save_blobs_mobility == 'True' or read.save_body_mobility == 'True':
