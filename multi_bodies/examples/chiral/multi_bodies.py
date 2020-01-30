@@ -279,7 +279,7 @@ def build_block_diagonal_preconditioners_det_stoch(bodies, r_vectors, Nblobs, et
       # 1. Compute blobs mobility 
       M = b.calc_mobility_blobs(eta, a)
       # 2. Compute Cholesy factorization, M = L^T * L
-      L, lower = scipy.linalg.cho_factor(M, checkfinite=False)
+      L, lower = scipy.linalg.cho_factor(M, check_finite=False)
       L = np.triu(L)   
       M_factorization_blobs.append(L.T)
       # 3. Compute inverse of L
@@ -383,7 +383,7 @@ def build_block_diagonal_preconditioner(bodies, r_vectors, Nblobs, eta, a, *args
       # 1. Compute blobs mobility and invert it
       M = b.calc_mobility_blobs(eta, a)
       # 2. Compute Cholesy factorization, M = L^T * L
-      L, lower = scipy.linalg.cho_factor(M)
+      L, lower = scipy.linalg.cho_factor(M, check_finite=False)
       L = np.triu(L)   
       # 3. Compute inverse mobility blobs
       mobility_inv_blobs.append(scipy.linalg.solve_triangular(L, scipy.linalg.solve_triangular(L, np.eye(b.Nblobs * 3), trans='T', check_finite=False), check_finite=False))
@@ -482,7 +482,7 @@ def build_stochastic_block_diagonal_preconditioner(bodies, r_vectors, eta, a, *a
     M = b.calc_mobility_blobs(eta, a)
     
     # 2. Compute Cholesy factorization, M = L^T * L
-    L, lower = scipy.linalg.cho_factor(M)
+    L, lower = scipy.linalg.cho_factor(M, check_finite=False)
     L = np.triu(L)   
     P_inv.append(L.T)
 
@@ -635,7 +635,6 @@ if __name__ == '__main__':
                                                debye_length_wall = read.debye_length_wall, 
                                                repulsion_strength = read.repulsion_strength, 
                                                debye_length = read.debye_length, 
-                                               periodic_length = read.periodic_length,
                                                mu = read.mu,
                                                B0 = read.B0,
                                                omega = read.omega,
