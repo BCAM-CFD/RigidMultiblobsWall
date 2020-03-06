@@ -1173,6 +1173,7 @@ class QuaternionIntegrator(object):
                                                     dt = kwargs.get('dt'), 
                                                     domain = self.domain,
                                                     harmonic_confinement = self.harmonic_confinement,
+                                                    harmonic_confinement_plane = self.harmonic_confinement_plane,
                                                     dipole_dipole = self.dipole_dipole)
         # Add noise to the force/torque
         if noise_FT is not None:

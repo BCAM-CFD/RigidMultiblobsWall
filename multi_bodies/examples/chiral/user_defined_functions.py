@@ -65,6 +65,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   dt = kwargs.get('dt')
   time = step * dt
   harmonic_confinement = kwargs.get('harmonic_confinement')
+  harmonic_confinement_plane = kwargs.get('harmonic_confinement_plane')
 
   # Rotate magnetic field
   R_B = quaternion_B.rotation_matrix()
@@ -80,7 +81,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
     force_torque[2*k+1] = np.cross(mu_body, B)
 
     # Add harmonic potential
-    force_torque[2*k,2] = -harmonic_confinement * b.location[2]
+    force_torque[2*k,2] = -harmonic_confinement * (b.location[2] - harmonic_confinement_plane)
     
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new

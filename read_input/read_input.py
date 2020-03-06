@@ -99,6 +99,7 @@ class ReadInput(object):
 
     # Some extra inputs for the potentials of chiral particles
     self.harmonic_confinement = float(self.options.get('harmonic_confinement') or 0.0)
+    self.harmonic_confinement_plane = float(self.options.get('harmonic_confinement_plane') or 0.0)
     self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
           
     # Create list with [vertex_file, clones_file] for each structure

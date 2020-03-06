@@ -663,6 +663,7 @@ if __name__ == '__main__':
   integrator.print_residual = args.print_residual
   integrator.rf_delta = read.rf_delta
   integrator.harmonic_confinement = read.harmonic_confinement
+  integrator.harmonic_confinement_plane = read.harmonic_confinement_plane
   integrator.dipole_dipole = read.dipole_dipole
 
   # Initialize HydroGrid library:
