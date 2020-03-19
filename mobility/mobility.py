@@ -53,6 +53,7 @@ except ImportError:
   try:
     from mobility import mobility_cpp
   except ImportError:
+    print('CPP not found')
     pass
 
 
@@ -1443,3 +1444,104 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
   vel += v_overlap.reshape((N, 3))
 
   return vel.flatten()
+
+
+def fluid_interface_mobility_cpp(r_vectors, eta, a, eta_ratio=0, *args, **kwargs):
+  '''
+  Compute the mobility of blobs above a flat fluid-fluid interface.
+  The interface is at z=0 and the mobility is
+
+  M = (1 / (1+eta_ratio)) * M_F + (eta_ratio / (1+eta_ratio)) * M_wall
+
+  with M_F = M_RP(x,y) + M_RP(x,y') * (I - 2 * delta_3 \times delta_3)
+
+  where 
+  M_F = mobility free stress surface
+  M_RP = Rotne-Prager mobility, free space
+  M_wall = mobility above a no-slip wall
+  I = identity matrix
+  delta_3 = (0, 0, 1)
+  y' = (y_1, y_2, -y_3)
+  eta_ratio = viscosity_bellow_interface / viscosity_above_interface
+  
+  See eq. 22 in Swan and Brady, Physics of fluids, 2007 and
+  Lee et al., J. Fluid Mechanics, 93, 705 (1979). 
+  '''
+
+  # Single wall
+  if eta_ratio > 0:
+    M_wall = mobility_cpp.single_wall_fluid_mobility(r_vectors, eta, a)
+  else:
+    M_wall = 0
+
+  # Rotne-Prager
+  M_RP = mobility_cpp.rotne_prager_tensor(r_vectors, eta, a)
+
+  # Rotne-Prager image
+  r_image = np.copy(r_vectors)
+  r_image[:,2] *= -1
+  p = np.ones(r_vectors.size)
+  p[2::3] = -1.0
+  M_RP_image = p * mobility_cpp.rotne_prager_tensor(r_image, eta, a)
+  
+  # Total contribution
+  return (1.0 / (1.0 + eta_ratio)) * (M_RP + M_RP_image) + (eta_ratio / (1.0 + eta_ratio)) * M_wall
+
+
+def fluid_interface_mobility_trans_times_force_cpp(r_vectors, force, eta, a, eta_ratio=0, *args, **kwargs):
+  '''
+  Compute the force mobility product for blobs above a flat fluid-fluid interface.
+  The interface is at z=0 and the mobility is
+
+  M = (1 / (1+eta_ratio)) * M_F + (eta_ratio / (1+eta_ratio)) * M_wall
+
+  with M_F = M_RP(x,y) + M_RP(x,y') * (I - 2 * delta_3 \times delta_3)
+
+  where 
+  M_F = mobility free stress surface
+  M_RP = Rotne-Prager mobility, free space
+  M_wall = mobility above a no-slip wall
+  I = identity matrix
+  delta_3 = (0, 0, 1)
+  y' = (y_1, y_2, -y_3)
+  eta_ratio = viscosity_bellow_interface / viscosity_above_interface
+  
+  See eq. 22 in Swan and Brady, Physics of fluids (2007) and
+  Lee et al., J. Fluid Mechanics, 93, 705 (1979). 
+  '''
+  # No pseudo-periodic implemented
+  L = np.array([0.0, 0.0, 0.0])
+  
+  # Single wall
+  if eta_ratio > 0:
+    # Get effective height
+    r_vectors_effective = shift_heights(r_vectors, a)
+    # Compute damping matrix B
+    B, overlap = mobility_cpp.damping_matrix_B(r_vectors, a)
+      
+    # Compute B * force
+    if overlap is True:
+      # Compute M_tilde * B * force
+      vel_wall = mobility_cpp.single_wall_mobility_trans_times_force(r_vectors_effective, B.dot(force.flatten()), eta, a, L)
+    else:
+      vel_wall = mobility_cpp.single_wall_mobility_trans_times_force(r_vectors_effective, force, eta, a, L)
+    # Compute B.T * M * B * vector
+    if overlap is True:
+      vel_wall = B.dot(vel_wall)      
+  else:
+    vel_wall = 0
+
+  # Rotne-Prager
+  vel_RP = mobility_numba.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, L)
+
+  # Rotne-Prager image
+  r_image = np.copy(r_vectors)
+  r_image[:,2] *= -1.0
+  force_image = np.copy(force.reshape(force.size // 3, 3))
+  force_image[:,2] *= -1.0
+  vel_RP_image = mobility_numba.no_wall_mobility_trans_times_force_numba(r_image, force_image, eta, a, L)
+
+  # Add all contributions
+  return (1.0 / (1.0 + eta_ratio)) * (vel_RP + vel_RP_image) + (eta_ratio / (1.0 + eta_ratio)) * vel_wall
+
+
