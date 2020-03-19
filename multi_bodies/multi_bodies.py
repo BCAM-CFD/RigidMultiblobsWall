@@ -40,6 +40,14 @@ while found_functions is False:
       found_HydroGrid = True
     except ImportError:
       found_HydroGrid = False
+    try:
+      from mpi4py import MPI
+    except ImportError:
+      pass
+    try:
+      import stkfmm
+    except ImportError:
+      pass
     found_functions = True
   except ImportError:
     path_to_append += '../'
@@ -96,7 +104,9 @@ def set_mobility_blobs(implementation):
     return mb.single_wall_fluid_mobility
   elif implementation == 'C++':
     return mb.single_wall_fluid_mobility_cpp
-
+  elif implementation == 'interface':
+    eta_ratio = kwargs.get('eta_ratio')
+    return partial(mb.fluid_interface_mobility_cpp, eta_ratio = eta_ratio)
 
 def set_mobility_vector_prod(implementation):
   '''
@@ -117,6 +127,13 @@ def set_mobility_vector_prod(implementation):
     return mb.no_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba_no_wall':
     return mb.no_wall_mobility_trans_times_force_numba
+  elif implementation == 'stkfmm':
+    mult_order = 8
+    max_pts = 2048
+    fmm_PVelLaplacian = stkfmm.STKFMM(mult_order, max_pts, stkfmm.PAXIS.NONE, stkfmm.KERNEL.PVelLaplacian)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm,
+                                                                fmm_PVelLaplacian=fmm_PVelLaplacian)
+    return no_wall_mobility_trans_times_force_stkfmm_partial
   # Implementations with wall
   elif implementation == 'python':
     return mb.single_wall_fluid_mobility_product
@@ -126,7 +143,9 @@ def set_mobility_vector_prod(implementation):
     return mb.single_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba':
     return mb.single_wall_mobility_trans_times_force_numba
-
+  elif implementation == 'interface':
+    eta_ratio = kwargs.get('eta_ratio')
+    return partial(mb.fluid_interface_mobility_trans_times_force_cpp, eta_ratio = eta_ratio)
 
 def calc_K_matrix(bodies, Nblobs):
   '''
@@ -264,7 +283,7 @@ def build_block_diagonal_preconditioners_det_stoch(bodies, r_vectors, Nblobs, et
       # 1. Compute blobs mobility 
       M = b.calc_mobility_blobs(eta, a)
       # 2. Compute Cholesy factorization, M = L^T * L
-      L, lower = scipy.linalg.cho_factor(M)
+      L, lower = scipy.linalg.cho_factor(M, check_finite=False)
       L = np.triu(L)   
       M_factorization_blobs.append(L.T)
       # 3. Compute inverse of L
@@ -368,7 +387,7 @@ def build_block_diagonal_preconditioner(bodies, r_vectors, Nblobs, eta, a, *args
       # 1. Compute blobs mobility and invert it
       M = b.calc_mobility_blobs(eta, a)
       # 2. Compute Cholesy factorization, M = L^T * L
-      L, lower = scipy.linalg.cho_factor(M)
+      L, lower = scipy.linalg.cho_factor(M, check_finite=False)
       L = np.triu(L)   
       # 3. Compute inverse mobility blobs
       mobility_inv_blobs.append(scipy.linalg.solve_triangular(L, scipy.linalg.solve_triangular(L, np.eye(b.Nblobs * 3), trans='T', check_finite=False), check_finite=False))
@@ -467,7 +486,7 @@ def build_stochastic_block_diagonal_preconditioner(bodies, r_vectors, eta, a, *a
     M = b.calc_mobility_blobs(eta, a)
     
     # 2. Compute Cholesy factorization, M = L^T * L
-    L, lower = scipy.linalg.cho_factor(M)
+    L, lower = scipy.linalg.cho_factor(M, check_finite=False)
     L = np.triu(L)   
     P_inv.append(L.T)
 
@@ -528,7 +547,7 @@ if __name__ == '__main__':
   output_name = read.output_name 
   structures = read.structures
   structures_ID = read.structures_ID
-  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation)
+  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, read.eta_ratio)
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
@@ -565,7 +584,7 @@ if __name__ == '__main__':
     # Create each body of type structure
     for i in range(num_bodies_struct):
       b = body.Body(struct_locations[i], struct_orientations[i], struct_ref_config, a)
-      b.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
+      b.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation, eta_ratio=read.eta_ratio)
       b.ID = structures_ID[ID]
       # Calculate body length for the RFD
       if i == 0:
@@ -613,13 +632,19 @@ if __name__ == '__main__':
 
   integrator.calc_slip = calc_slip 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
-  integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
+  integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation, eta_ratio=read.eta_ratio)
   integrator.force_torque_calculator = partial(multi_bodies_functions.force_torque_calculator_sort_by_bodies, 
                                                g = g, 
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
                                                debye_length_wall = read.debye_length_wall, 
                                                repulsion_strength = read.repulsion_strength, 
                                                debye_length = read.debye_length, 
+                                               mu = read.mu,
+                                               B0 = read.B0,
+                                               omega = read.omega,
+                                               quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                                               omega_perp = read.omega_perp,
+                                               vacuum_permeability = read.vacuum_permeability,
                                                periodic_length = read.periodic_length) 
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
@@ -641,6 +666,9 @@ if __name__ == '__main__':
   integrator.update_PC = read.update_PC
   integrator.print_residual = args.print_residual
   integrator.rf_delta = read.rf_delta
+  integrator.harmonic_confinement = read.harmonic_confinement
+  integrator.harmonic_confinement_plane = read.harmonic_confinement_plane
+  integrator.dipole_dipole = read.dipole_dipole
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:
@@ -657,6 +685,15 @@ if __name__ == '__main__':
                                0, 
                                get_blobs_r_vectors(bodies, Nblobs))
 
+  # Create fields
+  if read.save_number_density or read.save_velocity or read.save_stress:
+    fields_obj = fields.fields(read.mesh_fields, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+    if read.mesh_fields_opt1 is not None:
+      fields_obj_opt1 = fields.fields(read.mesh_fields_opt1, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+    if read.mesh_fields_opt2 is not None:
+      fields_obj_opt2 = fields.fields(read.mesh_fields_opt2, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
+    if read.mesh_fields_opt3 is not None:
+      fields_obj_opt3 = fields.fields(read.mesh_fields_opt3, read.save_number_density, read.save_velocity, read.save_stress, read.stress_inf_correction, read.blob_radius)
 
   # Loop over time steps
   start_time = time.time()
@@ -722,6 +759,24 @@ if __name__ == '__main__':
           mobility_bodies = np.linalg.pinv(np.dot(K.T, np.dot(resistance_blobs, K)))
           name = output_name + '.body_mobility.' + str(step).zfill(8) + '.dat'
           np.savetxt(name, mobility_bodies, delimiter='  ')
+
+      if read.save_number_density or read.save_velocity or read.save_stress:
+        # Save stress
+        fields_obj.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+        if read.mesh_fields_opt1 is not None:
+          fields_obj_opt1.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+        if read.mesh_fields_opt2 is not None:
+          fields_obj_opt2.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)     
+        if read.mesh_fields_opt3 is not None:
+          fields_obj_opt3.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+        if (step % read.save_fields_step) == 0:
+          fields_obj.print_files(read.output_name)
+          if read.mesh_fields_opt1 is not None:
+            fields_obj_opt1.print_files(read.output_name + '.opt1')
+          if read.mesh_fields_opt2 is not None:
+            fields_obj_opt2.print_files(read.output_name + '.opt2')
+          if read.mesh_fields_opt3 is not None:
+            fields_obj_opt3.print_files(read.output_name + '.opt3')
         
     # Update HydroGrid
     if (step % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
@@ -810,7 +865,25 @@ if __name__ == '__main__':
         mobility_bodies = np.linalg.pinv(np.dot(K.T, np.dot(resistance_blobs, K)))
         name = output_name + '.body_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_bodies, delimiter='  ')
-        
+
+    if read.save_number_density or read.save_velocity or read.save_stress:
+      # Save stress
+      fields_obj.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+      if read.mesh_fields_opt1 is not None:
+        fields_obj_opt1.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+      if read.mesh_fields_opt2 is not None:
+        fields_obj_opt2.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)       
+      if read.mesh_fields_opt3 is not None:
+        fields_obj_opt3.save(bodies, vw = integrator.bodies_velocity, r_vectors_blobs = get_blobs_r_vectors(bodies, Nblobs), force_blobs = integrator.blobs_lambda)
+      if ((step+1) % read.save_fields_step) == 0:
+        fields_obj.print_files(read.output_name)
+        if read.mesh_fields_opt1 is not None:
+          fields_obj_opt1.print_files(read.output_name + '.opt1')
+        if read.mesh_fields_opt2 is not None:
+          fields_obj_opt2.print_files(read.output_name + '.opt2')
+        if read.mesh_fields_opt3 is not None:
+          fields_obj_opt3.print_files(read.output_name + '.opt3')
+
   # Update HydroGrid data
   if ((step+1) % read.sample_HydroGrid) == 0 and found_HydroGrid and read.call_HydroGrid:
     cc.calculate_concentration(output_name, 
