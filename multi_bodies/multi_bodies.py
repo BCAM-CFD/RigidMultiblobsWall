@@ -83,7 +83,7 @@ def get_blobs_r_vectors(bodies, Nblobs):
   return r_vectors
 
 
-def set_mobility_blobs(implementation):
+def set_mobility_blobs(implementation, *args, **kwargs):
   '''
   Set the function to compute the dense mobility
   at the blob level to the right implementation.
@@ -108,7 +108,7 @@ def set_mobility_blobs(implementation):
     eta_ratio = kwargs.get('eta_ratio')
     return partial(mb.fluid_interface_mobility_cpp, eta_ratio = eta_ratio)
 
-def set_mobility_vector_prod(implementation):
+def set_mobility_vector_prod(implementation, *args, **kwargs):
   '''
   Set the function to compute the matrix-vector
   product (M*F) with the mobility defined at the blob 
@@ -146,6 +146,7 @@ def set_mobility_vector_prod(implementation):
   elif implementation == 'interface':
     eta_ratio = kwargs.get('eta_ratio')
     return partial(mb.fluid_interface_mobility_trans_times_force_cpp, eta_ratio = eta_ratio)
+
 
 def calc_K_matrix(bodies, Nblobs):
   '''
@@ -547,7 +548,7 @@ if __name__ == '__main__':
   output_name = read.output_name 
   structures = read.structures
   structures_ID = read.structures_ID
-  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, read.eta_ratio)
+  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, eta_ratio=read.eta_ratio)
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
