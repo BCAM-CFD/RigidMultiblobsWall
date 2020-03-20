@@ -304,6 +304,17 @@ def no_wall_mobility_trans_times_force_pycuda(r_vectors, force, eta, a, *args, *
   return vel
 
 
+def no_wall_mobility_trans_times_force_cpp(r_vectors, force, eta, a, *args, **kwargs):
+  '''
+  Returns the product of the mobility at the blob level to the force
+  on the blobs. Mobility for particles in an unbounded domain, it uses
+  the standard RPY tensor.  
+  
+  This function uses cpp.
+  '''
+  return mobility_cpp.rotne_prager_mobility_trans_times_force(r_vectors, force, eta, a)
+
+
 def single_wall_mobility_rot_times_force_pycuda(r_vectors, force, eta, a, *args, **kwargs):
   '''
   Returns the product of the mobility at the blob level to the force
@@ -1474,18 +1485,11 @@ def fluid_interface_mobility_cpp(r_vectors, eta, a, eta_ratio=0, *args, **kwargs
   else:
     M_wall = 0
 
-  # Rotne-Prager
-  M_RP = mobility_cpp.rotne_prager_tensor(r_vectors, eta, a)
-
-  # Rotne-Prager image
-  r_image = np.copy(r_vectors)
-  r_image[:,2] *= -1
-  p = np.ones(r_vectors.size)
-  p[2::3] = -1.0
-  M_RP_image = p * mobility_cpp.rotne_prager_tensor(r_image, eta, a)
+  # Rotne-Prager free surface
+  M_RP_free_surface = mobility_cpp.rotne_prager_free_surface_tensor(r_vectors, eta, a)
   
   # Total contribution
-  return (1.0 / (1.0 + eta_ratio)) * (M_RP + M_RP_image) + (eta_ratio / (1.0 + eta_ratio)) * M_wall
+  return (1.0 / (1.0 + eta_ratio)) *  M_RP_free_surface + (eta_ratio / (1.0 + eta_ratio)) * M_wall
 
 
 def fluid_interface_mobility_trans_times_force_cpp(r_vectors, force, eta, a, eta_ratio=0, *args, **kwargs):
@@ -1531,17 +1535,10 @@ def fluid_interface_mobility_trans_times_force_cpp(r_vectors, force, eta, a, eta
   else:
     vel_wall = 0
 
-  # Rotne-Prager
-  vel_RP = mobility_numba.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, L)
-
-  # Rotne-Prager image
-  r_image = np.copy(r_vectors)
-  r_image[:,2] *= -1.0
-  force_image = np.copy(force.reshape(force.size // 3, 3))
-  force_image[:,2] *= -1.0
-  vel_RP_image = mobility_numba.no_wall_mobility_trans_times_force_numba(r_image, force_image, eta, a, L)
-
+  # Rotne-Prager free surface
+  vel_free = mobility_cpp.rotne_prager_free_surface_trans_times_force(r_vectors, force, eta, a)
+  
   # Add all contributions
-  return (1.0 / (1.0 + eta_ratio)) * (vel_RP + vel_RP_image) + (eta_ratio / (1.0 + eta_ratio)) * vel_wall
+  return (1.0 / (1.0 + eta_ratio)) * vel_free + (eta_ratio / (1.0 + eta_ratio)) * vel_wall
 
 

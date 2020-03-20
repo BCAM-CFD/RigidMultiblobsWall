@@ -65,6 +65,10 @@ if __name__ == '__main__':
         u_no_wall_pycuda = mob.no_wall_mobility_trans_times_force_pycuda(r_vectors, force, eta, a)
         timer('zz_no_wall_pycuda') 
 
+    if found_cpp:
+        timer('zz_no_wall_cpp')
+        u_no_wall_cpp = mob.no_wall_mobility_trans_times_force_cpp(r_vectors, force, eta, a)
+        timer('zz_no_wall_cpp')
 
     # ================================================================
     # WALL TESTS
@@ -98,7 +102,9 @@ if __name__ == '__main__':
     if False:
         np.set_printoptions(precision=6)
         print('no_wall_numba  ', u_no_wall_numba)
+        print('no_wall_cpp    ', u_no_wall_cpp)
         print('numba          ', u_numba)
+        print('cpp            ', u_cpp)
         print('pycuda         ', u_gpu)
         print('diff           ', u_numba - u_gpu)
 
@@ -113,6 +119,7 @@ if __name__ == '__main__':
     if found_pycuda:
         print('|u_no_wall_pycuda - u_no_wall_loops_full| / |u_no_wall_loops_full| = ', np.linalg.norm(u_no_wall_pycuda - u_no_wall_loops_full) / np.linalg.norm(u_no_wall_loops_full))
     print('|u_no_wall_numba - u_no_wall_loops_full| / |u_no_wall_loops_full|  = ', np.linalg.norm(u_no_wall_numba - u_no_wall_loops_full) / np.linalg.norm(u_no_wall_loops_full))
+    print('|u_no_wall_cpp - u_no_wall_loops_full| / |u_no_wall_loops_full|  = ', np.linalg.norm(u_no_wall_cpp - u_no_wall_loops_full) / np.linalg.norm(u_no_wall_loops_full))
     print('=================== Wall tests ===================')
     print('|u - u_loops| / |u_loops|                                          = ', np.linalg.norm(u - u_loops) / np.linalg.norm(u_loops))
     print('|u_numba - u_loops| / |u_loops|                                    = ', np.linalg.norm(u_numba - u_loops) / np.linalg.norm(u_loops))

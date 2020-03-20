@@ -429,12 +429,362 @@ dvec single_wall_mobility_trans_times_force(Eigen::Ref<dvecvec> r_vectors_in,
     return u;
 }
 
+
+dvec rotne_prager_mobility_trans_times_force(Eigen::Ref<dvecvec> r_vectors_in,
+                                             Eigen::Ref<dvecvec> force_in,
+                                             double eta, double a) {
+    const int N = r_vectors_in.size() / 3;
+    Eigen::Map<dvecvec> r_vectors(r_vectors_in.data(), N, 3);
+    Eigen::Map<dvecvec> force(force_in.data(), N, 3);
+
+    constexpr double fourOverThree = 4.0 / 3.0;
+    const double inva = 1.0 / a;
+    const double norm_fact_f = 1.0 / (8.0 * M_PI * eta * a);
+
+    dvec u = dvec(N * 3).setZero();
+    if (force.isZero(0)) {
+        return u;
+    }
+
+    // Loop over all particles
+#pragma omp parallel for reduction(+ : u) schedule(dynamic)
+    for (int i = 0; i < N; ++i) {
+        { // self interaction
+          double Mxx = fourOverThree;
+          double Myy = fourOverThree;
+          double Mzz = fourOverThree;
+
+          u[i * 3 + 0] += Mxx * force(i, 0) * norm_fact_f;
+          u[i * 3 + 1] += Myy * force(i, 1) * norm_fact_f;
+          u[i * 3 + 2] += Mzz * force(i, 2) * norm_fact_f;
+        }
+
+        for (int j = i + 1; j < N; ++j) {
+          double Mxx, Mxy, Mxz;
+          double Myx, Myy, Myz;
+          double Mzx, Mzy, Mzz;
+
+          // Compute scaled vector between particles i and j
+          Eigen::Vector3d dr = inva * (r_vectors.row(i) - r_vectors.row(j));
+          
+          // Normalize distance with hydrodynamic radius
+          const double r = dr.norm();
+          const double r2 = r * r;
+
+          // TODO: We should not divide by zero
+          const double invr = 1.0 / r;
+          const double invr2 = invr * invr;
+
+          if (r > 2) {
+            const double c1 = 1.0 + 2.0 / (3.0 * r2);
+            const double c2 = (1.0 - 2.0 * invr2) * invr2;
+            Mxx = (c1 + c2 * dr[0] * dr[0]) * invr;
+            Mxy = (c2 * dr[0] * dr[1]) * invr;
+            Mxz = (c2 * dr[0] * dr[2]) * invr;
+            Myy = (c1 + c2 * dr[1] * dr[1]) * invr;
+            Myz = (c2 * dr[1] * dr[2]) * invr;
+            Mzz = (c1 + c2 * dr[2] * dr[2]) * invr;
+          } else {
+            const double c1 = fourOverThree * (1.0 - 0.28125 * r); //  9/32 = 0.28125
+            const double c2 = fourOverThree * 0.09375 * invr; // 3/32 = 0.09375
+            Mxx = c1 + c2 * dr[0] * dr[0];
+            Mxy = c2 * dr[0] * dr[1];
+            Mxz = c2 * dr[0] * dr[2];
+            Myy = c1 + c2 * dr[1] * dr[1];
+            Myz = c2 * dr[1] * dr[2];
+            Mzz = c1 + c2 * dr[2] * dr[2];
+          }
+          Myx = Mxy;
+          Mzx = Mxz;
+          Mzy = Myz;
+
+          u[i * 3 + 0] += (Mxx * force(j, 0) + Mxy * force(j, 1) + Mxz * force(j, 2)) * norm_fact_f;
+          u[i * 3 + 1] += (Myx * force(j, 0) + Myy * force(j, 1) + Myz * force(j, 2)) * norm_fact_f;
+          u[i * 3 + 2] += (Mzx * force(j, 0) + Mzy * force(j, 1) + Mzz * force(j, 2)) * norm_fact_f;
+          u[j * 3 + 0] += (Mxx * force(i, 0) + Myx * force(i, 1) + Mzx * force(i, 2)) * norm_fact_f;
+          u[j * 3 + 1] += (Mxy * force(i, 0) + Myy * force(i, 1) + Mzy * force(i, 2)) * norm_fact_f;
+          u[j * 3 + 2] += (Mxz * force(i, 0) + Myz * force(i, 1) + Mzz * force(i, 2)) * norm_fact_f;
+        }
+    }
+
+    return u;
+}
+
+
+dvecvec rotne_prager_free_surface_tensor(Eigen::Ref<dvecvec> r_vectors_in, double eta, double a) {
+    // Extract variables
+    Eigen::Map<dvecvec> r_vectors(r_vectors_in.data(), r_vectors_in.size() / 3, 3);
+
+    // Compute scalar functions f(r) and g(r)
+    double factor = 1.0 / (6.0 * M_PI * eta);
+
+    // Build mobility matrix of size 3N \times 3N
+    dvecvec M = dvecvec(r_vectors.size(), r_vectors.size());
+
+    for (int i = 0; i < r_vectors.rows(); ++i) {
+        for (int j = 0; j < r_vectors.rows(); ++j) {
+            // Interaction above interface
+            double dx = r_vectors(i, 0) - r_vectors(j, 0);
+            double dy = r_vectors(i, 1) - r_vectors(j, 1);
+            double dz = r_vectors(i, 2) - r_vectors(j, 2);
+            double dr = sqrt(dx * dx + dy * dy + dz * dz);
+
+            double fr, gr;
+            if (dr > 2.0 * a) {
+                double drij3 = dr * dr * dr;
+                double drij5 = dr * dr * drij3;
+                fr = factor * (0.75 / dr + a * a / (2.0 * drij3));
+                gr = factor * (0.75 / drij3 - 1.5 * a * a / drij5);
+            } else if (dr == 0.0) {
+                fr = factor / a;
+                gr = 0.0;
+            } else {
+                fr = factor * (1.0 / a - 0.28125 * dr / (a * a));
+                gr = factor * (3.0 / (32.0 * a * a * dr));
+            }
+
+            M(i * 3, j * 3)     = fr + gr * dx * dx;
+            M(i * 3, j * 3 + 1) = gr * dx * dy;
+            M(i * 3, j * 3 + 2) = gr * dx * dz;
+
+            M(i * 3 + 1, j * 3)     = gr * dy * dx;
+            M(i * 3 + 1, j * 3 + 1) = fr + gr * dy * dy;
+            M(i * 3 + 1, j * 3 + 2) = gr * dy * dz;
+
+            M(i * 3 + 2, j * 3)     = gr * dz * dx;
+            M(i * 3 + 2, j * 3 + 1) = gr * dz * dy;
+            M(i * 3 + 2, j * 3 + 2) = fr + gr * dz * dz;
+
+            // Interaction with image blob (below interface)
+            dx = r_vectors(i, 0) - r_vectors(j, 0);
+            dy = r_vectors(i, 1) - r_vectors(j, 1);
+            dz = r_vectors(i, 2) + r_vectors(j, 2);
+            dr = sqrt(dx * dx + dy * dy + dz * dz);
+            
+            if (dr > 2.0 * a) {
+                double drij3 = dr * dr * dr;
+                double drij5 = dr * dr * drij3;
+                fr = factor * (0.75 / dr + a * a / (2.0 * drij3));
+                gr = factor * (0.75 / drij3 - 1.5 * a * a / drij5);
+            } else if (dr == 0.0) {
+                fr = factor / a;
+                gr = 0.0;
+            } else {
+                fr = factor * (1.0 / a - 0.28125 * dr / (a * a));
+                gr = factor * (3.0 / (32.0 * a * a * dr));
+            }
+
+            M(i * 3, j * 3)     += fr + gr * dx * dx;
+            M(i * 3, j * 3 + 1) += gr * dx * dy;
+            M(i * 3, j * 3 + 2) -= gr * dx * dz;
+
+            M(i * 3 + 1, j * 3)     += gr * dy * dx;
+            M(i * 3 + 1, j * 3 + 1) += fr + gr * dy * dy;
+            M(i * 3 + 1, j * 3 + 2) -= gr * dy * dz;
+
+            M(i * 3 + 2, j * 3)     += gr * dz * dx;
+            M(i * 3 + 2, j * 3 + 1) += gr * dz * dy;
+            M(i * 3 + 2, j * 3 + 2) -= fr + gr * dz * dz;
+        }
+    }
+
+    return M;
+}
+
+
+dvec rotne_prager_free_surface_trans_times_force(Eigen::Ref<dvecvec> r_vectors_in,
+                                                 Eigen::Ref<dvecvec> force_in,
+                                                 double eta, double a) {
+    const int N = r_vectors_in.size() / 3;
+    Eigen::Map<dvecvec> r_vectors(r_vectors_in.data(), N, 3);
+    Eigen::Map<dvecvec> force(force_in.data(), N, 3);
+
+    constexpr double fourOverThree = 4.0 / 3.0;
+    const double inva = 1.0 / a;
+    const double norm_fact_f = 1.0 / (8.0 * M_PI * eta * a);
+
+    dvec u = dvec(N * 3).setZero();
+    if (force.isZero(0)) {
+        return u;
+    }
+
+    // Loop over all particles
+#pragma omp parallel for reduction(+ : u) schedule(dynamic)
+    for (int i = 0; i < N; ++i) {
+        if(true){ // self interaction
+          double Mxx = fourOverThree;
+          double Myy = fourOverThree;
+          double Mzz = fourOverThree;
+
+          u[i * 3 + 0] += Mxx * force(i, 0) * norm_fact_f;
+          u[i * 3 + 1] += Myy * force(i, 1) * norm_fact_f;
+          u[i * 3 + 2] += Mzz * force(i, 2) * norm_fact_f;
+
+          // interaction with self-image
+          Eigen::Vector3d ri = r_vectors.row(i);
+          Eigen::Vector3d dr;
+          dr[0] = 0;
+          dr[1] = 0;
+          dr[2] = inva * 2 * ri[2];
+          
+          // Normalize distance with hydrodynamic radius
+          const double r = dr.norm();
+          const double r2 = r * r;
+
+          // TODO: We should not divide by zero
+          const double invr = 1.0 / r;
+          const double invr2 = invr * invr;
+
+          if (r > 2) {
+            const double c1 = 1.0 + 2.0 / (3.0 * r2);
+            const double c2 = (1.0 - 2.0 * invr2) * invr2;
+            Mxx = c1 * invr;
+            Myy = c1 * invr;
+            Mzz = (c1 + c2 * dr[2] * dr[2]) * invr;
+          }
+          else if(r == 0) {
+            Mxx = fourOverThree;
+            Myy = fourOverThree;
+            Mzz = fourOverThree;
+          }
+          else {
+            const double c1 = fourOverThree * (1.0 - 0.28125 * r); //  9/32 = 0.28125
+            const double c2 = fourOverThree * 0.09375 * invr; // 3/32 = 0.09375
+            Mxx = c1;
+            Myy = c1;
+            Mzz = c1 + c2 * dr[2] * dr[2];
+          }
+          u[i * 3 + 0] += (Mxx * force(i, 0)) * norm_fact_f;
+          u[i * 3 + 1] += (Myy * force(i, 1)) * norm_fact_f;
+          u[i * 3 + 2] -= (Mzz * force(i, 2)) * norm_fact_f;
+        }
+
+        for (int j = i+1; j < N; ++j) {
+          double Mxx, Mxy, Mxz;
+          double Myx, Myy, Myz;
+          double Mzx, Mzy, Mzz;
+
+          // Compute interaction with blobs above interface
+          {
+            // Compute scaled vector between particles i and j
+            Eigen::Vector3d dr = inva * (r_vectors.row(i) - r_vectors.row(j));
+          
+            // Normalize distance with hydrodynamic radius
+            const double r = dr.norm();
+            const double r2 = r * r;
+
+            // TODO: We should not divide by zero
+            const double invr = 1.0 / r;
+            const double invr2 = invr * invr;
+
+            if (r > 2) {
+              const double c1 = 1.0 + 2.0 / (3.0 * r2);
+              const double c2 = (1.0 - 2.0 * invr2) * invr2;
+              Mxx = (c1 + c2 * dr[0] * dr[0]) * invr;
+              Mxy = (c2 * dr[0] * dr[1]) * invr;
+              Mxz = (c2 * dr[0] * dr[2]) * invr;
+              Myy = (c1 + c2 * dr[1] * dr[1]) * invr;
+              Myz = (c2 * dr[1] * dr[2]) * invr;
+              Mzz = (c1 + c2 * dr[2] * dr[2]) * invr;
+            }
+            else if(r == 0) {
+              Mxx = fourOverThree;
+              Mxy = 0;
+              Mxz = 0;
+              Myy = fourOverThree;
+              Myz = 0;
+              Mzz = fourOverThree;
+            }
+            else {
+              const double c1 = fourOverThree * (1.0 - 0.28125 * r); //  9/32 = 0.28125
+              const double c2 = fourOverThree * 0.09375 * invr; // 3/32 = 0.09375
+              Mxx = c1 + c2 * dr[0] * dr[0];
+              Mxy = c2 * dr[0] * dr[1];
+              Mxz = c2 * dr[0] * dr[2];
+              Myy = c1 + c2 * dr[1] * dr[1];
+              Myz = c2 * dr[1] * dr[2];
+              Mzz = c1 + c2 * dr[2] * dr[2];
+            }
+            Myx = Mxy;
+            Mzx = Mxz;
+            Mzy = Myz;
+            
+            u[i * 3 + 0] += (Mxx * force(j, 0) + Mxy * force(j, 1) + Mxz * force(j, 2)) * norm_fact_f;
+            u[i * 3 + 1] += (Myx * force(j, 0) + Myy * force(j, 1) + Myz * force(j, 2)) * norm_fact_f;
+            u[i * 3 + 2] += (Mzx * force(j, 0) + Mzy * force(j, 1) + Mzz * force(j, 2)) * norm_fact_f;
+            u[j * 3 + 0] += (Mxx * force(i, 0) + Myx * force(i, 1) + Mzx * force(i, 2)) * norm_fact_f;
+            u[j * 3 + 1] += (Mxy * force(i, 0) + Myy * force(i, 1) + Mzy * force(i, 2)) * norm_fact_f;
+            u[j * 3 + 2] += (Mxz * force(i, 0) + Myz * force(i, 1) + Mzz * force(i, 2)) * norm_fact_f;
+          }
+            
+          // Interaction with image particles (below interface)
+          {
+            // Compute scaled vector between particles i and j
+            Eigen::Vector3d rj = inva * r_vectors.row(j);
+            Eigen::Vector3d dr = inva * (r_vectors.row(i) - r_vectors.row(j));
+            dr[2] += 2 * rj[2];
+            
+            // Normalize distance with hydrodynamic radius
+            const double r = dr.norm();
+            const double r2 = r * r;
+
+            // TODO: We should not divide by zero
+            const double invr = 1.0 / r;
+            const double invr2 = invr * invr;
+
+            if (r > 2) {
+              const double c1 = 1.0 + 2.0 / (3.0 * r2);
+              const double c2 = (1.0 - 2.0 * invr2) * invr2;
+              Mxx = (c1 + c2 * dr[0] * dr[0]) * invr;
+              Mxy = (c2 * dr[0] * dr[1]) * invr;
+              Mxz = (c2 * dr[0] * dr[2]) * invr;
+              Myy = (c1 + c2 * dr[1] * dr[1]) * invr;
+              Myz = (c2 * dr[1] * dr[2]) * invr;
+              Mzz = (c1 + c2 * dr[2] * dr[2]) * invr;
+            } else if(r == 0) {
+              Mxx = fourOverThree;
+              Mxy = 0;
+              Mxz = 0;
+              Myy = fourOverThree;
+              Myz = 0;
+              Mzz = fourOverThree;
+            } else {
+              const double c1 = fourOverThree * (1.0 - 0.28125 * r); //  9/32 = 0.28125
+              const double c2 = fourOverThree * 0.09375 * invr; // 3/32 = 0.09375
+              Mxx = c1 + c2 * dr[0] * dr[0];
+              Mxy = c2 * dr[0] * dr[1];
+              Mxz = c2 * dr[0] * dr[2];
+              Myy = c1 + c2 * dr[1] * dr[1];
+              Myz = c2 * dr[1] * dr[2];
+              Mzz = c1 + c2 * dr[2] * dr[2];
+            }
+            Myx = Mxy;
+            Mzx = Mxz;
+            Mzy = Myz;
+            
+            u[i * 3 + 0] += ( Mxx * force(j, 0) + Mxy * force(j, 1) - Mxz * force(j, 2)) * norm_fact_f;
+            u[i * 3 + 1] += ( Myx * force(j, 0) + Myy * force(j, 1) - Myz * force(j, 2)) * norm_fact_f;
+            u[i * 3 + 2] += ( Mzx * force(j, 0) + Mzy * force(j, 1) - Mzz * force(j, 2)) * norm_fact_f;
+            // Mind the signs. Note that dr = r[i] - r[j] and r[j] = (r[j,0], r[j,1], -r[j,2])
+            u[j * 3 + 0] += ( Mxx * force(i, 0) + Mxy * force(i, 1) + Mxz * force(i, 2)) * norm_fact_f;
+            u[j * 3 + 1] += ( Myx * force(i, 0) + Myy * force(i, 1) + Myz * force(i, 2)) * norm_fact_f;
+            u[j * 3 + 2] += (-Mzx * force(i, 0) - Mzy * force(i, 1) - Mzz * force(i, 2)) * norm_fact_f;
+          }
+        }
+    }
+
+    return u;
+}
+
+
 #ifdef PYTHON
 PYBIND11_MODULE(mobility_cpp, m) {
-    m.def("single_wall_mobility_trans_times_force",
-          &single_wall_mobility_trans_times_force, "Calculate M*f for single wall.");
+    m.def("single_wall_mobility_trans_times_force", &single_wall_mobility_trans_times_force, "Calculate M*f for single wall.");
     m.def("single_wall_fluid_mobility", &single_wall_fluid_mobility, "");
     m.def("damping_matrix_B", &damping_matrix_B, "");
     m.def("rotne_prager_tensor", &rotne_prager_tensor, "Rotne-Prager tensor.");
+    m.def("rotne_prager_mobility_trans_times_force", &rotne_prager_mobility_trans_times_force, "Calculate M*f for RPY.");
+    m.def("rotne_prager_free_surface_tensor", &rotne_prager_free_surface_tensor, "Rotne-Prager free surface tensor.");
+    m.def("rotne_prager_free_surface_trans_times_force", &rotne_prager_free_surface_trans_times_force, "Calculate M*f for RPY above free surface.");
 }
 #endif
