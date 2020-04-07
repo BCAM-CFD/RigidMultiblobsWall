@@ -103,6 +103,10 @@ class ReadInput(object):
     self.harmonic_confinement_plane = float(self.options.get('harmonic_confinement_plane') or 0.0)
     self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
           
+    # Info for STKFMM
+    self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)
+    self.stkfmm_pbc = str(self.options.get('stkfmm_pbc') or 'None')
+
     # Create list with [vertex_file, clones_file] for each structure
     self.structures = []
     for i in range(number_of_structures):

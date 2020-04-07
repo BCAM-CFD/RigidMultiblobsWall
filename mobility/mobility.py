@@ -44,7 +44,7 @@ except ImportError:
   pass
 # Try to import stkfmm library
 try:
-  import stkfmm 
+  import PySTKFMM
 except ImportError:
   pass
 try:
@@ -1370,19 +1370,35 @@ def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force
 @utils.static_var('r_vectors_old', [])
 @utils.static_var('list_of_neighbors', [])
 @utils.static_var('offsets', [])
-def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, **kwargs):
+def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array([0.,0.,0.]), *args, **kwargs):
   ''' 
-  WARNING: overlap correction is not implemented!
-
   Returns the product of the mobility at the blob level to the force 
-  on the blobs. Mobility for particles in an unbounded domain, it uses
-  the standard RPY tensor.
+  on the blobs. Mobility for particles in an unbounded, semiperiodic or
+  periodic domain. It uses the standard RPY tensor.
   
   This function uses the stkfmm library.
   '''
-  # Get fmm
-  fmm_PVelLaplacian = kwargs.get('fmm_PVelLaplacian')
-  N = r_vectors.size // 3
+  def project_to_periodic_image(r, L):
+    '''
+    Project a vector r to the minimal image representation
+    of size L=(Lx, Ly, Lz) and with a corner at (0,0,0). If 
+    any dimension of L is equal or smaller than zero the 
+    box is assumed to be infinite in that direction.
+    
+    If one dimension is not periodic shift all coordinates by min(r[:,i]) value.
+    '''
+    if L is not None:
+      for i in range(3):
+        if(L[i] > 0):
+          r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+        else:
+          r[:,i] -= np.min(r[:,i])
+    return r
+
+  # Prepare coordinates
+  N = r.size // 3
+  r_vectors = np.copy(r)
+  r_vectors = project_to_periodic_image(r_vectors, L)
 
   # Set tree if necessary
   build_tree = True
@@ -1393,65 +1409,78 @@ def no_wall_mobility_trans_times_force_stkfmm(r_vectors, force, eta, a, *args, *
       offsets = no_wall_mobility_trans_times_force_stkfmm.offsets
   if build_tree:
     # Build tree in STKFMM
-    x_min = np.min(r_vectors[:,0])
-    x_max = np.max(r_vectors[:,0])
-    y_min = np.min(r_vectors[:,1])
-    y_max = np.max(r_vectors[:,1])
-    z_min = np.min(r_vectors[:,2])
-    z_max = np.max(r_vectors[:,2])
-    Lx = x_max - x_min
-    Ly = y_max - y_min
-    Lz = z_max - z_min 
-    utils.timer('set_fmm_tree')
-    stkfmm.setBox(fmm_PVelLaplacian, x_min-0.1*Lx, x_max+0.1*Lx, y_min-0.1*Ly, y_max+0.1*Ly, z_min-0.1*Lz, z_max+0.1*Lz)
-    stkfmm.setPoints(fmm_PVelLaplacian, N, r_vectors, 0, np.zeros(0), N, r_vectors)
-    stkfmm.setupTree(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
-    utils.timer('set_fmm_tree')
+    if L[0] > 0:
+      x_min = 0
+      x_max = L[0]
+      Lx = L[0]
+    else:
+      x_min = np.min(r_vectors[:,0])
+      x_max = np.max(r_vectors[:,0])
+      x_max += 0.01 * np.abs(x_max)
+      Lx = (x_max - x_min) * 10
+    if L[1] > 0:
+      y_min = 0
+      y_max = L[1]
+      Ly = L[1]
+    else:
+      y_min = np.min(r_vectors[:,1])
+      y_max = np.max(r_vectors[:,1])
+      y_max += 0.01 * np.abs(y_max)
+      Ly = (y_max - y_min) * 10
+    if L[2] > 0:
+      z_min = 0
+      z_max = L[2]
+      Lz = L[2]
+    else:
+      z_min = np.min(r_vectors[:,2])
+      z_max = np.max(r_vectors[:,2])
+      z_max += 0.01 * np.abs(z_max)
+      Lz = (z_max - z_min) * 10
+
+    # Build FMM tree
+    rpy_fmm.setBox(x_min, x_max, y_min, y_max, z_min, z_max)
+    rpy_fmm.setPoints(N, r_vectors, 0, np.zeros(0), N, r_vectors)
+    rpy_fmm.setupTree(PySTKFMM.KERNEL.RPY)
     
-    # Build tree in python
+    # Build tree in python and neighbors lists
     d_max = 2 * a
-    utils.timer('cKDTree')
-    tree = scsp.cKDTree(r_vectors)
-    utils.timer('cKDTree')
-    utils.timer('query_ball_tree')
+    if L[0] > 0 or L[1] > 0 or L[2] > 0:
+      boxsize = np.array([Lx, Ly, Lz])      
+    else:
+      boxsize = None
+    tree = scsp.cKDTree(r_vectors, boxsize = boxsize)
     pairs = tree.query_ball_tree(tree, d_max)
-    utils.timer('query_ball_tree')
-    utils.timer('set_offset')
     offsets = np.zeros(len(pairs)+1, dtype=int)
     for i in range(len(pairs)):
       offsets[i+1] = offsets[i] + len(pairs[i])
-    utils.timer('set_offset')
-    utils.timer('set_neighbors')
     list_of_neighbors = np.concatenate(pairs).ravel()
-    utils.timer('set_neighbors')
     no_wall_mobility_trans_times_force_stkfmm.offsets = np.copy(offsets)
     no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors = np.copy(list_of_neighbors)
     no_wall_mobility_trans_times_force_stkfmm.r_vectors_old = np.copy(r_vectors)
 
   # Set force with right format (single layer potential)
-  trg_value = np.zeros((N, 7))
+  trg_value = np.zeros((N, 6))
   src_SL_value = np.zeros((N, 4))
   src_SL_value[:,0:3] = np.copy(force.reshape((N, 3)))
+  src_SL_value[:,3] = a
     
   # Evaluate fmm; format p = trg_value[:,0], v = trg_value[:,1:4], Lap = trg_value[:,4:]
-  utils.timer('evaluate_fmm')
-  stkfmm.clearFMM(fmm_PVelLaplacian, stkfmm.KERNEL.PVelLaplacian)
-  stkfmm.evaluateFMM(fmm_PVelLaplacian, N, src_SL_value, 0, np.zeros(0), N, trg_value, stkfmm.KERNEL.PVelLaplacian)
-  utils.timer('evaluate_fmm')
+  rpy_fmm.clearFMM(PySTKFMM.KERNEL.RPY)
+  rpy_fmm.evaluateFMM(N, src_SL_value, 0, 0, N, trg_value, PySTKFMM.KERNEL.RPY)
+  comm = kwargs.get('comm')
+  comm.Barrier()
 
   # Compute RPY mobility
   # 1. Self mobility
   vel = (1.0 / (6.0 * np.pi * eta * a)) * force.reshape((N,3))
   # 2. Stokeslet
-  vel += trg_value[:,1:4] / (eta)
-  # 3. Laplacian
-  vel += (a**2 / (3.0 * eta)) * trg_value[:,4:]
+  vel += trg_value[:,0:3] / (eta)
+  # 3. Laplacian 
+  vel += (a**2 / (6.0 * eta)) * trg_value[:,3:]
   # 4. Double Laplacian
   #    it is zero with PBC
   # 5. Add blob-blob overlap correction
-  utils.timer('evaluate_correction')
   v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets)
-  utils.timer('evaluate_correction')
   vel += v_overlap.reshape((N, 3))
 
   return vel.flatten()

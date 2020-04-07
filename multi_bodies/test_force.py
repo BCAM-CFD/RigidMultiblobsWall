@@ -22,6 +22,7 @@ try:
 except ImportError:
   found_cpp = False
   pass
+found_boost = False
 
 
 if __name__ == '__main__':
@@ -31,8 +32,8 @@ if __name__ == '__main__':
   a = 0.13
   b = 0.01
   eps = 3.92
-  L = np.array([0.0, 0.0, 0.0])
-  r_vectors = np.random.rand(N, 3) * 80.0
+  L = np.array([0.0, 0.0, 25.0])
+  r_vectors = np.random.rand(N, 3) * 40.0
 
   if found_pycuda:
     force_pycuda = forces_pycuda.calc_blob_blob_forces_pycuda(r_vectors, blob_radius=a, debye_length=b, repulsion_strength=eps, periodic_length=L)
@@ -70,9 +71,11 @@ if __name__ == '__main__':
 
 
   if N < 3:
+    print('python     = \n', force_python)
+    print('numba      = \n', force_numba)
+    print('numba_tree = \n', force_numba_tree)
     if found_pycuda:
-      print('pycuda = ', force_pycuda)
-    print('numba = ', force_numba)
+      print('pycuda     = \n', force_pycuda)
     print('\n\n')
 
 

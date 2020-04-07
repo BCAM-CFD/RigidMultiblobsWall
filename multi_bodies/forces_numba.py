@@ -94,6 +94,9 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
   force = np.zeros((N, 3))
 
   # Copy arrays
+  Lx = L[0]
+  Ly = L[1]
+  Lz = L[2]
   rx_vec = np.copy(r_vectors[:,0])
   ry_vec = np.copy(r_vectors[:,1])
   rz_vec = np.copy(r_vectors[:,2])
@@ -107,6 +110,14 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
       ry = ry_vec[j] - ry_vec[i]
       rz = rz_vec[j] - rz_vec[i]
 
+      # If PBC use minimum distance
+      if Lx > 0:
+        rx -= int(rx / Lx + 0.5 * (int(rx>0) - int(rx<0))) * Lx
+      if Ly > 0:
+        ry -= int(ry / Ly + 0.5 * (int(ry>0) - int(ry<0))) * Ly
+      if Lz > 0:
+        rz -= int(rz / Lz + 0.5 * (int(rz>0) - int(rz<0))) * Lz
+
       # Compute force
       r_norm = np.sqrt(rx*rx + ry*ry + rz*rz)
       if r_norm > 2*a:
@@ -119,40 +130,71 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
   return force
 
 
-@utils.static_var('r_vectors_old', [])
-@utils.static_var('list_of_neighbors', [])
-@utils.static_var('offsets', [])
 def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
   '''
   This function computes the blob-blob forces and returns
   an array with shape (Nblobs, 3).
   '''
     
+  def project_to_periodic_image(r, L):
+    '''
+    Project a vector r to the minimal image representation
+    of size L=(Lx, Ly, Lz) and with a corner at (0,0,0). If 
+    any dimension of L is equal or smaller than zero the 
+    box is assumed to be infinite in that direction.
+    
+    If one dimension is not periodic shift all coordinates by min(r[:,i]) value.
+    '''
+    if L is not None:
+      for i in range(3):
+        if(L[i] > 0):
+          r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+        else:
+          r[:,i] -= np.min(r[:,i])
+    return r
+
   # Get parameters from arguments
   L = kwargs.get('periodic_length')
   eps = kwargs.get('repulsion_strength')
   b = kwargs.get('debye_length')
   a = kwargs.get('blob_radius')
   d_max = 2 * a + 30 * b
+  r_copy = r_vectors
 
   # Build tree and find neighbors
   build_tree = True
-  if len(calc_blob_blob_forces_tree_numba.list_of_neighbors) > 0:
-    if np.array_equal(calc_blob_blob_forces_tree_numba.r_vectors_old, r_vectors):
-      build_tree = False
-      list_of_neighbors = calc_blob_blob_forces_tree_numba.list_of_neighbors
-      offsets = calc_blob_blob_forces_tree_numba.offsets
-  if build_tree:  
-    tree = scsp.cKDTree(r_vectors)
+  if build_tree:
+    if L[0] > 0 or L[1] > 0 or L[2] > 0:
+      r_copy = np.copy(r_vectors)
+      r_copy = project_to_periodic_image(r_copy, L)
+      if L[0] > 0:
+        Lx = L[0]
+      else:
+        x_min = np.min(r_copy[:,0])
+        x_max = np.max(r_copy[:,0])
+        Lx = (x_max - x_min) * 10
+      if L[1] > 0:
+        Ly = L[1]
+      else:
+        y_min = np.min(r_copy[:,1])
+        y_max = np.max(r_copy[:,1])
+        Ly = (y_max - y_min) * 10
+      if L[2] > 0:
+        Lz = L[2]
+      else:
+        z_min = np.min(r_copy[:,2])
+        z_max = np.max(r_copy[:,2])
+        Lz = (z_max - z_min) * 10
+      boxsize = np.array([Lx, Ly, Lz])
+    else:
+      boxsize = None
+    tree = scsp.cKDTree(r_copy, boxsize=boxsize)
     pairs = tree.query_ball_tree(tree, d_max)
     offsets = np.zeros(len(pairs)+1, dtype=int)
     for i in range(len(pairs)):
       offsets[i+1] = offsets[i] + len(pairs[i])
     list_of_neighbors = np.concatenate(pairs).ravel()
-    calc_blob_blob_forces_tree_numba.offsets = np.copy(offsets)
-    calc_blob_blob_forces_tree_numba.list_of_neighbors = np.copy(list_of_neighbors)
-    calc_blob_blob_forces_tree_numba.r_vectors_old = np.copy(r_vectors)
   
   # Compute forces
-  force_blobs = blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offsets)
+  force_blobs = blob_blob_force_tree_numba(r_copy, L, eps, b, a, list_of_neighbors, offsets)
   return force_blobs

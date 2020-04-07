@@ -14,6 +14,11 @@ except:
     import cpickle
   except:
     import _pickle as cpickle
+try:
+  from mpi4py import MPI
+except ImportError:
+  print('It didn\'t find mpi4py!')
+
 
 # Add path to HydroGrid and import module
 # sys.path.append('../../HydroGrid/src/')
@@ -41,11 +46,7 @@ while found_functions is False:
     except ImportError:
       found_HydroGrid = False
     try:
-      from mpi4py import MPI
-    except ImportError:
-      pass
-    try:
-      import stkfmm
+      import PySTKFMM
     except ImportError:
       pass
     found_functions = True
@@ -128,12 +129,30 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
   elif implementation == 'numba_no_wall':
     return mb.no_wall_mobility_trans_times_force_numba
   elif implementation == 'stkfmm':
-    mult_order = 8
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    pbc_string = kwargs.get('stkfmm_pbc')
     max_pts = 2048
-    fmm_PVelLaplacian = stkfmm.STKFMM(mult_order, max_pts, stkfmm.PAXIS.NONE, stkfmm.KERNEL.PVelLaplacian)
-    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm,
-                                                                fmm_PVelLaplacian=fmm_PVelLaplacian)
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.RPY
+
+    # Setup FMM
+    rpy_fmm = PySTKFMM.STKFMM(mult_order, max_pts, pbc, kernel)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm, 
+                                                                rpy_fmm=rpy_fmm, 
+                                                                L=kwargs.get('L'), 
+                                                                comm=kwargs.get('comm'))
     return no_wall_mobility_trans_times_force_stkfmm_partial
+
   # Implementations with wall
   elif implementation == 'python':
     return mb.single_wall_fluid_mobility_product
@@ -526,6 +545,10 @@ def build_stochastic_block_diagonal_preconditioner(bodies, r_vectors, eta, a, *a
 
 
 if __name__ == '__main__':
+  # MPI
+  comm = MPI.COMM_WORLD
+  rank = comm.Get_rank()
+
   # Get command line arguments
   parser = argparse.ArgumentParser(description='Run a multi-body simulation and save trajectory.')
   parser.add_argument('--input-file', dest='input_file', type=str, default='data.main', help='name of the input file')
@@ -548,7 +571,12 @@ if __name__ == '__main__':
   output_name = read.output_name 
   structures = read.structures
   structures_ID = read.structures_ID
-  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, eta_ratio=read.eta_ratio)
+  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, 
+                                                  eta_ratio=read.eta_ratio, 
+                                                  stkfmm_mult_order=read.stkfmm_mult_order, 
+                                                  stkfmm_pbc=read.stkfmm_pbc,
+                                                  L=read.periodic_length,
+                                                  comm=comm)
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
