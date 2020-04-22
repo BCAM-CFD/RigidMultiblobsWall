@@ -1415,8 +1415,7 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
       Lx = L[0]
     else:
       x_min = np.min(r_vectors[:,0])
-      x_max = np.max(r_vectors[:,0])
-      x_max += 0.01 * np.abs(x_max)
+      x_max = np.max(r_vectors[:,0]) + 1e-10
       Lx = (x_max - x_min) * 10
     if L[1] > 0:
       y_min = 0
@@ -1424,8 +1423,7 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
       Ly = L[1]
     else:
       y_min = np.min(r_vectors[:,1])
-      y_max = np.max(r_vectors[:,1])
-      y_max += 0.01 * np.abs(y_max)
+      y_max = np.max(r_vectors[:,1]) + 1e-10
       Ly = (y_max - y_min) * 10
     if L[2] > 0:
       z_min = 0
@@ -1433,13 +1431,12 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
       Lz = L[2]
     else:
       z_min = np.min(r_vectors[:,2])
-      z_max = np.max(r_vectors[:,2])
-      z_max += 0.01 * np.abs(z_max)
+      z_max = np.max(r_vectors[:,2]) + 1e-10
       Lz = (z_max - z_min) * 10
 
     # Build FMM tree
-    rpy_fmm.setBox(x_min, x_max, y_min, y_max, z_min, z_max)
-    rpy_fmm.setPoints(N, r_vectors, 0, np.zeros(0), N, r_vectors)
+    rpy_fmm.setBox(np.array([x_min, y_min, z_min]), np.max(np.concatenate((L, np.array([x_max-x_min, y_max-y_min, z_max-z_min])))))
+    rpy_fmm.setPoints(N, r_vectors, N, r_vectors, 0, 0)
     rpy_fmm.setupTree(PySTKFMM.KERNEL.RPY)
     
     # Build tree in python and neighbors lists
@@ -1466,7 +1463,7 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
     
   # Evaluate fmm; format p = trg_value[:,0], v = trg_value[:,1:4], Lap = trg_value[:,4:]
   rpy_fmm.clearFMM(PySTKFMM.KERNEL.RPY)
-  rpy_fmm.evaluateFMM(N, src_SL_value, 0, 0, N, trg_value, PySTKFMM.KERNEL.RPY)
+  rpy_fmm.evaluateFMM(PySTKFMM.KERNEL.RPY, N, src_SL_value, N, trg_value, 0, 0)
   comm = kwargs.get('comm')
   comm.Barrier()
 

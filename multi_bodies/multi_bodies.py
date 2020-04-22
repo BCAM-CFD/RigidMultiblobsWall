@@ -132,7 +132,7 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     # STKFMM parameters
     mult_order = kwargs.get('stkfmm_mult_order')
     pbc_string = kwargs.get('stkfmm_pbc')
-    max_pts = 2048
+    max_pts = 512
     if pbc_string == 'None':
       pbc = PySTKFMM.PAXIS.NONE
     elif pbc_string == 'PX':
@@ -146,7 +146,7 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     kernel = PySTKFMM.KERNEL.RPY
 
     # Setup FMM
-    rpy_fmm = PySTKFMM.STKFMM(mult_order, max_pts, pbc, kernel)
+    rpy_fmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
     no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm, 
                                                                 rpy_fmm=rpy_fmm, 
                                                                 L=kwargs.get('L'), 
