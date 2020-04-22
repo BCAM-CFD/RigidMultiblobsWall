@@ -36,7 +36,11 @@ try:
   import visit.visit_writer as visit_writer
 except ImportError:
   pass
-
+# Try to import stkfmm library
+try:
+  import PySTKFMM
+except ImportError:
+  pass
 
 
 def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
@@ -87,7 +91,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
 
 
-def set_body_body_forces_torques_new(implementation):
+def set_body_body_forces_torques_new(implementation, *args, **kwargs):
   '''
   Set the function to compute the body-body forces
   to the right function. 
@@ -98,6 +102,36 @@ def set_body_body_forces_torques_new(implementation):
     return calc_body_body_forces_torques_python
   elif implementation == 'numba':
     return calc_body_body_forces_torques_numba
+  elif implementation == 'stkfmm':
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    max_pts = 512
+    pbc_string = kwargs.get('stkfmm_pbc')
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.LapPGradGrad
+    kernel_index = PySTKFMM.KERNEL(kernel)
+  
+    # Setup FMM
+    stkfmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel_index)
+    stkfmm.showActiveKernels()
+    kdimSL, kdimDL, kdimTrg = stkfmm.getKernelDimension(kernel)
+    print('kdimSL, kdimDL, kdimTrg = ', kdimSL, kdimDL, kdimTrg)
+
+    return partial(calc_body_body_forces_torques_stkfmm, 
+                   stkfmm=stkfmm, 
+                   mu=kwargs.get('mu'), 
+                   vacuum_permeability=kwargs.get('vacuum_permeability'), 
+                   L=kwargs.get('L'), 
+                   comm=kwargs.get('comm'))  
 multi_bodies_functions.set_body_body_forces_torques = set_body_body_forces_torques_new
 
 
@@ -129,7 +163,7 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     torque = np.zeros((Nbodies, 3))
   force_torque_bodies[:,0:3] = force
   force_torque_bodies[:,3:6] = torque
-
+  print('force_torque[0:2] = ', force_torque_bodies[0:2])
   return force_torque_bodies.reshape((2*len(bodies),3))
 
 
@@ -292,6 +326,108 @@ def body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeabilit
   return force, torque
   
 
+@utils.static_var('r_vectors_old', [])
+@utils.static_var('list_of_neighbors', [])
+@utils.static_var('offsets', [])
+def calc_body_body_forces_torques_stkfmm(bodies, r_vectors, *args, **kwargs):
+  ''' 
+  This function computes the body-body forces and torques and returns
+  an array with shape (2*Nblobs, 3).
+  '''
+  def project_to_periodic_image(r, L):
+    '''
+    Project a vector r to the minimal image representation
+    of size L=(Lx, Ly, Lz) and with a corner at (0,0,0). If 
+    any dimension of L is equal or smaller than zero the 
+    box is assumed to be infinite in that direction.
+    
+    If one dimension is not periodic shift all coordinates by min(r[:,i]) value.
+    '''
+    if L is not None:
+      for i in range(3):
+        if(L[i] > 0):
+          r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+        else:
+          r[:,i] -= np.min(r[:,i])
+    return r
+
+  # Prepare coordinates
+  Nbodies = len(bodies)
+  mu = kwargs.get('mu')
+  vacuum_permeability = kwargs.get('vacuum_permeability')
+  L = kwargs.get('L')
+  stkfmm = kwargs.get('stkfmm')
+
+  print('Nbodies             = ', Nbodies)
+  print('mu                  = ', mu)
+  print('vacuum_permeability = ', vacuum_permeability)
+  print('L                   = ', L)
+  
+  # Extract body locations and dipoles
+  r_bodies = np.zeros((len(bodies), 3))
+  dipoles = np.zeros((len(bodies), 3))
+  for i, b in enumerate(bodies):
+    r_bodies[i] = np.copy(b.location)
+    dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
+  r_bodies = project_to_periodic_image(r_bodies, L)
+
+  # Set tree if necessary
+  build_tree = True
+  if len(calc_body_body_forces_torques_stkfmm.list_of_neighbors) > 0:
+    if np.array_equal(calc_body_body_forces_torques_stkfmm.r_bodies_old, r_bodies):
+      build_tree = False
+  if build_tree:
+    # Build tree in STKFMM
+    if L[0] > 0:
+      x_min = 0
+      x_max = L[0]
+    else:
+      x_min = np.min(r_bodies[:,0])
+      x_max = np.max(r_bodies[:,0]) + 1e-10
+    if L[1] > 0:
+      y_min = 0
+      y_max = L[1]
+    else:
+      y_min = np.min(r_bodies[:,1])
+      y_max = np.max(r_bodies[:,1]) + 1e-10
+    if L[2] > 0:
+      z_min = 0
+      z_max = L[2]
+    else:
+      z_min = np.min(r_bodies[:,2])
+      z_max = np.max(r_bodies[:,2]) + 1e-10
+
+    # Build FMM tree
+    stkfmm.setBox(np.array([x_min, y_min, z_min]), np.max(np.concatenate((L, np.array([x_max-x_min, y_max-y_min, z_max-z_min])))))
+    stkfmm.setPoints(0, np.zeros(0), Nbodies, r_bodies, Nbodies, r_bodies)
+    stkfmm.setupTree(PySTKFMM.KERNEL.LapPGradGrad)
+
+    # Copy for next call
+    calc_body_body_forces_torques_stkfmm.r_bodies_old = np.copy(r_bodies)
+
+  # Set force with right format (single layer potential)
+  trg_value = np.zeros((Nbodies, 10))
+  src_DL_value = np.zeros((Nbodies, 3))
+  # Note, the minus signin the line below is necessary to reconcile the definition 
+  # of the double layer potential and the magnetic field created by a dipole mu
+  src_DL_value[:,0:3] = -np.copy(dipoles.reshape((Nbodies, 3))) 
+    
+  # Evaluate fmm; format phi = trg_value[:,0], grad(phi) = trg_value[:,1:4]
+  stkfmm.clearFMM(PySTKFMM.KERNEL.LapPGradGrad)
+  stkfmm.evaluateFMM(PySTKFMM.KERNEL.LapPGradGrad, 0, np.zeros(0), Nbodies, trg_value, Nbodies, src_DL_value)
+  comm = kwargs.get('comm')
+  comm.Barrier()
+
+  # Compute force and torque
+  force_torque = np.zeros((Nbodies, 6))
+  for i in range(Nbodies):
+    force_torque[i, 0] = trg_value[i,4] * dipoles[i,0] + trg_value[i,5] * dipoles[i,1] + trg_value[i,6] * dipoles[i,2]
+    force_torque[i, 1] = trg_value[i,5] * dipoles[i,0] + trg_value[i,7] * dipoles[i,1] + trg_value[i,8] * dipoles[i,2]
+    force_torque[i, 2] = trg_value[i,6] * dipoles[i,0] + trg_value[i,8] * dipoles[i,1] + trg_value[i,9] * dipoles[i,2]
+    force_torque[i, 3:6] = np.cross(dipoles[i], trg_value[i, 1:4])
+  force_torque *= vacuum_permeability
+  print('force_torque[0:2] = ', force_torque[0:2])
+  return force_torque.reshape((2*Nbodies, 3))
 
 
 

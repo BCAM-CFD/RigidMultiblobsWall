@@ -578,7 +578,13 @@ if __name__ == '__main__':
                                                   L=read.periodic_length,
                                                   comm=comm)
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
-  multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
+  multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation,
+                                                                                                             stkfmm_mult_order=read.stkfmm_mult_order, 
+                                                                                                             stkfmm_pbc=read.stkfmm_pbc,
+                                                                                                             L=read.periodic_length,
+                                                                                                             comm=comm,
+                                                                                                             mu=read.mu,
+                                                                                                             vacuum_permeability=read.vacuum_permeability)
 
   # Copy input file to output
   # subprocess.call(["cp", input_file, output_name + '.inputfile'])
