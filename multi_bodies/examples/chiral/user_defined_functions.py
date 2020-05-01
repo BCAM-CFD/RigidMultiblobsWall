@@ -163,7 +163,6 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     torque = np.zeros((Nbodies, 3))
   force_torque_bodies[:,0:3] = force
   force_torque_bodies[:,3:6] = torque
-  print('force_torque[0:2] = ', force_torque_bodies[0:2])
   return force_torque_bodies.reshape((2*len(bodies),3))
 
 
@@ -357,11 +356,6 @@ def calc_body_body_forces_torques_stkfmm(bodies, r_vectors, *args, **kwargs):
   vacuum_permeability = kwargs.get('vacuum_permeability')
   L = kwargs.get('L')
   stkfmm = kwargs.get('stkfmm')
-
-  print('Nbodies             = ', Nbodies)
-  print('mu                  = ', mu)
-  print('vacuum_permeability = ', vacuum_permeability)
-  print('L                   = ', L)
   
   # Extract body locations and dipoles
   r_bodies = np.zeros((len(bodies), 3))
@@ -426,7 +420,6 @@ def calc_body_body_forces_torques_stkfmm(bodies, r_vectors, *args, **kwargs):
     force_torque[i, 2] = trg_value[i,6] * dipoles[i,0] + trg_value[i,8] * dipoles[i,1] + trg_value[i,9] * dipoles[i,2]
     force_torque[i, 3:6] = np.cross(dipoles[i], trg_value[i, 1:4])
   force_torque *= vacuum_permeability
-  print('force_torque[0:2] = ', force_torque[0:2])
   return force_torque.reshape((2*Nbodies, 3))
 
 
