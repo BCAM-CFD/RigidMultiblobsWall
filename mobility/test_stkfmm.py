@@ -1,12 +1,16 @@
 from __future__ import division, print_function
 import numpy as np
 import sys
-import stkfmm
-sys.path.append('..')
-import mobility as mob
-from general_application_utils import timer 
-from mpi4py import MPI
+from functools import partial
+try:
+  from mpi4py import MPI
+except ImportError:
+  print('problem with MPI')
 from numba import njit, prange
+sys.path.append('..')
+from general_application_utils import timer
+import mobility as mob
+import PySTKFMM
 
 try:
   import mobility_fmm as fmm
@@ -38,123 +42,87 @@ def distance(r_vectors):
   return np.sqrt(d2_min)
 
 
-
 if __name__ == '__main__':
   print('# Start')
   # Set parameters
-  N = 1048576
+  comm = MPI.COMM_WORLD
+  rank = comm.Get_rank()
+  print('rank = ', rank)
+  comm.Barrier()
+  print('rank = ', rank)
+    
+  N = 1000
   a = 1e-0
   phi = 1e-03
-  L = np.power(4*np.pi * N / (3 * phi), 1.0/3.0) * a
+  L_scalar = np.power(4*np.pi * N / (3 * phi), 1.0/3.0) * a
   eta = 1.0
   mult_order = 8
-  max_pts = 1000
-  N_max = 300000
-
-  print('L = ', L)
+  max_pts = 128
+  wall = True
+  pbc = PySTKFMM.PAXIS.NONE
+  L = np.array([0., 0., 0.])
+  print('L_scalar = ', L_scalar)
+  print('L        = ', L)
 
   # Create random blobs
-  r_vectors = np.random.rand(N, 3) * L
-  forces = np.random.randn(N, 3)
-  #forces[:,:] = 0
-  #forces[1,:] = 1.0
-  #r_vectors[:,:] = 0
-  #r_vectors[1,0] = L 
+  r_vectors = np.random.rand(N, 3) * L_scalar
+  if wall:
+    r_vectors[:,2] *= 0.45
+  force = np.random.randn(N, 3)
 
+  # Setup FMM
+  kernel = PySTKFMM.KERNEL.RPY
+  if wall:
+    timer('built_fmm')
+    rpy_fmm = PySTKFMM.StkWallFMM(mult_order, max_pts, pbc, kernel)
+    mobility_trans_times_force_stkfmm_partial = partial(mob.mobility_trans_times_force_stkfmm,
+                                                        rpy_fmm=rpy_fmm,
+                                                        L=L,
+                                                        comm=comm,
+                                                        wall=wall)
+    timer('built_fmm')
+  else:
+    timer('built_fmm')
+    rpy_fmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
+    mobility_trans_times_force_stkfmm_partial = partial(mob.mobility_trans_times_force_stkfmm,
+                                                        rpy_fmm=rpy_fmm,
+                                                        L=L,
+                                                        comm=comm,
+                                                        wall=wall)
+    timer('built_fmm')
+  SLdim, DLdim, Trgdim = rpy_fmm.getKernelDimension(kernel)
+  print('SLdim, DLdim, Trgdim = ', SLdim, DLdim, Trgdim)
 
-  # Compute velocities with stkfmm
-  timer('stkfmm_create_fmm')
-  fmm_PVelLaplacian = None
-  fmm_PVelLaplacian = stkfmm.STKFMM(mult_order, max_pts, stkfmm.PAXIS.NONE, stkfmm.KERNEL.PVelLaplacian)
-  timer('stkfmm_create_fmm')
-  v_stkfmm_tree = mob.no_wall_mobility_trans_times_force_stkfmm(r_vectors, 
-                                                                forces, 
-                                                                eta, 
-                                                                a, 
-                                                                fmm_PVelLaplacian=fmm_PVelLaplacian,
-                                                                set_tree=True)
-  timer(' ')
-  timer(' ', clean_all=True)
-  r_vectors = np.random.rand(N, 3) * L
-
-  timer('stkfmm_setting_tree')
-  v_stkfmm_tree = mob.no_wall_mobility_trans_times_force_stkfmm(r_vectors, 
-                                                                forces, 
-                                                                eta, 
-                                                                a, 
-                                                                fmm_PVelLaplacian=fmm_PVelLaplacian,
-                                                                set_tree=True)
-  timer('stkfmm_setting_tree')
-  timer('stkfmm')
-  v_stkfmm = mob.no_wall_mobility_trans_times_force_stkfmm(r_vectors, 
-                                                           forces, 
-                                                           eta, 
-                                                           a,
-                                                           fmm_PVelLaplacian=fmm_PVelLaplacian,
-                                                           set_tree=False)
-  timer('stkfmm')
-
-  # Compute velocities with numba (no wall)
-  if N <= N_max:
-    v_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, forces, eta, a)
-  timer('numba')
-  if N <= N_max:
-    v_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, forces, eta, a)
-  timer('numba')  
-
-
-
-  # Compute velocities with rpyfmm
-  if fortran_fmm_found:
-    timer('rpyfmm')
-    v_rpyfmm = mob.fmm_rpy(r_vectors, forces, eta, a)
-    timer('rpyfmm')
-
-
-  print('\n\n')
-  # Compute distance between points
-  if N <= N_max:
-    dr_min = distance(r_vectors)
-    print('dr_min = ', dr_min)
+  # Compute velocities
+  if wall:
+    u_numba = mob.single_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
+    timer('numba')
+    u_numba = mob.single_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    timer('numba')
+    timer('stkfmm')
+    u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
+    timer('stkfmm')
+  else:
+    u_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
+    timer('numba')
+    u_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    timer('numba')
+    timer('stkfmm')
+    u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
+    timer('stkfmm')
 
   # Compute errors
-  if N <= N_max:
-    diff_tree = v_stkfmm_tree - v_numba
-    diff = v_stkfmm - v_numba
-    print('relative L2 error (1) = ', np.linalg.norm(diff_tree) / np.linalg.norm(v_numba))
-    print('Linf error        (1) = ', np.linalg.norm(diff_tree.flatten(), ord=np.inf))
-    print('relative L2 error (2) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
-    print('Linf error        (2) = ', np.linalg.norm(diff.flatten(), ord=np.inf))
-    if fortran_fmm_found:
-      print('fortran_rpy_fmm errors:')
-      diff = v_rpyfmm - v_numba
-      diff = v_rpyfmm - v_numba
-      print('relative L2 error (3) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
-      print('Linf error        (3) = ', np.linalg.norm(diff.flatten(), ord=np.inf))   
-  else:
-    diff = v_stkfmm_tree - v_stkfmm
-    print('relative L2 error (fmm) = ', np.linalg.norm(diff) / np.linalg.norm(v_stkfmm_tree))
-    print('Linf error        (fmm) = ', np.linalg.norm(diff.flatten(), ord=np.inf))
-    if fortran_fmm_found:
-      print('fortran_rpy_fmm errors:')
-      diff = v_rpyfmm - v_vtkfmm
-      diff = v_rpyfmm - v_vtkfmm
-      print('relative L2 error (3) = ', np.linalg.norm(diff) / np.linalg.norm(v_numba))
-      print('Linf error        (3) = ', np.linalg.norm(diff.flatten(), ord=np.inf))   
-  print('\n\n')
+  L2 = np.linalg.norm(u_stkfmm - u_numba)
+  print('L2          = ', L2)
+  print('L2 relative = ', L2 / np.linalg.norm(u_numba))
 
-
-
-
-  
   if N < 6:
-    N_min = N
-  else:
-    N_min = 6
-  print('diff = \n', diff[0:3*N_min])
-  if N <= N_max:
-    print('v_numba = \n', v_numba[0:3*N_min])
-  print('v_stkfmm = \n', v_stkfmm[0:3*N_min])
- 
+    print('\n\n\n')
+    print('r_vectors = \n', r_vectors)
+    print('u_numba   = \n', u_numba)
+    print('u_stkfmm  = \n', u_stkfmm)
+    
   timer(' ', print_all=True)
   print('# End')

@@ -128,7 +128,7 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     return mb.no_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba_no_wall':
     return mb.no_wall_mobility_trans_times_force_numba
-  elif implementation == 'stkfmm':
+  elif implementation == 'stkfmm_no_wall':
     # STKFMM parameters
     mult_order = kwargs.get('stkfmm_mult_order')
     pbc_string = kwargs.get('stkfmm_pbc')
@@ -147,9 +147,10 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
 
     # Setup FMM
     rpy_fmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
-    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.no_wall_mobility_trans_times_force_stkfmm, 
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
                                                                 rpy_fmm=rpy_fmm, 
-                                                                L=kwargs.get('L'), 
+                                                                L=kwargs.get('L'),
+                                                                wall=False,
                                                                 comm=kwargs.get('comm'))
     return no_wall_mobility_trans_times_force_stkfmm_partial
 
@@ -165,6 +166,31 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
   elif implementation == 'interface':
     eta_ratio = kwargs.get('eta_ratio')
     return partial(mb.fluid_interface_mobility_trans_times_force_cpp, eta_ratio = eta_ratio)
+  elif implementation == 'stkfmm_single_wall':
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    pbc_string = kwargs.get('stkfmm_pbc')
+    max_pts = 512
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.RPY
+
+    # Setup FMM
+    rpy_fmm = PySTKFMM.StkWallFMM(mult_order, max_pts, pbc, kernel)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
+                                                                rpy_fmm=rpy_fmm, 
+                                                                L=kwargs.get('L'),
+                                                                wall=True,
+                                                                comm=kwargs.get('comm'))
+    return no_wall_mobility_trans_times_force_stkfmm_partial
 
 
 def calc_K_matrix(bodies, Nblobs):

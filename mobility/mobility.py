@@ -1370,7 +1370,7 @@ def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force
 @utils.static_var('r_vectors_old', [])
 @utils.static_var('list_of_neighbors', [])
 @utils.static_var('offsets', [])
-def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array([0.,0.,0.]), *args, **kwargs):
+def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array([0.,0.,0.]), wall=False, *args, **kwargs):
   ''' 
   Returns the product of the mobility at the blob level to the force 
   on the blobs. Mobility for particles in an unbounded, semiperiodic or
@@ -1392,7 +1392,9 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
         if(L[i] > 0):
           r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
         else:
-          r[:,i] -= np.min(r[:,i])
+          ri_min =  np.min(r[:,i])
+          if ri_min < 0:
+            r[:,i] -= ri_min
     return r
 
   # Prepare coordinates
@@ -1400,49 +1402,66 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
   r_vectors = np.copy(r)
   r_vectors = project_to_periodic_image(r_vectors, L)
 
+  wall = kwargs.get('wall')
+  if wall:
+    # Compute damping matrix B
+    B_damp, overlap = damping_matrix_B(r_vectors, a, *args, **kwargs)
+    # Get effective height
+    r_vectors = shift_heights(r_vectors, a)
+
+    if overlap is True:
+      force = B_damp.dot(force.flatten())
+
   # Set tree if necessary
   build_tree = True
-  if len(no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors) > 0:
-    if np.array_equal(no_wall_mobility_trans_times_force_stkfmm.r_vectors_old, r_vectors):
+  if len(mobility_trans_times_force_stkfmm.list_of_neighbors) > 0:
+    if np.array_equal(mobility_trans_times_force_stkfmm.r_vectors_old, r_vectors):
       build_tree = False
-      list_of_neighbors = no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors
-      offsets = no_wall_mobility_trans_times_force_stkfmm.offsets
+      list_of_neighbors = mobility_trans_times_force_stkfmm.list_of_neighbors
+      offsets = mobility_trans_times_force_stkfmm.offsets
   if build_tree:
     # Build tree in STKFMM
     if L[0] > 0:
       x_min = 0
-      x_max = L[0]
-      Lx = L[0]
+      Lx_pvfmm = L[0]
+      Lx_cKDTree = L[0]
     else:
       x_min = np.min(r_vectors[:,0])
-      x_max = np.max(r_vectors[:,0]) + 1e-10
-      Lx = (x_max - x_min) * 10
+      Lx_pvfmm = (np.max(r_vectors[:,0]) * 1.01 - x_min)
+      Lx_cKDTree = (np.max(r_vectors[:,0]) * 1.01 - x_min) * 10
     if L[1] > 0:
       y_min = 0
-      y_max = L[1]
-      Ly = L[1]
+      Ly_pvfmm = L[1]
+      Ly_cKDTree = L[1]
     else:
       y_min = np.min(r_vectors[:,1])
-      y_max = np.max(r_vectors[:,1]) + 1e-10
-      Ly = (y_max - y_min) * 10
+      Ly_pvfmm = (np.max(r_vectors[:,1]) * 1.01 - y_min)
+      Ly_cKDTree = (np.max(r_vectors[:,1]) * 1.01 - y_min) * 10
     if L[2] > 0:
       z_min = 0
-      z_max = L[2]
-      Lz = L[2]
+      Lz_pvfmm = L[2]
+      Lz_cKDTree = L[2]
     else:
       z_min = np.min(r_vectors[:,2])
-      z_max = np.max(r_vectors[:,2]) + 1e-10
-      Lz = (z_max - z_min) * 10
+      z_min = 0
+      Lz_pvfmm = (np.max(r_vectors[:,2]) * 1.01 - z_min)
+      Lz_cKDTree = (np.max(r_vectors[:,2]) * 1.01 - z_min) * 10
 
-    # Build FMM tree
-    rpy_fmm.setBox(np.array([x_min, y_min, z_min]), np.max(np.concatenate((L, np.array([x_max-x_min, y_max-y_min, z_max-z_min])))))
+    # Set box size for pvfmm
+    if L[0] > 0 or L[1] > 0 or L[2] > 0:
+      L_box = np.max(L)
+    else:
+      L_box = np.max([Lx_pvfmm, Ly_pvfmm, Lz_pvfmm])
+
+    # Buid FMM tree
+    rpy_fmm.setBox(np.array([x_min, y_min, z_min]), L_box)
     rpy_fmm.setPoints(N, r_vectors, N, r_vectors, 0, 0)
     rpy_fmm.setupTree(PySTKFMM.KERNEL.RPY)
-    
+
     # Build tree in python and neighbors lists
     d_max = 2 * a
     if L[0] > 0 or L[1] > 0 or L[2] > 0:
-      boxsize = np.array([Lx, Ly, Lz])      
+      boxsize = np.array([Lx_cKDTree, Ly_cKDTree, Lz_cKDTree])      
     else:
       boxsize = None
     tree = scsp.cKDTree(r_vectors, boxsize = boxsize)
@@ -1451,9 +1470,9 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
     for i in range(len(pairs)):
       offsets[i+1] = offsets[i] + len(pairs[i])
     list_of_neighbors = np.concatenate(pairs).ravel()
-    no_wall_mobility_trans_times_force_stkfmm.offsets = np.copy(offsets)
-    no_wall_mobility_trans_times_force_stkfmm.list_of_neighbors = np.copy(list_of_neighbors)
-    no_wall_mobility_trans_times_force_stkfmm.r_vectors_old = np.copy(r_vectors)
+    mobility_trans_times_force_stkfmm.offsets = np.copy(offsets)
+    mobility_trans_times_force_stkfmm.list_of_neighbors = np.copy(list_of_neighbors)
+    mobility_trans_times_force_stkfmm.r_vectors_old = np.copy(r_vectors)
 
   # Set force with right format (single layer potential)
   trg_value = np.zeros((N, 6))
@@ -1480,6 +1499,11 @@ def no_wall_mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=
   v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets)
   vel += v_overlap.reshape((N, 3))
 
+  if wall:
+    if overlap is True:
+      print('vel = ', vel.shape)
+      vel = B_damp.dot(vel.flatten())
+  
   return vel.flatten()
 
 
