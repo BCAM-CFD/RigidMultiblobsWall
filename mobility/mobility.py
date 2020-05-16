@@ -1277,7 +1277,7 @@ def single_wall_mobility_rot_times_torque_numba(r_vectors, torque, eta, a, *args
 
 
 @njit(parallel=True, fastmath=True)
-def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets):
+def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=np.array([0., 0., 0.])):
   ''' 
   Returns the blob-blob overlap correction for unbound fluids using the
   RPY mobility. It subtract the uncorrected value for r<2*a and it adds
@@ -1293,7 +1293,11 @@ def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force
   fourOverThree = 4.0 / 3.0
   inva = 1.0 / a
   norm_fact_f = 1.0 / (8.0 * np.pi * eta * a)
-    
+
+  Lx = L[0]
+  Ly = L[1]
+  Lz = L[2]
+  
   rx_vec = np.copy(r_vectors[:,0])
   ry_vec = np.copy(r_vectors[:,1])
   rz_vec = np.copy(r_vectors[:,2])
@@ -1317,6 +1321,14 @@ def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force
       rx = rxi - rx_vec[j]
       ry = ryi - ry_vec[j]
       rz = rzi - rz_vec[j]
+
+      # PBC
+      if Lx > 0:
+        rx = rx - int(rx / Lx + 0.5 * (int(rx>0) - int(rx<0))) * Lx
+      if Ly > 0:
+        ry = ry - int(ry / Ly + 0.5 * (int(ry>0) - int(ry<0))) * Ly
+      if Lz > 0:
+        rz = rz - int(rz / Lz + 0.5 * (int(rz>0) - int(rz<0))) * Lz
       
       # Normalize distance with hydrodynamic radius
       rx = rx * inva 
@@ -1402,7 +1414,6 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
   r_vectors = np.copy(r)
   r_vectors = project_to_periodic_image(r_vectors, L)
 
-  wall = kwargs.get('wall')
   if wall:
     # Compute damping matrix B
     B_damp, overlap = damping_matrix_B(r_vectors, a, *args, **kwargs)
@@ -1496,7 +1507,7 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
   # 4. Double Laplacian
   #    it is zero with PBC
   # 5. Add blob-blob overlap correction
-  v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets)
+  v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=L)
   vel += v_overlap.reshape((N, 3))
 
   if wall:

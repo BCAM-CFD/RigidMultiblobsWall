@@ -53,10 +53,10 @@ if __name__ == '__main__':
     
   N = 1000
   a = 1e-0
-  phi = 1e-03
+  phi = 1e-01
   L_scalar = np.power(4*np.pi * N / (3 * phi), 1.0/3.0) * a
   eta = 1.0
-  mult_order = 8
+  mult_order = 12
   max_pts = 128
   wall = True
   pbc = PySTKFMM.PAXIS.NONE
@@ -67,7 +67,7 @@ if __name__ == '__main__':
   # Create random blobs
   r_vectors = np.random.rand(N, 3) * L_scalar
   if wall:
-    r_vectors[:,2] *= 0.45
+    r_vectors[:,2] *= 0.25
   force = np.random.randn(N, 3)
 
   # Setup FMM
