@@ -93,6 +93,9 @@ class ReadInput(object):
     self.save_stress = str(self.options.get('save_stress') or 'False') == 'True'
     self.mesh_fields = np.fromstring(self.options.get('mesh_fields') or 'None', sep=' ')
     self.save_fields_step = int(self.options.get('save_fields_step') or 1)
+    self.save_fields_averaging_method = str(self.options.get('save_fields_averaging_method') or 'rectangular')
+    # self.save_fields_averaging_N = float(self.options.get('save_fields_averaging_N') or 0.0)
+    self.save_fields_averaging_mesh = np.fromstring(self.options.get('save_fields_averaging_mesh') or '1 1 1', sep=' ', dtype=np.int32)
     self.stress_inf_correction = int(self.options.get('stress_inf_correction') or 0)
     self.mesh_fields_opt1 = np.fromstring(self.options.get('mesh_fields_opt1') or 'None', sep=' ')
     self.mesh_fields_opt2 = np.fromstring(self.options.get('mesh_fields_opt2') or 'None', sep=' ')

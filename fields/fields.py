@@ -12,16 +12,27 @@ class fields(object):
   '''
 
   '''
-  def __init__(self, grid_options, save_number_density = False, save_velocity = False, save_stress = False, stress_inf_correction = 0, blob_radius = None):
+  def __init__(self,
+               grid_options,
+               save_fields_averaging_method,
+               save_fields_averaging_mesh,
+               save_number_density = False,
+               save_velocity = False,
+               save_stress = False,
+               stress_inf_correction = 0,
+               blob_radius = None):
     '''
     
     '''
     # Save general options
+    self.save_fields_averaging_method = save_fields_averaging_method
+    # self.save_fields_averaging_N = save_fields_averaging_N
+    self.save_fields_averaging_mesh = save_fields_averaging_mesh
     self.save_number_density = save_number_density
     self.save_velocity = save_velocity
     self.save_stress = save_stress
     self.stress_inf_correction = stress_inf_correction
-    self.blob_radius = blob_radius
+    self.blob_radius = blob_radius    
     
     # Save grid options
     grid = np.reshape(grid_options, (3,3)).T
@@ -57,6 +68,21 @@ class fields(object):
     self.mesh_coor[:,1] = np.reshape(yy, yy.size)
     self.mesh_coor[:,2] = np.reshape(zz, zz.size)
 
+    # Create subgrid for averaging
+    if self.save_fields_averaging_method == 'rect':
+      self.dx_mesh_avg = self.dx_mesh / self.save_fields_averaging_mesh
+      mesh_x = (np.array([x + 0.5 for x in range(self.save_fields_averaging_mesh[0])]) - self.save_fields_averaging_mesh[0] / 2.0) * self.dx_mesh_avg[0]
+      mesh_y = (np.array([x + 0.5 for x in range(self.save_fields_averaging_mesh[1])]) - self.save_fields_averaging_mesh[1] / 2.0) * self.dx_mesh_avg[1]
+      mesh_z = (np.array([x + 0.5 for x in range(self.save_fields_averaging_mesh[2])]) - self.save_fields_averaging_mesh[2] / 2.0) * self.dx_mesh_avg[2]
+      
+      # Be aware, x is the fast axis.
+      zz, yy, xx = np.meshgrid(mesh_z, mesh_y, mesh_x, indexing = 'ij')
+      num_points = np.prod(self.save_fields_averaging_mesh)
+      self.mesh_coor_avg = np.zeros((num_points, 3))
+      self.mesh_coor_avg[:,0] = np.reshape(xx, xx.size)
+      self.mesh_coor_avg[:,1] = np.reshape(yy, yy.size)
+      self.mesh_coor_avg[:,2] = np.reshape(zz, zz.size)
+
     # Create variables
     self.counter = 0
     if self.save_number_density:
@@ -69,7 +95,6 @@ class fields(object):
       self.stress_avg = np.zeros((self.num_points, 9))
       self.stress_var = np.zeros((self.num_points, 9))
     return
-
 
 
   def save(self, bodies, vw = None, r_vectors_blobs = None, force_blobs = None):
@@ -89,8 +114,8 @@ class fields(object):
     for i, b in enumerate(bodies):
       q[i] = np.copy(b.location)
       b_length[i] = b.body_length 
-      mu = np.dot(b.orientation.rotation_matrix(), b.mu) / np.linalg.norm(b.mu)
-      vw[i,6] = np.linalg.norm(np.cross(vw[i,3:6], mu))
+      # mu = np.dot(b.orientation.rotation_matrix(), b.mu) / np.linalg.norm(b.mu)
+      # vw[i,6] = np.linalg.norm(np.cross(vw[i,3:6], mu))
 
     if self.save_number_density or self.save_velocity:
       number_density, velocity = self.compute_number_density_velocity(q, 
@@ -115,6 +140,7 @@ class fields(object):
         force_blobs = np.zeros_like(r_vectors_blobs)
       stress = self.compute_stress_tensor(r_vectors_blobs.reshape(r_vectors_blobs.size // 3, 3),
                                           self.mesh_coor,
+                                          self.mesh_coor_avg, 
                                           force_blobs.reshape(force_blobs.size // 3, 3),
                                           self.blob_radius,
                                           self.stress_inf_correction)
@@ -323,7 +349,7 @@ class fields(object):
   
   @staticmethod
   @njit(parallel=True, fastmath=True)
-  def compute_stress_tensor(r_vectors, r_grid, force_blobs, blob_radius, beta):
+  def compute_stress_tensor(r_vectors, r_grid, mesh_coor_avg, force_blobs, blob_radius, beta):
     '''
     Compute stress like 
     
@@ -352,6 +378,7 @@ class fields(object):
     factor_4 = 1.0 / (2.0 * sigma**2)
     r = sigma * 100
     I_inf = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
+    N_avg = mesh_coor_avg.size // 3
   
     rx_blobs = np.copy(r_vectors[:,0])
     ry_blobs = np.copy(r_vectors[:,1])
@@ -359,35 +386,39 @@ class fields(object):
     rx_grid = np.copy(r_grid[:,0])
     ry_grid = np.copy(r_grid[:,1])
     rz_grid = np.copy(r_grid[:,2])
+    rx_avg =  np.copy(mesh_coor_avg[:,0])
+    ry_avg =  np.copy(mesh_coor_avg[:,1])
+    rz_avg =  np.copy(mesh_coor_avg[:,2])
 
     for i in prange(Nnodes):
       rxi = rx_grid[i]
       ryi = ry_grid[i]
       rzi = rz_grid[i]
       for j in range(Nblobs):
-        # Compute displacement vector and distance
-        rx = rxi - rx_blobs[j]
-        ry = ryi - ry_blobs[j] 
-        rz = rzi - rz_blobs[j]
-
-        # Compute distance
-        r2 = rx*rx + ry*ry + rz*rz
-        r = np.sqrt(r2)
-        if r == 0:
-          continue
+        for k in range(N_avg):
+          # Compute displacement vector and distance
+          rx = rxi + rx_avg[k] - rx_blobs[j]
+          ry = ryi + ry_avg[k] - ry_blobs[j]
+          rz = rzi + rz_avg[k] - rz_blobs[j]
+   
+          # Compute distance
+          r2 = rx*rx + ry*ry + rz*rz
+          r = np.sqrt(r2)
+          if r == 0:
+            continue
       
-        # Compute kernel integral
-        I = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
+          # Compute kernel integral
+          I = factor_1 * math.erf(factor_2 * r) - factor_3 * r * np.exp(-factor_4 * r**2)
       
-        # Compute stress
-        factor_5 = (I - beta * I_inf) / r**3
-        stress[i,0] += factor_5 * force_blobs[j,0] * rx
-        stress[i,1] += factor_5 * force_blobs[j,0] * ry
-        stress[i,2] += factor_5 * force_blobs[j,0] * rz
-        stress[i,3] += factor_5 * force_blobs[j,1] * rx
-        stress[i,4] += factor_5 * force_blobs[j,1] * ry
-        stress[i,5] += factor_5 * force_blobs[j,1] * rz
-        stress[i,6] += factor_5 * force_blobs[j,2] * rx
-        stress[i,7] += factor_5 * force_blobs[j,2] * ry
-        stress[i,8] += factor_5 * force_blobs[j,2] * rz
-    return stress
+          # Compute stress
+          factor_5 = (I - beta * I_inf) / r**3
+          stress[i,0] += factor_5 * force_blobs[j,0] * rx
+          stress[i,1] += factor_5 * force_blobs[j,0] * ry
+          stress[i,2] += factor_5 * force_blobs[j,0] * rz
+          stress[i,3] += factor_5 * force_blobs[j,1] * rx
+          stress[i,4] += factor_5 * force_blobs[j,1] * ry
+          stress[i,5] += factor_5 * force_blobs[j,1] * rz
+          stress[i,6] += factor_5 * force_blobs[j,2] * rx
+          stress[i,7] += factor_5 * force_blobs[j,2] * ry
+          stress[i,8] += factor_5 * force_blobs[j,2] * rz
+    return stress / N_avg

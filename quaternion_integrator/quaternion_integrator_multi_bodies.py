@@ -157,6 +157,9 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
+      # Extract force on blobs
+      self.blobs_lambda = sol_precond[0:3*self.Nblobs]
+      
       # Update location and orientation
       if self.first_step == False:
         # Use Adams-Bashforth
