@@ -90,6 +90,10 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
+      # Extract force on blobs and bodies velocities
+      self.blobs_lambda = sol_precond[0:3*self.Nblobs]
+      self.bodies_velocity = np.reshape(sol_precond[3*self.Nblobs:], (len(self.bodies), 6))
+
       # Update location orientation 
       for k, b in enumerate(self.bodies):
         b.location_new = b.location + velocities[6*k:6*k+3] * dt

@@ -105,6 +105,7 @@ class ReadInput(object):
     self.harmonic_confinement = float(self.options.get('harmonic_confinement') or 0.0)
     self.harmonic_confinement_plane = float(self.options.get('harmonic_confinement_plane') or 0.0)
     self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
+    self.mg_bodies = np.fromstring(self.options.get('mg_bodies') or 'None', sep=' ')
           
     # Info for STKFMM
     self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)

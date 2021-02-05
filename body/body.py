@@ -34,6 +34,7 @@ class Body(object):
     self.reference_configuration = np.reshape(reference_configuration, (self.Nblobs, 3))
     # Blob masses
     self.blob_masses = np.ones(self.Nblobs)
+    self.mg = 0
     # Blob radius
     self.blob_radius = blob_radius
     # Body length

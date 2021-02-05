@@ -1512,7 +1512,7 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
 
   if wall:
     if overlap is True:
-      print('vel = ', vel.shape)
+      # print('vel = ', vel.shape)
       vel = B_damp.dot(vel.flatten())
   
   return vel.flatten()

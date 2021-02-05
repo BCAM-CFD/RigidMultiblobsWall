@@ -86,6 +86,9 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 
     # Add harmonic potential
     force_torque[2*k,2] = -harmonic_confinement * (b.location[2] - harmonic_confinement_plane)
+
+    # Add gravity
+    force_torque[2*k,2] += -b.mg
     
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new

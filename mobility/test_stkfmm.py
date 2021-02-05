@@ -51,7 +51,7 @@ if __name__ == '__main__':
   comm.Barrier()
   print('rank = ', rank)
     
-  N = 1000
+  N = 2000
   a = 1e-0
   phi = 1e-01
   L_scalar = np.power(4*np.pi * N / (3 * phi), 1.0/3.0) * a
@@ -78,8 +78,8 @@ if __name__ == '__main__':
     mobility_trans_times_force_stkfmm_partial = partial(mob.mobility_trans_times_force_stkfmm,
                                                         rpy_fmm=rpy_fmm,
                                                         L=L,
-                                                        comm=comm,
-                                                        wall=wall)
+                                                        wall=wall,
+                                                        comm=comm)
     timer('built_fmm')
   else:
     timer('built_fmm')
@@ -87,8 +87,8 @@ if __name__ == '__main__':
     mobility_trans_times_force_stkfmm_partial = partial(mob.mobility_trans_times_force_stkfmm,
                                                         rpy_fmm=rpy_fmm,
                                                         L=L,
-                                                        comm=comm,
-                                                        wall=wall)
+                                                        wall=wall,
+                                                        comm=comm)
     timer('built_fmm')
   SLdim, DLdim, Trgdim = rpy_fmm.getKernelDimension(kernel)
   print('SLdim, DLdim, Trgdim = ', SLdim, DLdim, Trgdim)
