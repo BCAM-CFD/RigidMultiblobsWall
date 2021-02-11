@@ -35,6 +35,7 @@ class Body(object):
     # Blob masses
     self.blob_masses = np.ones(self.Nblobs)
     self.mg = 0
+    self.k = 1.0
     # Blob radius
     self.blob_radius = blob_radius
     # Body length

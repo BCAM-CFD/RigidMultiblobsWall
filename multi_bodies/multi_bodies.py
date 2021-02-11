@@ -659,6 +659,11 @@ if __name__ == '__main__':
         b.mg = read.mg_bodies[ID]
       else:
         b.mg = 0.0
+      if ID < len(read.k_bodies):
+        b.k = read.k_bodies[ID]
+      else:
+        b.k = 1.0
+
 
       # Append bodies to total bodies list
       bodies.append(b)

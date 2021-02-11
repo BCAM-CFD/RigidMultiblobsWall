@@ -2,23 +2,29 @@
 # Length, time and mass are given in units of microns, seconds and miligrams.
 
 # Select scheme to integrate Brownian equations
-scheme                                   stochastic_Slip_Trapz
+scheme                                   deterministic_adams_bashforth
 
 # Select implementation to compute M and M*f
 # We recommend to use the C++ implementation which is faster,
 # see documentation
-mobility_blobs_implementation            python
+mobility_blobs_implementation            C++
 mobility_vector_prod_implementation      stkfmm_single_wall
 domain                                   single_wall
-stkfmm_mult_order                        12
 
 # Select implementation to compute the blobs-blob interactions
-blob_blob_force_implementation           numba
-body_body_force_torque_implementation    numba
+blob_blob_force_implementation           tree_numba
+body_body_force_torque_implementation    stkfmm
+
+# Infor for stkfmm
+stkfmm_mult_order                        10
+
+# Periodic Boundary conditions
+periodic_length                          0    0     0
+stkfmm_pbc                               None
 
 # Set time step, number of steps and save frequency
 dt                                       0.0002
-n_steps                                  1
+n_steps                                  2
 n_save                                   1
 initial_step                             0
 
@@ -28,21 +34,20 @@ update_PC                                1
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
 eta                                      1e-03
-g                                        0
-blob_radius                              0.2612054951340682
+g                                        0.0107530161618171
+blob_radius                              0.577009424015244
 
 # Stochastic parameters
 # 300 Kelvin * k_B = 0.0041419464 in this units
-kT                                       0.0041419464
-seed                                     1
+kT                                       0
 
 # Set interaction with the wall
-repulsion_strength_wall                  0
-debye_length_wall                        0.02612
+repulsion_strength_wall                  0.2
+debye_length_wall                        0.05770
 
 # Define implementation to compute the blobs-blob force and pass its arguments
 repulsion_strength                       0.2
-debye_length                             0.02612
+debye_length                             0.05770
 
 # Magnetic interactions
 quaternion_B                             1 0 0 0
@@ -51,12 +56,27 @@ vacuum_permeability                      1.25663706143592e+06
 B0                                       1e+03
 omega                                    62.8318530717959
 
+# More about interactions
+harmonic_confinement                     0
+harmonic_confinement_plane               0
+dipole_dipole                            True
+
+# Save fields
+save_fields_averaging_method             rect
+save_fields_averaging_mesh               10  10  1
+save_number_density                      True
+save_velocity                            True
+save_stress                              True
+stress_inf_correction                    0
+save_fields_step                         2
+mesh_fields                              -40 40 10 -40 40 10 1.82 1.82 1
+
 # Set output name
-output_name                              /home/fbalboausabiaga/symlinks/ceph/sfw/RigidMultiblobsWall/chiral/data/run.stkfmm
+output_name                              /mnt/home/fbalboausabiaga/symlinks/ceph/sfw/RigidMultiblobsWall/chiral/data/run900/run921/run921.24.0.0
 save_clones                              one_file
 
 
 
-structure Structures/superellipsoid_Lg_1.368_r_3.9_N_26.vertex Structures/superellipsoid.clones
+structure Structures/shell_N_12_Rg_1.0976_Rh_1.3856.vertex Structures/shell_run921.24.0.0.clones
 
 

@@ -85,7 +85,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
     force_torque[2*k+1] = np.cross(mu_body, B)
 
     # Add harmonic potential
-    force_torque[2*k,2] = -harmonic_confinement * (b.location[2] - harmonic_confinement_plane)
+    force_torque[2*k,2] = -harmonic_confinement * b.k * (b.location[2] - harmonic_confinement_plane)
 
     # Add gravity
     force_torque[2*k,2] += -b.mg
