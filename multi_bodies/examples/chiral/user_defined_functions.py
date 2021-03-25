@@ -21,6 +21,7 @@ see below.
 from __future__ import division, print_function
 import numpy as np
 import scipy.special as scsp
+import scipy.spatial as scspatial
 import math
 import multi_bodies_functions
 from multi_bodies_functions import *
@@ -111,7 +112,7 @@ def set_body_body_forces_torques_new(implementation, *args, **kwargs):
   elif implementation == 'python':
     return calc_body_body_forces_torques_python
   elif implementation == 'numba':
-    return calc_body_body_forces_torques_numba
+    return partial(calc_body_body_forces_torques_numba, L=kwargs.get('L'))  
   elif implementation == 'stkfmm':
     # STKFMM parameters
     mult_order = kwargs.get('stkfmm_mult_order')
@@ -155,12 +156,19 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
   mu = kwargs.get('mu')
   vacuum_permeability = kwargs.get('vacuum_permeability')
   dipole_dipole = kwargs.get('dipole_dipole')
+  L = kwargs.get('L')
   
   # Extract body locations and dipoles
   r_bodies = np.zeros((len(bodies), 3))
   dipoles = np.zeros((len(bodies), 3))
+  R = np.zeros(len(bodies))
+  repulsion_strength = np.zeros(len(bodies))
+  debye_length = np.zeros(len(bodies))
   for i, b in enumerate(bodies):
     r_bodies[i] = b.location
+    R[i] = b.R
+    repulsion_strength[i] = b.repulsion_strength
+    debye_length[i] = b.debye_length
     dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
   
   # Compute forces and torques
@@ -173,52 +181,12 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     torque = np.zeros((Nbodies, 3))
   force_torque_bodies[:,0:3] = force
   force_torque_bodies[:,3:6] = torque
+
+  # Calc steric body-body force
+  if np.max(repulsion_strength) > 0:
+    force = calc_body_body_forces_tree_numba(r_bodies, L, repulsion_strength, debye_length, R)
+    force_torque_bodies[:, 0:3] += force 
   return force_torque_bodies.reshape((2*len(bodies),3))
-
-
-@njit(parallel=True, fastmath=True)
-def body_body_force_torque_numba(r_bodies, dipoles, vacuum_permeability):
-  '''
-  This function compute the force between N bodies
-  with locations r and dipoles dipoles.
-  '''
-  N = r_bodies.size // 3
-  force = np.zeros_like(r_bodies)
-  torque = np.zeros_like(r_bodies)
-
-  # Loop over bodies
-  for i in prange(N):
-    mi = dipoles[i]
-    for j in range(N):
-      if i == j:
-        continue
-      mj = dipoles[j]
-      
-      # Distance between bodies
-      rij = r_bodies[i] - r_bodies[j]
-      r = np.sqrt(rij[0]*rij[0] + rij[1]*rij[1] + rij[2]*rij[2])
-      rij_hat = rij / r
-
-      #if r > 2.4:
-      #  continue
-
-      # Compute force
-      Ai = np.dot(mi, rij_hat)
-      Aj = np.dot(mj, rij_hat)
-      force[i] += (mi * Aj + mj * Ai + rij_hat * np.dot(mi,mj) - 5 * rij_hat * Ai * Aj) / r**4
-      # force[i] += -(1e-04 / r**4) * rij_hat
-
-      # Compute torque
-      torque[i,0] += (3*Aj * (mi[1] * rij_hat[2] - mi[2]*rij_hat[1]) - (mi[1] * mj[2] - mi[2]*mj[1])) / r**3
-      torque[i,1] += (3*Aj * (mi[2] * rij_hat[0] - mi[0]*rij_hat[2]) - (mi[2] * mj[0] - mi[0]*mj[2])) / r**3
-      torque[i,2] += (3*Aj * (mi[0] * rij_hat[1] - mi[1]*rij_hat[0]) - (mi[0] * mj[1] - mi[1]*mj[0])) / r**3
-
-  # Multiply by prefactors
-  force *= 0.75 * vacuum_permeability / np.pi
-  torque *= 0.25 * vacuum_permeability / np.pi 
-
-  # Return 
-  return force, torque
 
 
 @njit(parallel=True, fastmath=True)
@@ -370,9 +338,15 @@ def calc_body_body_forces_torques_stkfmm(bodies, r_vectors, *args, **kwargs):
   # Extract body locations and dipoles
   r_bodies = np.zeros((len(bodies), 3))
   dipoles = np.zeros((len(bodies), 3))
+  R = np.zeros(len(bodies))
+  repulsion_strength = np.zeros(len(bodies))
+  debye_length = np.zeros(len(bodies))
   for i, b in enumerate(bodies):
     r_bodies[i] = np.copy(b.location)
     dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
+    R[i] = b.R
+    repulsion_strength[i] = b.repulsion_strength
+    debye_length[i] = b.debye_length
   r_bodies = project_to_periodic_image(r_bodies, L)
 
   # Set tree if necessary
@@ -430,7 +404,141 @@ def calc_body_body_forces_torques_stkfmm(bodies, r_vectors, *args, **kwargs):
     force_torque[i, 2] = trg_value[i,6] * dipoles[i,0] + trg_value[i,8] * dipoles[i,1] + trg_value[i,9] * dipoles[i,2]
     force_torque[i, 3:6] = np.cross(dipoles[i], trg_value[i, 1:4])
   force_torque *= vacuum_permeability
+
+  # Calc steric body-body force
+  if np.max(repulsion_strength) > 0:
+    force = calc_body_body_forces_tree_numba(r_bodies, L, repulsion_strength, debye_length, R)
+    force_torque[:, 0:3] += force
   return force_torque.reshape((2*Nbodies, 3))
 
+
+@njit(parallel=True, fastmath=True)
+def body_body_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offsets):
+  '''
+  This function compute the force between two blobs
+  with vector between blob centers r.
+
+  In this example the force is derived from the potential
+  
+  U(r) = U0 + U0 * (2*a-r)/b   if z<2*a
+  U(r) = U0 * exp(-(r-2*a)/b)  iz z>=2*a
+  
+  with
+  eps = potential strength
+  r_norm = distance between blobs
+  b = Debye length
+  a = blob_radius
+  '''
+
+  N = r_vectors.size // 3
+  r_vectors = r_vectors.reshape((N, 3))
+  force = np.zeros((N, 3))
+
+  # Copy arrays
+  Lx = L[0]
+  Ly = L[1]
+  Lz = L[2]
+  rx_vec = np.copy(r_vectors[:,0])
+  ry_vec = np.copy(r_vectors[:,1])
+  rz_vec = np.copy(r_vectors[:,2])
+
+  for i in prange(N):
+    for k in range(offsets[i+1] - offsets[i]):
+      j = list_of_neighbors[offsets[i] + k]
+      if i == j:
+        continue
+      rx = rx_vec[j] - rx_vec[i]
+      ry = ry_vec[j] - ry_vec[i]
+      rz = rz_vec[j] - rz_vec[i]
+
+      # If PBC use minimum distance
+      if Lx > 0:
+        rx -= int(rx / Lx + 0.5 * (int(rx>0) - int(rx<0))) * Lx
+      if Ly > 0:
+        ry -= int(ry / Ly + 0.5 * (int(ry>0) - int(ry<0))) * Ly
+      if Lz > 0:
+        rz -= int(rz / Lz + 0.5 * (int(rz>0) - int(rz<0))) * Lz
+
+      # Parameters
+      a_ij = 0.5 * (a[i] + a[j])
+      b_ij = 0.5 * (b[i] + b[j])
+      eps_ij = np.sqrt(eps[i] * eps[j])
+        
+      # Compute force
+      r_norm = np.sqrt(rx*rx + ry*ry + rz*rz)
+      if r_norm > 2*a_ij:
+        f0 = -((eps_ij / b_ij) * np.exp(-(r_norm - 2.0*a_ij) / b_ij) / r_norm)
+      else:
+        f0 = -((eps_ij / b_ij) / np.maximum(r_norm, 1e-25))
+      force[i, 0] += f0 * rx
+      force[i, 1] += f0 * ry
+      force[i, 2] += f0 * rz
+  return force
+
+
+def calc_body_body_forces_tree_numba(r_vectors, L, eps, b, a):
+  '''
+  This function computes the blob-blob forces and returns
+  an array with shape (Nblobs, 3).
+  '''
+    
+  def project_to_periodic_image(r, L):
+    '''
+    Project a vector r to the minimal image representation
+    of size L=(Lx, Ly, Lz) and with a corner at (0,0,0). If 
+    any dimension of L is equal or smaller than zero the 
+    box is assumed to be infinite in that direction.
+    
+    If one dimension is not periodic shift all coordinates by min(r[:,i]) value.
+    '''
+    if L is not None:
+      for i in range(3):
+        if(L[i] > 0):
+          r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+        else:
+          r[:,i] -= np.min(r[:,i])
+    return r
+
+  # Get parameters from arguments
+  d_max = 2 * np.max(a) + 30 * np.max(b)
+  r_copy = r_vectors
+
+  # Build tree and find neighbors
+  build_tree = True
+  if build_tree:
+    if L[0] > 0 or L[1] > 0 or L[2] > 0:
+      r_copy = np.copy(r_vectors)
+      r_copy = project_to_periodic_image(r_copy, L)
+      if L[0] > 0:
+        Lx = L[0]
+      else:
+        x_min = np.min(r_copy[:,0])
+        x_max = np.max(r_copy[:,0])
+        Lx = (x_max - x_min) * 10
+      if L[1] > 0:
+        Ly = L[1]
+      else:
+        y_min = np.min(r_copy[:,1])
+        y_max = np.max(r_copy[:,1])
+        Ly = (y_max - y_min) * 10
+      if L[2] > 0:
+        Lz = L[2]
+      else:
+        z_min = np.min(r_copy[:,2])
+        z_max = np.max(r_copy[:,2])
+        Lz = (z_max - z_min) * 10
+      boxsize = np.array([Lx, Ly, Lz])
+    else:
+      boxsize = None
+    tree = scspatial.cKDTree(r_copy, boxsize=boxsize)
+    pairs = tree.query_ball_tree(tree, d_max)
+    offsets = np.zeros(len(pairs)+1, dtype=int)
+    for i in range(len(pairs)):
+      offsets[i+1] = offsets[i] + len(pairs[i])
+    list_of_neighbors = np.concatenate(pairs).ravel()
+  
+  # Compute forces
+  force_bodies = body_body_force_tree_numba(r_copy, L, eps, b, a, list_of_neighbors, offsets)
+  return force_bodies
 
 
