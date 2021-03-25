@@ -89,7 +89,14 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
 
     # Add gravity
     force_torque[2*k,2] += -b.mg
-    
+
+    # Add wall repulsion
+    h = b.location[2]
+    if h > b.R:
+      force_torque[2*k,2] += (b.repulsion_strength_wall / b.debye_length_wall) * np.exp(-(h - b.R) / b.debye_length_wall)
+    else:
+      force_torque[2*k,2] += (b.repulsion_strength_wall / b.debye_length_wall)    
+      
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
 

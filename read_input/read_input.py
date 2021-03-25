@@ -107,7 +107,12 @@ class ReadInput(object):
     self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
     self.mg_bodies = np.fromstring(self.options.get('mg_bodies') or 'None', sep=' ')
     self.k_bodies = np.fromstring(self.options.get('k_bodies') or 'None', sep=' ')
-          
+    self.R_bodies = np.fromstring(self.options.get('R_bodies') or 'None', sep=' ')
+    self.repulsion_strength_wall_bodies = np.fromstring(self.options.get('repulsion_strength_wall_bodies') or 'None', sep=' ')
+    self.debye_length_wall_bodies = np.fromstring(self.options.get('debye_length_wall_bodies') or 'None', sep=' ')
+    self.repulsion_strength_bodies = np.fromstring(self.options.get('repulsion_strength_bodies') or 'None', sep=' ')
+    self.debye_length_bodies = np.fromstring(self.options.get('debye_length_bodies') or 'None', sep=' ')
+    
     # Info for STKFMM
     self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)
     self.stkfmm_pbc = str(self.options.get('stkfmm_pbc') or 'None')

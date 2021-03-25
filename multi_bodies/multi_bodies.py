@@ -663,7 +663,26 @@ if __name__ == '__main__':
         b.k = read.k_bodies[ID]
       else:
         b.k = 1.0
-
+      if ID < len(read.R_bodies):
+        b.R = read.R_bodies[ID]
+      else:
+        b.R = 1.0
+      if ID < len(read.repulsion_strength_wall_bodies):
+        b.repulsion_strength_wall = read.repulsion_strength_wall_bodies[ID]
+      else:
+        b.repulsion_strength_wall = 0
+      if ID < len(read.debye_length_wall_bodies):
+        b.debye_length_wall = read.debye_length_wall_bodies[ID]
+      else:
+        b.debye_length_wall = 1
+      if ID < len(read.repulsion_strength_bodies):
+        b.repulsion_strength = read.repulsion_strength_bodies[ID]
+      else:
+        b.repulsion_strength = 0
+      if ID < len(read.debye_length_bodies):
+        b.debye_length = read.debye_length_bodies[ID]
+      else:
+        b.debye_length = 1
 
       # Append bodies to total bodies list
       bodies.append(b)
