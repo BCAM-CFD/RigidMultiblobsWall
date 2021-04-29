@@ -85,7 +85,7 @@ class QuaternionIntegrator(object):
       preprocess_result = self.preprocess(self.bodies)
 
       # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, step = kwargs.get('step'))
+      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, step = kwargs.get('step'), dt = dt)
       
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -1187,7 +1187,11 @@ class QuaternionIntegrator(object):
           force_torque += noise_FT
         # Set right hand side
         RHS = np.reshape(np.concatenate([slip, -force_torque]), (System_size))
-
+        print('force_torque = \n', force_torque.reshape((len(self.bodies), 6)))
+        print('all close F = ', np.allclose(force_torque[0], -force_torque[2]))
+        print('all close T = ', np.allclose(force_torque[1], force_torque[3]))                
+        print('diff F = ', force_torque[0] + force_torque[2])
+        print('diff T = ', force_torque[1] - force_torque[3])
       # Add noise to the slip
       if noise is not None:
         RHS[0:r_vectors_blobs.size] -= noise
@@ -1214,7 +1218,7 @@ class QuaternionIntegrator(object):
       RHS_norm = np.linalg.norm(RHS)
       if RHS_norm > 0:
         RHS = RHS / RHS_norm
-
+      
       # Solve preconditioned linear system
       counter = gmres_counter(print_residual = self.print_residual)
       (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter) 

@@ -1,52 +1,57 @@
 # Length, time and mass are given in units of microns, seconds and miligrams.
 
 # Select scheme to integrate Brownian equations
-scheme                                   body_mobility
+scheme                                   resistance
 
 # Select implementation to compute M and M*f
 # We recommend to use the C++ implementation which is faster,
 # see documentation
-mobility_blobs_implementation            python_no_wall
-mobility_vector_prod_implementation      numba_no_wall
-domain                                   no_wall
+mobility_blobs_implementation            C++
+mobility_vector_prod_implementation      C++
+domain                                   single_wall
 
 # Select implementation to compute the blobs-blob interactions
-blob_blob_force_implementation           None
+blob_blob_force_implementation           tree_numba
+body_body_force_torque_implementation    numba
 
 # Solver params
 solver_tolerance                         1.0e-12
-update_PC                                2
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
-eta                                      1.0
+eta                                      1e-03
 g                                        0
-blob_radius                              0.06365290053263141
+blob_radius                              0.577009424015244
 
 # Stochastic parameters
 # 300 Kelvin * k_B = 0.0041419464 in this units
 kT                                       0
 
 # Set interaction with the wall
-repulsion_strength_wall                  0.00
-debye_length_wall                        0.025
+repulsion_strength_wall                  0.0
+debye_length_wall                        0.0577
 
 # Define implementation to compute the blobs-blob force and pass its arguments
-repulsion_strength                       0.001
-debye_length                             0.025
+repulsion_strength                       0.0
+debye_length                             0.0577
 
-# Slip options
-slip_options                             24 72 -1.0  0
+# Magnetic interactions
+quaternion_B                             1 0 0 0
+mu                                       4.798541882470477860e-03 4.798541882470477860e-03 7.344929652784522034e-03
+vacuum_permeability                      1.25663706143592e+06
+B0                                       0e+03
+omega                                    6.28318530717959
+
+# More about interactions
+harmonic_confinement                     0
+harmonic_confinement_plane               0
+dipole_dipole                            True
+
+# Structures
+structure Structures/shell_N_12_Rg_1.0976_Rh_1.3856.vertex Structures/shell.clones
+
+# Velocity field
+velocity_file                            /home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2000/run2000.1.0.0.velocity.dat
 
 # Set output name
-output_name                              /mnt/ceph/users/fbalboausabiaga/sfw/RigidMultiblobsWall/chiral/data/run
+output_name                              /home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2000/run2000.2.0.0
 save_clones                              one_file
-
-# Plot velocity field
-# plot_velocity_field                      -3 3 512 -0.01 0.01 3 0 1.0 256
-# tracer_radius                            0 
-
-
-structure Structures/superellipsoid_Lg_1.951_r_3.9_N_960.vertex Structures/superellipsoid.clones
-
-
-

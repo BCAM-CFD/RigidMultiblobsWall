@@ -188,6 +188,35 @@ if __name__ ==  '__main__':
       b.mobility_blobs = multi_bodies.set_mobility_blobs(read.mobility_blobs_implementation)
       b.ID = read.structures_ID[ID]
       multi_bodies_functions.set_slip_by_ID(b, slip)
+      # Add body mass
+      if ID < len(read.mg_bodies):
+        b.mg = read.mg_bodies[ID]
+      else:
+        b.mg = 0.0
+      if ID < len(read.k_bodies):
+        b.k = read.k_bodies[ID]
+      else:
+        b.k = 1.0
+      if ID < len(read.R_bodies):
+        b.R = read.R_bodies[ID]
+      else:
+        b.R = 1.0
+      if ID < len(read.repulsion_strength_wall_bodies):
+        b.repulsion_strength_wall = read.repulsion_strength_wall_bodies[ID]
+      else:
+        b.repulsion_strength_wall = 0
+      if ID < len(read.debye_length_wall_bodies):
+        b.debye_length_wall = read.debye_length_wall_bodies[ID]
+      else:
+        b.debye_length_wall = 1
+      if ID < len(read.repulsion_strength_bodies):
+        b.repulsion_strength = read.repulsion_strength_bodies[ID]
+      else:
+        b.repulsion_strength = 0
+      if ID < len(read.debye_length_bodies):
+        b.debye_length = read.debye_length_bodies[ID]
+      else:
+        b.debye_length = 1
       # Append bodies to total bodies list
       bodies.append(b)
   bodies = np.array(bodies)
@@ -238,6 +267,13 @@ if __name__ ==  '__main__':
 
     # Use the code to compute force-torques on bodies if a file was not given
     if read.force_file is None:
+      multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation,
+                                                                                                                 stkfmm_mult_order=read.stkfmm_mult_order, 
+                                                                                                                 stkfmm_pbc=read.stkfmm_pbc,
+                                                                                                                 L=read.periodic_length,
+                                                                                                                 comm=None,
+                                                                                                                 mu=read.mu,
+                                                                                                                 vacuum_permeability=read.vacuum_permeability)
       force_torque = multi_bodies_functions.force_torque_calculator_sort_by_bodies(bodies,
                                                                                    r_vectors_blobs,
                                                                                    g = read.g, 
@@ -245,7 +281,19 @@ if __name__ ==  '__main__':
                                                                                    debye_length_wall = read.debye_length_wall, 
                                                                                    repulsion_strength = read.repulsion_strength, 
                                                                                    debye_length = read.debye_length, 
-                                                                                   periodic_length = read.periodic_length) 
+                                                                                   mu = read.mu,
+                                                                                   B0 = read.B0,
+                                                                                   omega = read.omega,
+                                                                                   quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                                                                                   omega_perp = read.omega_perp,
+                                                                                   vacuum_permeability = read.vacuum_permeability,
+                                                                                   periodic_length = read.periodic_length,
+                                                                                   step = 0, 
+                                                                                   dt = read.dt, 
+                                                                                   domain = read.domain,
+                                                                                   harmonic_confinement = read.harmonic_confinement,
+                                                                                   harmonic_confinement_plane = read.harmonic_confinement_plane,
+                                                                                   dipole_dipole = read.dipole_dipole) 
 
     # Set right hand side
     System_size = Nblobs * 3 + num_bodies * 6
