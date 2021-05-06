@@ -1187,11 +1187,7 @@ class QuaternionIntegrator(object):
           force_torque += noise_FT
         # Set right hand side
         RHS = np.reshape(np.concatenate([slip, -force_torque]), (System_size))
-        print('force_torque = \n', force_torque.reshape((len(self.bodies), 6)))
-        print('all close F = ', np.allclose(force_torque[0], -force_torque[2]))
-        print('all close T = ', np.allclose(force_torque[1], force_torque[3]))                
-        print('diff F = ', force_torque[0] + force_torque[2])
-        print('diff T = ', force_torque[1] - force_torque[3])
+
       # Add noise to the slip
       if noise is not None:
         RHS[0:r_vectors_blobs.size] -= noise

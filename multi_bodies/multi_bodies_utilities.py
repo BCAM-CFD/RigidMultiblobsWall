@@ -333,6 +333,13 @@ if __name__ ==  '__main__':
     np.savetxt(name, velocity, delimiter='  ')
     print('Time to solve mobility problem =', time.time() - start_time )
 
+    # Compute force-torques on bodies
+    force = np.reshape(multi_bodies.K_matrix_T_vector_prod(bodies, lambda_blobs, Nblobs), (num_bodies, 6))
+    
+    # Save force
+    name = read.output_name + '.force.dat'
+    np.savetxt(name, force, delimiter='  ')
+
     # Plot velocity field
     if read.plot_velocity_field.size > 1: 
       print('plot_velocity_field')
@@ -395,6 +402,75 @@ if __name__ ==  '__main__':
 
     # Compute velocity field
 
+  elif read.scheme == 'resistance_avg':
+    start_time = time.time()  
+    N_orientations = 1000
+    N_distances = 200
+    d_min = 1.3856
+    d_max = 13.856
+    d = (d_max - d_min) / (N_distances - 1)
+    force_avg = np.zeros((N_distances, 13))
+    force_std = np.zeros((N_distances, 13))
+  
+    for i_d in range(N_distances):
+      # Update body location
+      print('i_d = ', i_d)
+      bodies[1].location[0] = d_min + d * i_d
+      force_std[i_d, 0] = d_min + d * i_d
+      force_avg[i_d, 0] = d_min + d * i_d
+
+      # Loop over orientations
+      for i_o in range(N_orientations):
+        if False:
+          theta_0 = np.random.normal(0, 1, 4)
+          theta_1 = np.random.normal(0, 1, 4)
+          bodies[0].orientation = Quaternion(theta_0 / np.linalg.norm(theta_0))
+          bodies[1].orientation = Quaternion(theta_1 / np.linalg.norm(theta_1))
+        else:
+          omega_vec = np.random.normal(0, 1, 3)
+          omega_vec[0:2] = 0
+          quaternion_dt = Quaternion.from_rotation(omega_vec)
+          bodies[0].orientation = quaternion_dt * bodies[0].orientation
+          bodies[1].orientation = quaternion_dt * bodies[1].orientation
+          
+        # Get blobs coordinates 
+        r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs) 
+    
+        # Calculate block-diagonal matrix K
+        K = multi_bodies.calc_K_matrix(bodies, Nblobs)
+
+        # Set right hand side
+        slip = multi_bodies.K_matrix_vector_prod(bodies, velocity, Nblobs) 
+        RHS = np.reshape(slip, slip.size)
+    
+        # Calculate mobility (M) at the blob level
+        mobility_blobs = multi_bodies.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius)
+
+        # Compute constraint forces 
+        force_blobs = np.linalg.solve(mobility_blobs, RHS)
+
+        # Compute force-torques on bodies
+        force_torque = np.reshape(multi_bodies.K_matrix_T_vector_prod(bodies, force_blobs, Nblobs), (num_bodies, 6)).flatten()
+        
+        # Compute averge
+        force_std[i_d, 1:] += i_o * (force_torque - force_avg[i_d, 1:])**2 / (i_o + 1)
+        force_avg[i_d, 1:] += (force_torque - force_avg[i_d, 1:]) / (i_o + 1)
+           
+    # Save force
+    name = read.output_name + '.force_vs_distance.dat'
+    result = np.zeros((N_distances, 25))
+    result[:,0] = force_avg[:,0]
+    result[:,1:13] = force_avg[:,1:]
+    result[:,13:25] = np.sqrt(force_std[:,1:] / np.maximum(1, N_orientations - 1))
+    
+    np.savetxt(name, result, delimiter='  ', header='Columns: distance, force-torque (12 numbers), standard deviation (12 numbers)')
+    print('Time to solve resistance problem =', time.time() - start_time  )
+
+
+      
+
+
+    
   print('\n\n\n# End')
 
 
