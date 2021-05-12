@@ -467,6 +467,185 @@ if __name__ ==  '__main__':
     print('Time to solve resistance problem =', time.time() - start_time  )
 
 
+  elif read.scheme == 'body_mobility_avg':
+    start_time = time.time()  
+    N_orientations = 1000
+    N_distances = 200
+    d_min = 1.3856
+    d_max = 13.856
+    d = (d_max - d_min) / (N_distances - 1)
+    force_avg = np.zeros((N_distances, 7))
+    force_std = np.zeros((N_distances, 7))
+    omega_ext = np.zeros(6)
+    omega_ext[2::3] = 2 * np.pi * 10
+  
+    for i_d in range(N_distances):
+      # Update body location
+      print('i_d = ', i_d)
+      bodies[1].location[0] = d_min + d * i_d
+      force_std[i_d, 0] = d_min + d * i_d
+      force_avg[i_d, 0] = d_min + d * i_d
+
+      # Loop over orientations
+      for i_o in range(N_orientations):
+        if False:
+          theta_0 = np.random.normal(0, 1, 4)
+          theta_1 = np.random.normal(0, 1, 4)
+          bodies[0].orientation = Quaternion(theta_0 / np.linalg.norm(theta_0))
+          bodies[1].orientation = Quaternion(theta_1 / np.linalg.norm(theta_1))
+        else:
+          omega_vec = np.random.normal(0, 1, 3)
+          omega_vec[0:2] = 0
+          quaternion_dt = Quaternion.from_rotation(omega_vec)
+          bodies[0].orientation = quaternion_dt * bodies[0].orientation
+          bodies[1].orientation = quaternion_dt * bodies[1].orientation
+
+        r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs)
+        mobility_blobs = multi_bodies.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius)
+        resistance_blobs = np.linalg.inv(mobility_blobs)
+        K = multi_bodies.calc_K_matrix(bodies, Nblobs)
+        resistance_bodies = np.dot(K.T, np.dot(resistance_blobs, K))
+        mobility_bodies = np.linalg.pinv(np.dot(K.T, np.dot(resistance_blobs, K)))
+
+        M_rr = np.zeros((6, 6))
+        M_rr[0:3, 0:3] = mobility_bodies[3:6, 3:6]
+        M_rr[0:3, 3:6] = mobility_bodies[3:6, 9:12]
+        M_rr[3:6, 0:3] = mobility_bodies[9:12, 3:6]
+        M_rr[3:6, 3:6] = mobility_bodies[9:12, 9:12]
+
+        R_tr = np.zeros((6,6))
+        R_tr[0:3, 0:3] = resistance_bodies[0:3, 3:6]
+        R_tr[0:3, 3:6] = resistance_bodies[0:3, 9:12]
+        R_tr[3:6, 0:3] = resistance_bodies[6:9, 3:6]
+        R_tr[3:6, 3:6] = resistance_bodies[6:9, 9:12]
+
+        # Force as f = - R_tr * omega        
+        force = -np.dot(R_tr, omega_ext)
+      
+        # Compute averge
+        force_std[i_d, 1:] += i_o * (force - force_avg[i_d, 1:])**2 / (i_o + 1)
+        force_avg[i_d, 1:] += (force - force_avg[i_d, 1:]) / (i_o + 1)
+           
+    # Save force
+    name = read.output_name + '.force_vs_distance.dat'
+    result = np.zeros((N_distances, 25))
+    result[:,0] = force_avg[:,0]
+    result[:,1:7] = force_avg[:,1:]
+    result[:,7:13] = np.sqrt(force_std[:,1:] / np.maximum(1, N_orientations - 1))
+    
+    np.savetxt(name, result, delimiter='  ', header='Columns: distance, force (6 numbers), standard deviation (6 numbers)')
+    print('Time to solve resistance problem =', time.time() - start_time  )
+
+  elif read.scheme == 'body_mobility_trajectory':
+    start_time = time.time()
+    # Set parameters
+    name_0 = '/home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2001/run2001.11.0.0.superellipsoid.0.dat'
+    name_1 = '/home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2001/run2001.11.0.0.superellipsoid.1.dat'
+    omega = 2 * np.pi * 10
+    B0 = 1e+03
+    dt = 0.0004
+    N_steps = 500
+    N_offset = 2
+    R = (3.0 / (4 * np.pi))**(1.0 / 3.0) * 1.6
+    zeta_0 = 6 * np.pi * read.eta * R
+    # Use torque type: trajectory, constant_torque, constant_angular_velocity
+    torque_mode = 'trajectory_v2'
+
+    # Load trajectories
+    x_0 = np.loadtxt(name_0)
+    x_1 = np.loadtxt(name_1)
+    force_trajectory = np.zeros((N_steps, 7))
+  
+    for i in range(N_offset, N_steps + N_offset):
+      # Update body location
+      print('i = ', i)
+      bodies[0].location = x_0[i,1:4]
+      bodies[1].location = x_1[i,1:4]
+      bodies[0].orientation = Quaternion(x_0[i,4:])
+      bodies[1].orientation = Quaternion(x_1[i,4:])
+
+      # Compute mobility and resistance
+      r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs)
+      mobility_blobs = multi_bodies.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius)
+      resistance_blobs = np.linalg.inv(mobility_blobs)
+      K = multi_bodies.calc_K_matrix(bodies, Nblobs)
+      resistance_bodies = np.dot(K.T, np.dot(resistance_blobs, K))
+      mobility_bodies = np.linalg.pinv(resistance_bodies)
+
+      # Extract submatrices
+      M_rr = np.zeros((6, 6))
+      M_rr[0:3, 0:3] = mobility_bodies[3:6, 3:6]
+      M_rr[0:3, 3:6] = mobility_bodies[3:6, 9:12]
+      M_rr[3:6, 0:3] = mobility_bodies[9:12, 3:6]
+      M_rr[3:6, 3:6] = mobility_bodies[9:12, 9:12]
+
+      R_tr = np.zeros((6,6))
+      R_tr[0:3, 0:3] = resistance_bodies[0:3, 3:6]
+      R_tr[0:3, 3:6] = resistance_bodies[0:3, 9:12]
+      R_tr[3:6, 0:3] = resistance_bodies[6:9, 3:6]
+      R_tr[3:6, 3:6] = resistance_bodies[6:9, 9:12]
+
+      R_tt = np.zeros((6, 6))
+      R_tt[0:3, 0:3] = resistance_bodies[0:3, 0:3]
+      R_tt[0:3, 3:6] = resistance_bodies[0:3, 6:9]
+      R_tt[3:6, 0:3] = resistance_bodies[6:9, 0:3]
+      R_tt[3:6, 3:6] = resistance_bodies[6:9, 6:9]
+
+      # Compute torque
+      torque = np.zeros((2, 3))
+      t = dt * i 
+      B = B0 * np.array([np.cos(omega * t), np.sin(omega * t), 0.0])
+      for k, b in enumerate(bodies):
+        rotation_matrix = b.orientation.rotation_matrix()
+        mu_body = np.dot(rotation_matrix, read.mu)
+        torque[k] = np.cross(mu_body, B)
+
+      # Force as f = - R_tr * omega
+      if torque_mode == 'constant_angular_velocity':
+        omega_vec = np.zeros(6)
+        omega_vec[2] = omega
+        omega_vec[5] = omega
+        force = -np.dot(R_tr, omega_vec)
+      elif torque_mode == 'trajectory':
+        force = -np.dot(R_tr, np.dot(M_rr, torque.flatten()))
+      elif torque_mode == 'constant_angular_velocity_v2':
+        omega_vec = np.zeros(6)
+        omega_vec[2] = omega
+        omega_vec[5] = omega
+        force = -zeta_0 * np.dot(np.linalg.inv(R_tt), np.dot(R_tr, omega_vec))
+      elif torque_mode == 'trajectory_v2':
+        force = -zeta_0 * np.dot(np.linalg.inv(R_tt), np.dot(R_tr, np.dot(M_rr, torque.flatten())))
+      
+      # Decompose force and save
+      r = bodies[1].location - bodies[0].location
+      r[2] = 0
+      r_perp = np.zeros(3)
+      r_perp[0] = r[1]
+      r_perp[1] = -r[0]
+      r_perp = r_perp / np.linalg.norm(r_perp)
+      r_hat = r / np.linalg.norm(r)
+      z = np.zeros(3)
+      z[2] = 1
+      force_longitudinal_0 = np.dot(r_hat, force[0:3])
+      force_longitudinal_1 = np.dot(r_hat, force[3:6])
+      force_transverse_0 = np.dot(r_perp, force[0:3])
+      force_transverse_1 = np.dot(r_perp, force[3:6])
+      force_vertical_0 = np.dot(z, force[0:3])
+      force_vertical_1 = np.dot(z, force[3:6])
+      force_trajectory[i - N_offset, 0] = t - N_offset * dt
+      force_trajectory[i - N_offset, 1] = force_longitudinal_0
+      force_trajectory[i - N_offset, 2] = force_transverse_0
+      force_trajectory[i - N_offset, 3] = force_vertical_0
+      force_trajectory[i - N_offset, 4] = force_longitudinal_1
+      force_trajectory[i - N_offset, 5] = force_transverse_1
+      force_trajectory[i - N_offset, 6] = force_vertical_1
+           
+    # Save force
+    name = read.output_name + '.force_vs_time.dat'
+    np.savetxt(name, force_trajectory, delimiter='  ', header='Columns: time, force longitudinal, transverse, vertical, viz second particle')
+    print('Time to solve resistance problem =', time.time() - start_time  )
+
+
       
 
 
