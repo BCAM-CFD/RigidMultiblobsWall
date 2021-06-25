@@ -685,7 +685,7 @@ if __name__ ==  '__main__':
   elif read.scheme == 'body_mobility_trajectory_many_bodies':
     start_time = time.time()
     # Set parameters
-    name = '/home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2000/run2000.40.49.0.shell.config'
+    name = '/home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2000/run2000.40.3.0.shell.config'
     x = read_config(name)
     omega = 2 * np.pi * 10
     B0 = 1e+03
@@ -730,7 +730,7 @@ if __name__ ==  '__main__':
       if torque_mode == 'constant_angular_velocity':
         # Force as f = - R_tr * omega
         velocity = np.zeros(6 * len(bodies))
-        # velocity[5::6 * len(bodies)] = omega
+        #velocity[5::6] = omega
         velocity[5] = omega
         velocity[11] = omega
         force_torque = -np.dot(resistance_bodies, velocity)
