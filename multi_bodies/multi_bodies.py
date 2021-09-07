@@ -653,7 +653,7 @@ if __name__ == '__main__':
         b.calc_body_length()
       else:
         b.body_length = bodies[-1].body_length
-      multi_bodies_functions.set_slip_by_ID(b, slip)
+      multi_bodies_functions.set_slip_by_ID(b, slip, shear_rate=read.shear_rate)
       # Add body mass
       if ID < len(read.mg_bodies):
         b.mg = read.mg_bodies[ID]

@@ -542,3 +542,37 @@ def calc_body_body_forces_tree_numba(r_vectors, L, eps, b, a):
   return force_bodies
 
 
+def set_slip_by_ID_new(body, slip, *args, **kwargs):
+  '''
+  This functions assing a slip function to each
+  body depending on his ID. The ID of a structure
+  is the name of the clones file (without .clones)
+  given in the input file.
+  As an example we give a default function which sets the
+  slip to zero and a function for active rods with an
+  slip along its axis. The user can create new functions
+  for other kind of active bodies.
+  '''
+  if 'rod_resolved_shear' in body.ID:
+    body.function_slip = partial(slip_rod_resolved, *args, **kwargs)
+  else:
+    body.function_slip = default_zero_blobs
+  return
+multi_bodies_functions.set_slip_by_ID = set_slip_by_ID_new
+
+
+def slip_rod_resolved(body, *args, **kwargs):
+  '''
+  Apply shear flow along x-axis.
+  flow_x = shear_rate * z 
+  '''
+
+  # Get slip options
+  shear_rate = kwargs.get('shear_rate')
+
+  # Applied shear
+  r_configuration = body.get_r_vectors()
+  slip = np.zeros((body.Nblobs, 3))
+  slip[:,0] -= shear_rate * r_configuration[:,2]
+
+  return slip

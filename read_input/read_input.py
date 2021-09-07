@@ -112,6 +112,7 @@ class ReadInput(object):
     self.debye_length_wall_bodies = np.fromstring(self.options.get('debye_length_wall_bodies') or 'None', sep=' ')
     self.repulsion_strength_bodies = np.fromstring(self.options.get('repulsion_strength_bodies') or 'None', sep=' ')
     self.debye_length_bodies = np.fromstring(self.options.get('debye_length_bodies') or 'None', sep=' ')
+    self.shear_rate = float(self.options.get('shear_rate') or 0.0)
     
     # Info for STKFMM
     self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)
