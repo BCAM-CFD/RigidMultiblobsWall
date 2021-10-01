@@ -278,8 +278,9 @@ class QuaternionIntegrator(object):
       # Compute M at time level n
       r_vectors_blobs_n = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
         
-      # Build preconditioner 
+      # Build preconditioner
       PC_partial = self.build_block_diagonal_preconditioner(self.bodies,
+                                                            self.articulated,
                                                             r_vectors_blobs_n,
                                                             self.Nblobs,
                                                             self.eta,
