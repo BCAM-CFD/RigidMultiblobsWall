@@ -24,7 +24,7 @@ class Lub_Solver(object):
   '''
   Class to handle Lubrication solve
   '''  
-  def __init__(self, bodies, a, eta, cutoff, periodic_length, debye_length=1e-4, domain='single_wall', mobility_vector_prod_implementation='pycuda'):
+  def __init__(self, bodies, a, eta, cutoff, periodic_length, firm_delta=1e-4, domain='single_wall', mobility_vector_prod_implementation='pycuda'):
     '''
     Constructor. Take arguments like ...
     '''
@@ -40,12 +40,11 @@ class Lub_Solver(object):
     self.cutoff_wall = 1.0e10 #1.45
     self.num_rejections_wall = 0
     self.num_rejections_jump = 0
-    self.debye_length = debye_length
     self.delta = 1e-3
     self.print_residual = False    
     self.reflect_forces = np.zeros(6*len(bodies))
     
-    self.LC = Lub_cc.Lubrication(debye_length)
+    self.LC = Lub_cc.Lubrication(firm_delta)
     self.R_MB = None
     self.R_Sup = None
     self.Delta_R = None

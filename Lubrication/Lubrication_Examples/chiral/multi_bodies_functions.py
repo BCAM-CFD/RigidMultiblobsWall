@@ -14,6 +14,19 @@ import scipy.spatial as spatial
 import general_application_utils
 from quaternion_integrator.quaternion import Quaternion
 
+# If numba is installed import forces_numba
+try: 
+  imp.find_module('numba')
+  found_numba = True
+except ImportError:
+  found_numba = False
+if found_numba:
+  import forces_numba
+try:
+  import forces_cpp
+except ImportError:
+  pass
+
 
 def project_to_periodic_image(r, L):
   '''
@@ -27,6 +40,7 @@ def project_to_periodic_image(r, L):
       if(L[i] > 0):
         r[i] = r[i] - int(r[i] / L[i] + 0.5 * (int(r[i]>0) - int(r[i]<0))) * L[i]
   return r
+
 
 def put_r_vecs_in_periodic_box(r_vecs, L):
   for r_vec in r_vecs:
@@ -104,56 +118,45 @@ def bodies_external_force_torque(bodies, r_vectors, *args, **kwargs):
   
   In this is example we just set it to zero.
   '''
-  ext_FT = np.zeros((2*len(bodies), 3))
-  return ext_FT
-  
+  return np.zeros((2*len(bodies), 3))
 
-def blob_external_force(r_vectors, *args, **kwargs):
+
+def blob_external_forces(r_vectors, *args, **kwargs):
   '''
   This function compute the external force acting on a
   single blob. It returns an array with shape (3).
-  
+
   In this example we add gravity and a repulsion with the wall;
   the interaction with the wall is derived from the potential
 
   U(z) = U0 + U0 * (a-z)/b   if z<a
   U(z) = U0 * exp(-(z-a)/b)  iz z>=a
 
-  with 
+  with
   e = repulsion_strength_wall
   a = blob_radius
   h = distance to the wall
   b = debye_length_wall
   '''
-  f = np.zeros(3)
+  N = r_vectors.size // 3
+  f = np.zeros((N, 3))
 
   # Get parameters from arguments
   blob_mass = kwargs.get('blob_mass')
   blob_radius = kwargs.get('blob_radius')
   g = kwargs.get('g')
-  repulsion_strength_firm = kwargs.get('repulsion_strength_firm') 
-  debye_length_firm = kwargs.get('debye_length_firm')
-  firm_delta = kwargs.get('firm_delta')
+  repulsion_strength_wall = kwargs.get('repulsion_strength_wall')
+  debye_length_wall = kwargs.get('debye_length_wall')
   # Add gravity
-  f += -g * blob_mass * np.array([0., 0., 1.0])
-  
+  f[:,2] = -g * blob_mass
+
   # Add wall interaction
-  h = r_vectors[2]
-  if h > blob_radius*(1.0-firm_delta):
-    f[2] += (repulsion_strength_firm / debye_length_firm) * np.exp(-(h-blob_radius*(1.0-firm_delta))/debye_length_firm)
-  else:
-    f[2] += (repulsion_strength_firm / debye_length_firm)
-    
-    
-  # Add wall interaction
-  eps_soft = kwargs.get('repulsion_strength_wall') 
-  b_soft = kwargs.get('debye_length_wall')
-  h = r_vectors[2]
-  if h > (blob_radius):
-    f[2] += (eps_soft / b_soft) * np.exp(-(h-blob_radius)/b_soft)
-  else:
-    f[2] += (eps_soft / b_soft)
-      
+  h = r_vectors[:,2]
+  lr_mask = h > blob_radius
+  sr_mask = h <= blob_radius
+  f[lr_mask,2] += (repulsion_strength_wall / debye_length_wall) * np.exp(-(h[lr_mask]-blob_radius)/debye_length_wall)
+  f[sr_mask,2] += (repulsion_strength_wall / debye_length_wall)
+
   return f
 
 
@@ -161,15 +164,8 @@ def calc_one_blob_forces(r_vectors, *args, **kwargs):
   '''
   Compute one-blob forces. It returns an array with shape (Nblobs, 3).
   '''
-  Nblobs = r_vectors.size // 3
-  force_blobs = np.zeros((Nblobs, 3))
-  r_vectors = np.reshape(r_vectors, (Nblobs, 3))
-  
-  # Loop over blobs
-  for blob in range(Nblobs):
-    force_blobs[blob] += blob_external_force(r_vectors[blob], *args, **kwargs)   
-
-  return force_blobs
+  r_vectors = np.reshape(r_vectors, (r_vectors.size // 3, 3)) 
+  return blob_external_forces(r_vectors, *args, **kwargs)   
 
 
 def set_blob_blob_forces(implementation):
@@ -187,10 +183,10 @@ def set_blob_blob_forces(implementation):
     return default_zero_r_vectors
   elif implementation == 'python':
     return calc_blob_blob_forces_python
-  elif implementation == 'C++':
-    return calc_blob_blob_forces_boost 
-  elif implementation == 'pycuda':
-    return forces_pycuda.calc_blob_blob_forces_pycuda
+  elif implementation == 'numba':
+    return forces_numba.calc_blob_blob_forces_numba
+  elif implementation == 'tree_numba':
+    return forces_numba.calc_blob_blob_forces_tree_numba
 
 
 def blob_blob_force(r, *args, **kwargs):
@@ -212,30 +208,17 @@ def blob_blob_force(r, *args, **kwargs):
   # Get parameters from arguments
   L = kwargs.get('periodic_length')
   a = kwargs.get('blob_radius')
-  repulsion_strength_firm = kwargs.get('repulsion_strength_firm')
-  debye_length_firm = kwargs.get('debye_length_firm')
-  firm_delta = kwargs.get('firm_delta')
+  eps = kwargs.get('repulsion_strength') 
+  b = kwargs.get('debye_length')
 
   # Compute force
   project_to_periodic_image(r, L)
   r_norm = np.linalg.norm(r)
   
-  #print "no interparticle force"
-  offset = 2.0*a-2.0*firm_delta*a
-  if r_norm > (offset):
-    force_torque = -((repulsion_strength_firm / debye_length_firm) * np.exp(-(r_norm-(offset)) / debye_length_firm) / np.maximum(r_norm, np.finfo(float).eps)) * r 
+  if r_norm > 2.0 * a:
+    return -((eps / b) * np.exp(-(r_norm- 2.0 * a) / b) / np.maximum(r_norm, np.finfo(float).eps)) * r 
   else:
-    force_torque = -((repulsion_strength_firm / debye_length_firm) / np.maximum(r_norm, np.finfo(float).eps)) * r;
-  
-  
-  # Add wall interaction
-  #print('no pair soft, only wall soft')
-  eps_soft = kwargs.get('repulsion_strength') 
-  b_soft = kwargs.get('debye_length')
-  if r_norm > (2.0*a):
-    force_torque += -((eps_soft / b_soft) * np.exp(-(r_norm-(2.0*a)) / b_soft) / np.maximum(r_norm, np.finfo(float).eps)) * r 
-  else:
-    force_torque += -((eps_soft / b_soft) / np.maximum(r_norm, np.finfo(float).eps)) * r;
+    return -((eps / b) / np.maximum(r_norm, np.finfo(float).eps)) * r;
   
   return force_torque
   
@@ -247,37 +230,15 @@ def calc_blob_blob_forces_python(r_vectors, *args, **kwargs):
   '''
   Nblobs = r_vectors.size // 3
   force_blobs = np.zeros((Nblobs, 3))
-  
-  L = kwargs.get('periodic_length')
-  a = kwargs.get('blob_radius')
-  eps_s = kwargs.get('repulsion_strength')
-  if eps_s > 1e-8:
-    cut_pot = 3.5*a
-  else:
-    cut_pot = 2.2*a  
-  
-  put_r_vecs_in_periodic_box(r_vectors, L)
-  r_tree = spatial.cKDTree(r_vectors,boxsize=L)
-  
-  for j in range(Nblobs):
-    s1 = r_vectors[j]
-    idx = r_tree.query_ball_point(s1,r=cut_pot) #2.2*a
-    idx_trim = [i for i in idx if i > j]
-    for k in idx_trim:
-      s2 = r_vectors[k]
-      r = s2-s1
-      force = blob_blob_force(r, *args, **kwargs)
-      force_blobs[j] += force
-      force_blobs[k] -= force
 
   # Double loop over blobs to compute forces
-  #for i in range(Nblobs-1):
-    #for j in range(i+1, Nblobs):
-      ## Compute vector from j to u
-      #r = r_vectors[j] - r_vectors[i]
-      #force = blob_blob_force(r, *args, **kwargs)
-      #force_blobs[i] += force
-      #force_blobs[j] -= force
+  for i in range(Nblobs-1):
+    for j in range(i+1, Nblobs):
+      # Compute vector from j to u
+      r = r_vectors[j] - r_vectors[i]
+      force = blob_blob_force(r, *args, **kwargs)
+      force_blobs[i] += force
+      force_blobs[j] -= force
 
   return force_blobs
 
@@ -327,13 +288,7 @@ def body_body_force_torque(r, quaternion_i, quaternion_j, *args, **kwargs):
   r_norm = distance between bodies' location
   b = Debye length
   '''
-  force_torque = np.zeros((2, 3))
-
-  # Get parameters from arguments
-  L = kwargs.get('periodic_length')
-  eps = kwargs.get('repulsion_strength')
-  b = kwargs.get('debye_length')
-  
+  force_torque = np.zeros((2, 3)) 
   return force_torque
 
 

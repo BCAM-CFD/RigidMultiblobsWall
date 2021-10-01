@@ -111,9 +111,6 @@ if __name__ == '__main__':
     num_particles = len(bodies)
     Nblobs = sum([x.Nblobs for x in bodies])
     cutoff = read.Lub_Cut         
-    firm_delta = read.firm_delta
-    debye_length_delta = 2.0*a*firm_delta/np.log(1.0e1) 
-    repulsion_strength_delta = read.repulsion_strength_firm
     n_steps = read.n_steps 
     n_save = read.n_save
     dt = read.dt 
@@ -123,7 +120,7 @@ if __name__ == '__main__':
                a,
                eta,cutoff,
                read.periodic_length,
-               debye_length=firm_delta,
+               firm_delta=read.firm_delta,
                domain=read.domain,
                mobility_vector_prod_implementation=read.mobility_vector_prod_implementation)
     LSolv.dt = dt
@@ -135,15 +132,13 @@ if __name__ == '__main__':
     multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)   
     FT_calc = partial(multi_bodies_functions.force_torque_calculator_sort_by_bodies, 
                       g = read.g, 
-                      repulsion_strength_firm = repulsion_strength_delta,
-                      debye_length_firm = debye_length_delta, 
-                      firm_delta = firm_delta,
+                      firm_delta = read.firm_delta,
                       repulsion_strength_wall = read.repulsion_strength_wall,
                       debye_length_wall = read.debye_length_wall,
                       repulsion_strength = read.repulsion_strength, 
                       debye_length = read.debye_length, 
                       periodic_length = read.periodic_length,
-                      omega = 0, #Omega ############## CHANGE ME TO ZERO FOR CONST OMEGA AND TO 'Omega' FOR CONST TORQUE
+                      omega = 0, 
                       eta = eta,
                       a = a)  
 
@@ -193,7 +188,6 @@ if __name__ == '__main__':
     # Save data if...
     if ((n+1) % n_save) == 0 and n >= 0:
       elapsed_time = time.time() - start_time
-      print('\n\n\n')
       print('Integrator = ', read.scheme, ', step = ', n+1, ',  wallclock time = ', time.time() - start_time)
       body_offset = 0
       for i, f_ID in enumerate(output_files):
