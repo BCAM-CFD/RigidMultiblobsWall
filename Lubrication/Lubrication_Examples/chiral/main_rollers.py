@@ -25,18 +25,19 @@ path_to_append = ''
 sys.path.append('../../')
 while found_functions is False:
     try:
-        from Lub_Solver import Lub_Solver as LS
-        from stochastic_forcing import stochastic_forcing as stochastic
-        from mobility import mobility as mb
-        from body import body
-        from read_input import read_input
-        from read_input import read_vertex_file
-        from read_input import read_clones_file
-        from read_input import read_slip_file
-        import general_application_utils
-        import multi_bodies_functions
+      from quaternion_integrator.quaternion import Quaternion
+      from Lub_Solver import Lub_Solver as LS
+      from stochastic_forcing import stochastic_forcing as stochastic
+      from mobility import mobility as mb
+      from body import body
+      from read_input import read_input
+      from read_input import read_vertex_file
+      from read_input import read_clones_file
+      from read_input import read_slip_file
+      import general_application_utils
+      import multi_bodies_functions
 
-        found_functions = True
+      found_functions = True
     except ImportError:
         path_to_append += '../'
         print('searching functions in path ', path_to_append)
@@ -101,6 +102,36 @@ if __name__ == '__main__':
           b.calc_body_length()
         else:
           b.body_length = bodies[-1].body_length
+        # Add body mass
+        if ID < len(read.mg_bodies):
+          b.mg = read.mg_bodies[ID]
+        else:
+          b.mg = 0.0
+        if ID < len(read.k_bodies):
+            b.k = read.k_bodies[ID]
+        else:
+          b.k = 1.0
+        if ID < len(read.R_bodies):
+          b.R = read.R_bodies[ID]
+        else:
+          b.R = 1.0
+        if ID < len(read.repulsion_strength_wall_bodies):
+          b.repulsion_strength_wall = read.repulsion_strength_wall_bodies[ID]
+        else:
+          b.repulsion_strength_wall = 0
+        if ID < len(read.debye_length_wall_bodies):
+          b.debye_length_wall = read.debye_length_wall_bodies[ID]
+        else:
+          b.debye_length_wall = 1
+        if ID < len(read.repulsion_strength_bodies):
+          b.repulsion_strength = read.repulsion_strength_bodies[ID]
+        else:
+          b.repulsion_strength = 0
+        if ID < len(read.debye_length_bodies):
+          b.debye_length = read.debye_length_bodies[ID]
+        else:
+          b.debye_length = 1
+
         # Append bodies to total bodies list
         bodies.append(b)
     bodies = np.array(bodies)
@@ -138,10 +169,19 @@ if __name__ == '__main__':
                       repulsion_strength = read.repulsion_strength, 
                       debye_length = read.debye_length, 
                       periodic_length = read.periodic_length,
-                      omega = 0, 
                       eta = eta,
-                      a = a)  
-
+                      a = a,
+                      mu = read.mu,
+                      B0 = read.B0,
+                      omega = read.omega,
+                      quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                      omega_perp = read.omega_perp,
+                      vacuum_permeability = read.vacuum_permeability,
+                      omega_one_roller = read.omega_one_roller,
+                      harmonic_confinement = read.harmonic_confinement,
+                      harmonic_confinement_plane = read.harmonic_confinement_plane, 
+                      dipole_dipole = read.dipole_dipole)  
+    
     if True:
       # Set lubrication matrices in sparse csc format for the class members
       t0 = time.time()
@@ -180,7 +220,7 @@ if __name__ == '__main__':
           body_offset += body_types[i]
 
       # Advance time step
-      LSolv.Update_Bodies_Trap(FT_calc)
+      LSolv.Update_Bodies_Trap(FT_calc, step=n)
      
 
 

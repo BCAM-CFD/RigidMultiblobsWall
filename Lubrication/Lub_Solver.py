@@ -731,7 +731,7 @@ class Lub_Solver(object):
     return reject_wall, reject_jump
   
   
-  def Update_Bodies_Trap(self, FT_calc, Omega=None, Out_Torque=False, Cut_Torque=None):
+  def Update_Bodies_Trap(self, FT_calc, step=None, Omega=None, Out_Torque=False, Cut_Torque=None):
     L = self.periodic_length
 
     # Save initial configuration
@@ -741,8 +741,8 @@ class Lub_Solver(object):
         
     # compute forces for predictor step
     r_vecs_np = [b.location for b in self.bodies]
-    r_vecs = self.put_r_vecs_in_periodic_box(r_vecs_np,self.periodic_length)
-    FT = FT_calc(self.bodies, r_vecs)
+    r_vecs = self.put_r_vecs_in_periodic_box(r_vecs_np,self.periodic_length) 
+    FT = FT_calc(self.bodies, r_vecs, step=step, dt = self.dt)
     FT = FT.flatten()
     FT = FT[:,np.newaxis]
     
@@ -795,7 +795,7 @@ class Lub_Solver(object):
     # compute RHSs for the corr. step
     RHS_X_C = D_M + Mhalf
     
-    FT_C = FT_calc(self.bodies, r_vecs_c)
+    FT_C = FT_calc(self.bodies, r_vecs_c, step=step, dt = self.dt)
     FT_C = FT_C.flatten()
     FT_C = FT_C[:,np.newaxis]
     
