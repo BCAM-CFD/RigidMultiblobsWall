@@ -169,7 +169,6 @@ if __name__ == '__main__':
       # Save data if...
       if (n % n_save) == 0 and n >= 0:
         elapsed_time = time.time() - start_time
-        print('\n\n\n')
         print('Integrator = ', read.scheme, ', step = ', n, ',  wallclock time = ', time.time() - start_time)
         body_offset = 0
         for i, f_ID in enumerate(output_files):
@@ -195,7 +194,7 @@ if __name__ == '__main__':
     if ((n+1) % n_save) == 0 and n >= 0:
       elapsed_time = time.time() - start_time
       print('\n\n\n')
-      print('Integrator = ', read.scheme, ', step = ', n, ',  wallclock time = ', time.time() - start_time)
+      print('Integrator = ', read.scheme, ', step = ', n+1, ',  wallclock time = ', time.time() - start_time)
       body_offset = 0
       for i, f_ID in enumerate(output_files):
         f_ID.write(str(body_types[i]) + '\n')

@@ -548,12 +548,9 @@ class Lub_Solver(object):
           isolated.append(j)
       ##############
       
-      start = time.time()
       small = 6.0*np.pi*self.eta*self.a*self.tolerance
       Eig_Shift_R_Sup = self.R_Sup + sp.diags(small*np.ones(6*num_particles),0,format='csc')
       factor = cholesky(Eig_Shift_R_Sup)
-      end = time.time()
-      print('factor time : '+ str((end - start)))
       PC_operator_partial = partial(self.IpMDR_PC, R_fact=factor,isolated=isolated)
       
       ################## SWAN #####################
@@ -581,7 +578,6 @@ class Lub_Solver(object):
     X0 = None
     if X0 is not None:
       X0 = X0/RHS_norm
-    print('self.print_residual = ', self.print_residual)
     counter = gmres_counter(print_residual = self.print_residual)
     # (U_gmres, info_precond) = pyamg.krylov.gmres(A, RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=2*min(100,A.shape[0]), restrt=min(100,A.shape[0]), residuals=res_list, callback=counter)
     (U_gmres, info_precond) = utils.gmres(A, RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=2*min(100,A.shape[0]), restart = min(100,A.shape[0]), callback=counter)
