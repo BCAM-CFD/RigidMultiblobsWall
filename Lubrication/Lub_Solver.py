@@ -10,7 +10,7 @@ from functools import partial
 import copy
 import inspect
 import time
-import general_application_utils
+import general_application_utils as utils
 import sys
 from mobility import mobility as mob
 import pyamg
@@ -24,7 +24,7 @@ class Lub_Solver(object):
   '''
   Class to handle Lubrication solve
   '''  
-  def __init__(self, bodies, a, eta, cutoff, periodic_length, debye_length=1e-4):
+  def __init__(self, bodies, a, eta, cutoff, periodic_length, debye_length=1e-4, domain='single_wall', mobility_vector_prod_implementation='pycuda'):
     '''
     Constructor. Take arguments like ...
     '''
@@ -42,7 +42,7 @@ class Lub_Solver(object):
     self.num_rejections_jump = 0
     self.debye_length = debye_length
     self.delta = 1e-3
-    
+    self.print_residual = False    
     self.reflect_forces = np.zeros(6*len(bodies))
     
     self.LC = Lub_cc.Lubrication(debye_length)
@@ -52,17 +52,46 @@ class Lub_Solver(object):
     
     self.Delta_R_cut = None
     self.Delta_R_cut_wall = None
-    
-    #if domain is a 'single_wall'
-    self.mobility_trans_times_force_wall = mob.single_wall_mobility_trans_times_force_pycuda #pycuda
-    self.mobility_trans_times_torque_wall = mob.single_wall_mobility_trans_times_torque_pycuda #pycuda
-    self.mobility_rot_times_force_wall = mob.single_wall_mobility_rot_times_force_pycuda #pycuda
-    self.mobility_rot_times_torque_wall = mob.single_wall_mobility_rot_times_torque_pycuda #pycuda
-    #if domain is a 'no_wall'
-    self.mobility_trans_times_force = mob.no_wall_mobility_trans_times_force_pycuda #pycuda
-    self.mobility_trans_times_torque = mob.no_wall_mobility_trans_times_torque_pycuda #pycuda
-    self.mobility_rot_times_force = mob.no_wall_mobility_rot_times_force_pycuda #pycuda
-    self.mobility_rot_times_torque = mob.no_wall_mobility_rot_times_torque_pycuda #pycuda
+
+    if domain == 'single_wall':
+      if mobility_vector_prod_implementation.find('pycuda') > -1:
+        self.mobility_trans_times_force_wall = mob.single_wall_mobility_trans_times_force_pycuda
+        self.mobility_trans_times_torque_wall = mob.single_wall_mobility_trans_times_torque_pycuda
+        self.mobility_rot_times_force_wall = mob.single_wall_mobility_rot_times_force_pycuda
+        self.mobility_rot_times_torque_wall = mob.single_wall_mobility_rot_times_torque_pycuda
+        self.mobilit_trans_times_force_torque_wall = mob.single_wall_mobility_trans_times_force_torque_pycuda
+      elif mobility_vector_prod_implementation.find('numba') > -1:
+        self.mobility_trans_times_force_wall = mob.single_wall_mobility_trans_times_force_numba
+        self.mobility_trans_times_torque_wall = mob.single_wall_mobility_trans_times_torque_numba
+        self.mobility_rot_times_force_wall = mob.single_wall_mobility_rot_times_force_numba
+        self.mobility_rot_times_torque_wall = mob.single_wall_mobility_rot_times_torque_numba
+        # self.mobilit_trans_times_force_torque = mob.single_wall_mobility_trans_times_force_torque_numba
+    elif domain == 'no_wall':
+      if mobility_vector_prod_implementation.find('pycuda') > -1:
+        self.mobility_trans_times_force = mob.no_wall_mobility_trans_times_force_pycuda
+        self.mobility_trans_times_torque = mob.no_wall_mobility_trans_times_torque_pycuda
+        self.mobility_rot_times_force = mob.no_wall_mobility_rot_times_force_pycuda
+        self.mobility_rot_times_torque = mob.no_wall_mobility_rot_times_torque_pycuda
+        self.mobilit_trans_times_force_torque = mob.no_wall_mobility_trans_times_force_torque_pycuda
+      elif mobility_vector_prod_implementation.find('numba') > -1:
+        self.mobility_trans_times_force = mob.no_wall_mobility_trans_times_force_numba
+        self.mobility_trans_times_torque = mob.no_wall_mobility_trans_times_torque_numba
+        self.mobility_rot_times_force = mob.no_wall_mobility_rot_times_force_numba
+        self.mobility_rot_times_torque = mob.no_wall_mobility_rot_times_torque_numba
+        # self.mobilit_trans_times_force_torque = mob.no_wall_mobility_trans_times_force_torque_numba
+
+    print('mobility_vector_prod_implementation.find = ', mobility_vector_prod_implementation)
+        
+    # #if domain is a 'single_wall'
+    # self.mobility_trans_times_force_wall = mob.single_wall_mobility_trans_times_force_pycuda #pycuda
+    # self.mobility_trans_times_torque_wall = mob.single_wall_mobility_trans_times_torque_pycuda #pycuda
+    # self.mobility_rot_times_force_wall = mob.single_wall_mobility_rot_times_force_pycuda #pycuda
+    # self.mobility_rot_times_torque_wall = mob.single_wall_mobility_rot_times_torque_pycuda #pycuda
+    # #if domain is a 'no_wall'
+    # self.mobility_trans_times_force = mob.no_wall_mobility_trans_times_force_pycuda #pycuda
+    # self.mobility_trans_times_torque = mob.no_wall_mobility_trans_times_torque_pycuda #pycuda
+    # self.mobility_rot_times_force = mob.no_wall_mobility_rot_times_force_pycuda #pycuda
+    # self.mobility_rot_times_torque = mob.no_wall_mobility_rot_times_torque_pycuda #pycuda
     
   def project_to_periodic_image(self, r, L):
     '''
@@ -76,8 +105,8 @@ class Lub_Solver(object):
       
     if L is not None:
       for i in range(3):
-	if(L[i] > 0):
-	  r[i] = r[i] - int(r[i] / L[i] + 0.5 * (int(r[i]>0) - int(r[i]<0))) * L[i]
+        if(L[i] > 0):
+          r[i] = r[i] - int(r[i] / L[i] + 0.5 * (int(r[i]>0) - int(r[i]<0))) * L[i]
     #print r
     return r 
   
@@ -85,17 +114,17 @@ class Lub_Solver(object):
     r_vecs = np.copy(r_vecs_np)
     for r_vec in r_vecs:
       for i in range(3):
-	if L[i] > 0:
-	  while r_vec[i] < 0:
-	    r_vec[i] += L[i]
-	  while r_vec[i] > L[i]:
-	    r_vec[i] -= L[i]
+        if L[i] > 0:
+          while r_vec[i] < 0:
+            r_vec[i] += L[i]
+          while r_vec[i] > L[i]:
+            r_vec[i] -= L[i]
     return r_vecs
   
   
   def Set_R_Mats(self, r_vecs_np=None):
     '''
-    Set lubrication matricees in sparse csc format for the class members
+    Set lubrication matrices in sparse csc format for the class members
     '''
     start = time.time()
     if r_vecs_np is None:
@@ -471,7 +500,7 @@ class Lub_Solver(object):
       PC = None
       
     A = spla.LinearOperator((6*num_particles, 6*num_particles), matvec = self.IpDRM_Mult, dtype='float64')
-      
+    X0 = None
     (U_gmres, info_precond) = pyamg.krylov.gmres(A,RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=min(its_out,A.shape[0]), restrt = min(100,A.shape[0]), residuals=res_list)
     if RHS_norm > 0:
       U_gmres = U_gmres * RHS_norm
@@ -500,7 +529,7 @@ class Lub_Solver(object):
       
     RHS_norm = np.linalg.norm(RHS)
     if RHS_norm > 0:
-      RHS = RHS / RHS_norm
+      RHS = RHS.flatten() / RHS_norm
 
     if PC_flag:
       #############
@@ -510,13 +539,13 @@ class Lub_Solver(object):
 
       isolated = [];
       for j in range(num_particles):
-	s1 = r_vecs[j]
-	if s1[2] < self.cutoff*self.a: 
-	  continue
-	idx = r_tree.query_ball_point(s1,r=self.cutoff*self.a)
-	idx_trim = [i for i in idx if i > j]
-	if not idx_trim:
-	  isolated.append(j)
+        s1 = r_vecs[j]
+        if s1[2] < self.cutoff*self.a: 
+          continue
+        idx = r_tree.query_ball_point(s1,r=self.cutoff*self.a)
+        idx_trim = [i for i in idx if i > j]
+        if not idx_trim:
+          isolated.append(j)
       ##############
       
       start = time.time()
@@ -534,8 +563,8 @@ class Lub_Solver(object):
       #onev = np.ones(6*num_particles)
       #diag_m = onev
       #for k in range(num_particles):
-	#diag_m[6*k:6*k+3] *= (1.0/gamma)
-	#diag_m[6*k+3:6*k+6] *= (1.0/gamma_r)
+        #diag_m[6*k:6*k+3] *= (1.0/gamma)
+        #diag_m[6*k+3:6*k+6] *= (1.0/gamma_r)
       #Shift_R_Sup = sp.diags(diag_m,0,format='csc')*self.Delta_R + sp.diags(onev,0,format='csc')
       #factor = cholesky(Shift_R_Sup)
       #end = time.time()
@@ -549,17 +578,18 @@ class Lub_Solver(object):
     A = spla.LinearOperator((6*num_particles, 6*num_particles), matvec = self.IpMDR_Mult, dtype='float64')
     
     res_list = []
+    X0 = None
     if X0 is not None:
       X0 = X0/RHS_norm
-    
-    (U_gmres, info_precond) = pyamg.krylov.gmres(A,RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=min(its_out,A.shape[0]), restrt = min(100,A.shape[0]), residuals=res_list) 
-    #(U_gmres, info_precond) = pyamg.krylov.bicgstab(A,RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=min(its_out,A.shape[0]), residuals=res_list) 
-    #(U_gmres, info_precond) = utils.gmres(A, RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=min(its_out,A.shape[0]), restart = min(100,A.shape[0])) #, callback=counter) 
+    print('self.print_residual = ', self.print_residual)
+    counter = gmres_counter(print_residual = self.print_residual)
+    # (U_gmres, info_precond) = pyamg.krylov.gmres(A, RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=2*min(100,A.shape[0]), restrt=min(100,A.shape[0]), residuals=res_list, callback=counter)
+    (U_gmres, info_precond) = utils.gmres(A, RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=2*min(100,A.shape[0]), restart = min(100,A.shape[0]), callback=counter)
     if RHS_norm > 0:
       U_gmres = U_gmres * RHS_norm
-    #print res_list
-    return U_gmres, res_list#
+    return U_gmres, res_list
 
+  
   def Form_Lub_Mobility(self):
     '''
     Computes the Lubrication corrected mobility from self.bodies using ittereative linear algebra
@@ -698,9 +728,9 @@ class Lub_Solver(object):
     if (reject_wall+reject_jump)==0:
       L = self.periodic_length
       for b in self.bodies:
-	b.location = b.location_new
-	b.orientation = b.orientation_new
-	
+        b.location = b.location_new
+        b.orientation = b.orientation_new
+
 
     self.Set_R_Mats() ######## VERY IMPORTANT
     return reject_wall, reject_jump
@@ -708,6 +738,7 @@ class Lub_Solver(object):
   
   def Update_Bodies_Trap(self, FT_calc, Omega=None, Out_Torque=False, Cut_Torque=None):
     L = self.periodic_length
+
     # Save initial configuration
     for k, b in enumerate(self.bodies):
       np.copyto(b.location_old, b.location)
@@ -716,10 +747,7 @@ class Lub_Solver(object):
     # compute forces for predictor step
     r_vecs_np = [b.location for b in self.bodies]
     r_vecs = self.put_r_vecs_in_periodic_box(r_vecs_np,self.periodic_length)
-    start = time.time()
     FT = FT_calc(self.bodies, r_vecs)
-    end = time.time()
-    print('F calc time : '+ str((end - start)))
     FT = FT.flatten()
     FT = FT[:,np.newaxis]
     
@@ -728,39 +756,28 @@ class Lub_Solver(object):
     if Omega is not None:
       FTrs = np.reshape(FT,(len(self.bodies),6))
       F = FTrs[:,0:3]
-      start = time.time()
       T_omega, VO_guess = self.Torque_from_Omega(Omega,F)
       if Cut_Torque is not None:
-          Tn = np.linalg.norm(T_omega,axis=1)
-          NewNorm = np.minimum(Tn,Cut_Torque)/Tn
-          T_omega = NewNorm[:,None]*T_omega
-      end = time.time()
-      print('Omega time : '+ str((end - start)))
+        Tn = np.linalg.norm(T_omega,axis=1)
+        NewNorm = np.minimum(Tn,Cut_Torque)/Tn
+        T_omega = NewNorm[:,None]*T_omega
       FTrs[:,3::] += T_omega
       FT = np.reshape(FTrs,(6*len(self.bodies),1))
       
     # compute relevant matrix root for pred. and corr. steps
-    start = time.time()
     Root_Xm, Root_X = self.Lub_Mobility_Root_RHS() 
     X = Root_X[:,np.newaxis]
     MXm = self.Wall_Mobility_Mult(Root_Xm)
     MXm = MXm[:,np.newaxis]
     Mhalf = X + MXm
-    end = time.time()
-    print('root time : '+ str((end - start)))
-    
     
     # compute predictor velocities and update positions
-    start = time.time()
     vel_p, res_p = self.Lubrucation_solve(X = Mhalf, Xm = FT, X0=VO_guess)
-    end = time.time()
-    print('solve 1 : '+ str((end - start)))
-    
 
     for k, b in enumerate(self.bodies):
-        b.location = b.location_old + vel_p[6*k:6*k+3] * self.dt
-        quaternion_dt = Quaternion.from_rotation((vel_p[6*k+3:6*k+6]) * self.dt)
-        b.orientation = quaternion_dt * b.orientation_old
+      b.location = b.location_old + vel_p[6*k:6*k+3] * self.dt
+      quaternion_dt = Quaternion.from_rotation((vel_p[6*k+3:6*k+6]) * self.dt)
+      b.orientation = quaternion_dt * b.orientation_old
     
     r_vecs_np = [b.location for b in self.bodies]
     r_vecs_c = self.put_r_vecs_in_periodic_box(r_vecs_np,self.periodic_length)
@@ -783,10 +800,7 @@ class Lub_Solver(object):
     # compute RHSs for the corr. step
     RHS_X_C = D_M + Mhalf
     
-    start = time.time()
     FT_C = FT_calc(self.bodies, r_vecs_c)
-    end = time.time()
-    print('F calc time : '+ str((end - start)))
     FT_C = FT_C.flatten()
     FT_C = FT_C[:,np.newaxis]
     
@@ -809,13 +823,9 @@ class Lub_Solver(object):
       FT_C = np.reshape(FTrsc,(6*len(self.bodies),1))
     
     RHS_Xm_C = FT_C
-    # compute for corrected velocity and update positions
-    
-    start = time.time()
+
+    # compute for corrected velocity and update positions    
     vel_c, res_c = self.Lubrucation_solve(X = RHS_X_C, Xm = RHS_Xm_C, X0=VO_guessc)
-    end = time.time()
-    print('solve 2 : '+ str((end - start)))
-    
     vel_trap = 0.5 * (vel_c + vel_p)
     
     for k, b in enumerate(self.bodies):
@@ -831,20 +841,15 @@ class Lub_Solver(object):
     
     if (reject_wall+reject_jump)==0:
       for b in self.bodies:
-	np.copyto(b.location, b.location_new)
+        np.copyto(b.location, b.location_new)
         b.orientation = copy.copy(b.orientation_new)
     else:
-      for b in self.bodies:
-	np.copyto(b.location, b.location_old)
-        b.orientation = copy.copy(b.orientation_old)
-
-	
-
-    self.Set_R_Mats() ######## VERY IMPORTANT
-    if Out_Torque:
-      return reject_wall, reject_jump, T_omega.flatten()
-    else:
-      return reject_wall, reject_jump
+      print('Invalid config!')
+      print('reject_wall = ', reject_wall)
+      print('reject_jump = ', reject_jump)
+      sys.exit()
+      
+    return 
   
   
   def Torque_from_Omega(self,Om,F):
@@ -856,11 +861,11 @@ class Lub_Solver(object):
     r_vecs = self.put_r_vecs_in_periodic_box(r_vecs_np,self.periodic_length)
     
     def Mrr(torque):
-	return self.mobility_rot_times_torque_wall(r_vecs, torque, self.eta, self.a, periodic_length=self.periodic_length)
+      return self.mobility_rot_times_torque_wall(r_vecs, torque, self.eta, self.a, periodic_length=self.periodic_length)
     def Mtr(torque):
-	return self.mobility_trans_times_torque_wall(r_vecs, torque, self.eta, self.a, periodic_length=self.periodic_length)
+      return self.mobility_trans_times_torque_wall(r_vecs, torque, self.eta, self.a, periodic_length=self.periodic_length)
     def Mtt(force):
-	return self.mobility_trans_times_force_wall(r_vecs, force, self.eta, self.a, periodic_length=self.periodic_length)
+      return self.mobility_trans_times_force_wall(r_vecs, force, self.eta, self.a, periodic_length=self.periodic_length)
     
     
     def V_T_Mat_Mult(VT):
@@ -974,9 +979,9 @@ class Lub_Solver(object):
     if (reject_wall+reject_jump)==0:
       L = self.periodic_length
       for b in self.bodies:
-	b.location = b.location_new
-	b.orientation = b.orientation_new
-	
+        b.location = b.location_new
+        b.orientation = b.orientation_new
+
     return reject_wall, reject_jump
         
   def Check_Update_With_Jump_Trap(self):
@@ -991,18 +996,18 @@ class Lub_Solver(object):
     for j in range(num_particles):
       s1 = r_vecs[j]
       if s1[2] < 0:
-	print("rejected time step, wall")
-	reject_wall = 1
-	return reject_wall, reject_jump
+        print("rejected time step, wall")
+        reject_wall = 1
+        return reject_wall, reject_jump
       
       s1_old = r_vecs_old[j]
       r = s1-s1_old
       r = self.project_to_periodic_image(r,self.periodic_length)
       disp = np.linalg.norm(r)
       if disp > 2*self.a:
-	print("rejected time step large jump: ", disp, s1, s1_old)
-	reject_jump = 1
-	return reject_wall, reject_jump
+        print("rejected time step large jump: ", disp, s1, s1_old)
+        reject_jump = 1
+        return reject_wall, reject_jump
       
     return reject_wall, reject_jump
  
@@ -1019,17 +1024,33 @@ class Lub_Solver(object):
     for j in range(num_particles):
       s1 = r_vecs[j]
       if s1[2] < 0:
-	print("rejected time step, wall")
-	reject_wall = 1
-	return reject_wall, reject_jump
+        print("rejected time step, wall")
+        reject_wall = 1
+        return reject_wall, reject_jump
       
       s1_old = r_vecs_old[j]
       r = s1-s1_old
       r = self.project_to_periodic_image(r,self.periodic_length)
       disp = np.linalg.norm(r)
       if disp > 2*self.a:
-	print("rejected time step large jump: ", disp, s1, s1_old)
-	reject_jump = 1
-	return reject_wall, reject_jump
+        print("rejected time step large jump: ", disp, s1, s1_old)
+        reject_jump = 1
+        return reject_wall, reject_jump
       
     return reject_wall, reject_jump
+
+  
+class gmres_counter(object):
+  '''
+  Callback generator to count iterations. 
+  '''
+  def __init__(self, print_residual = False):
+    self.print_residual = print_residual
+    self.niter = 0
+  def __call__(self, rk=None):
+    self.niter += 1
+    if self.print_residual is True:
+      if self.niter == 1:
+        print('gmres =  0 1')
+      print('gmres = ', self.niter, np.linalg.norm(rk))
+
