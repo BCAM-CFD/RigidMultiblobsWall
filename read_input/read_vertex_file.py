@@ -1,7 +1,7 @@
 '''
 Small module to read a vertex file of the rigid bodies.
 '''
-from __future__ import division, print_function
+
 import numpy as np
 
 def read_vertex_file(name_file):
@@ -24,8 +24,7 @@ def read_vertex_file(name_file):
         if i == 0:
           Nblobs = int(line.split()[0])
         else:
-          data = line.split()
-          location = [float(data[0]), float(data[1]), float(data[2])]
+          location = np.fromstring(line, sep=' ')
           coor.append(location)
         i += 1
 

@@ -1,6 +1,6 @@
 '''File with utilities for the scripts and functions in this project.'''
 
-from __future__ import division, print_function
+
 import logging
 try:
   import matplotlib
@@ -125,9 +125,9 @@ def plot_time_dependent_msd(msd_statistics, ind, figure, color=None, symbol=None
   if not num_err_bars:
      num_err_bars = 40
   linestyles = [':', '--', '-.', '']
-  for scheme in msd_statistics.data.keys():
-    for dt in msd_statistics.data[scheme].keys():
-      if dt in DT_STYLES.keys():
+  for scheme in list(msd_statistics.data.keys()):
+    for dt in list(msd_statistics.data[scheme].keys()):
+      if dt in list(DT_STYLES.keys()):
         if not symbol:
           style = ''
           nosymbol_style = DT_STYLES[dt]
@@ -348,7 +348,7 @@ def write_trajectory_to_txt(file_name, trajectory, params, location=True):
   # Write data to file, parameters first then trajectory.
   with open(file_name, 'w') as f:
     f.write('Parameters:\n')
-    for key, value in params.items():
+    for key, value in list(params.items()):
       f.writelines(['%s: %s \n' % (key, value)])
     f.write('Trajectory data:\n')
     if location:
@@ -600,23 +600,41 @@ def gmres(A, b, x0=None, tol=1e-05, restart=None, maxiter=None, xtype=None, M=No
 
   # If left preconditioner (or no Preconditioner) just call scipy gmres
   if PC_side == 'left' or M is None:
-    return scspla.gmres(A, b, M=M, x0=x0, tol=tol, maxiter=maxiter, restart=restart, atol=atol, callback=callback)
+    return scspla.gmres(A, b, M=M, x0=x0, tol=tol, atol=0, maxiter=maxiter, restart=restart, callback=callback)    
 
   # Create LinearOperator for A and P^{-1}
   A_LO = scspla.aslinearoperator(A)
   M_LO = scspla.aslinearoperator(M)
 
-  # Define new LinearOperator A*P^{-1}
+  # Define new LinearOperators P^{-1} * A and A * P^{-1}
+  def PinvA(x,A,M):
+    return M.matvec(A.matvec(x))
+
   def APinv(x,A,M):
     return A.matvec(M.matvec(x))
-  APinv_partial = partial(APinv, A=A_LO, M=M_LO)
-  APinv_partial_LO = scspla.LinearOperator((b.size, b.size), matvec = APinv_partial, dtype='float64') 
 
-  # Solve system A*P^{-1} * y = b
-  (y, info) = scspla.gmres(APinv_partial_LO, b, x0=None, tol=tol, maxiter=maxiter, restart=restart, atol=atol, callback=callback) 
+  # Select new linear operator
+  if PC_side == 'left_res':
+    A_new = PinvA
+  elif PC_side == 'right':
+    A_new = APinv
 
-  # Solve system P*x = y
-  x = M_LO.matvec(y)
+  # Set new linear operator
+  A_partial = partial(A_new, A=A_LO, M=M_LO)
+  A_partial_LO = scspla.LinearOperator((b.size, b.size), matvec = A_partial, dtype='float64') 
+    
+  # Modify RHS
+  if PC_side == 'left_res':
+    # b_new = P^{-1} * b
+    b = M.matvec(b)
+  
+  # Solve system A_new * x = b
+  (x, info) = scspla.gmres(A_partial_LO, b, x0=None, tol=tol, atol=0, maxiter=maxiter, restart=restart, callback=callback) 
+
+  # Modify solution
+  if PC_side == 'right':
+    # Solve system P*x = y
+    x = M_LO.matvec(x)
   
   # Return solution and info
   return x, info

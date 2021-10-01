@@ -1,4 +1,4 @@
-from __future__ import division, print_function
+
 import argparse
 import numpy as np
 import scipy.linalg
@@ -8,7 +8,7 @@ from functools import partial
 import sys
 import time
 try:
-  import cPickle as cpickle
+  import pickle as cpickle
 except:
   try:
     import cpickle
@@ -34,7 +34,7 @@ while found_functions is False:
     from read_input import read_vertex_file
     from read_input import read_clones_file
     from read_input import read_slip_file
-    import utils
+    import general_application_utils as utils        
     try:
       import libCallHydroGrid as cc
       found_HydroGrid = True

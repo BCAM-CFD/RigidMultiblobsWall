@@ -1,9 +1,10 @@
 '''
 Simple class to read the input files to run a simulation.
 '''
-from __future__ import division, print_function
+
 import numpy as np
 import ntpath
+import sys
 
 class ReadInput(object):
   '''
@@ -15,7 +16,9 @@ class ReadInput(object):
     self.entries = entries
     self.input_file = entries
     self.options = {}
-    number_of_structures = 0
+    number_of_structures = 0 
+    number_of_obstacles = 0 
+    number_of_articulated = 0 
 
     # Read input file
     comment_symbols = ['#']   
@@ -33,6 +36,12 @@ class ReadInput(object):
           if option == 'structure':
             option += str(number_of_structures)
             number_of_structures += 1
+          if option == 'obstacle':
+            option += str(number_of_obstacles)
+            number_of_obstacles += 1
+          if option == 'articulated':
+            option += str(number_of_articulated)
+            number_of_articulated += 1
           self.options[option] = value
 
     # Set option to file or default values
@@ -67,6 +76,7 @@ class ReadInput(object):
     self.force_file = self.options.get('force_file')
     self.velocity_file = self.options.get('velocity_file')
     self.solver_tolerance = float(self.options.get('solver_tolerance') or 1e-08)
+    self.nonlinear_solver_tolerance = float(self.options.get('nonlinear_solver_tolerance') or 1e-08)
     self.rf_delta = float(self.options.get('rf_delta') or 1e-03)
     self.save_clones = str(self.options.get('save_clones') or 'one_file_per_step')
     self.periodic_length = np.fromstring(self.options.get('periodic_length') or '0 0 0', sep=' ')
@@ -81,7 +91,6 @@ class ReadInput(object):
     self.update_PC = int(self.options.get('update_PC') or 1)
     self.domain = str(self.options.get('domain') or 'single_wall')
     self.call_HydroGrid = str(self.options.get('call_HydroGrid') or 'False') == 'True'
-
     self.mu = np.fromstring(self.options.get('mu') or '1 0 0', sep=' ')
     self.B0 = float(self.options.get('B0') or 0)
     self.omega = float(self.options.get('omega') or 0)
@@ -117,16 +126,38 @@ class ReadInput(object):
     # Info for STKFMM
     self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)
     self.stkfmm_pbc = str(self.options.get('stkfmm_pbc') or 'None')
+    self.repulsion_strength_firm = float(self.options.get('repulsion_strength_firm') or 0.0)
+    self.firm_delta = float(self.options.get('firm_delta') or 1e-02)
+    self.Lub_Cut = float(self.options.get('Lub_Cut') or 4.5)
 
     # Create list with [vertex_file, clones_file] for each structure
+    self.num_free_bodies = number_of_structures
     self.structures = []
+    self.structures_ID = []
+    self.articulated = []
+    self.articulated_ID = []
     for i in range(number_of_structures):
       option = 'structure' + str(i)
       structure_files = str.split(str(self.options.get(option)))
       self.structures.append(structure_files)
 
+    # Create list with [vertex_file, clones_file] for each obstacle
+    for i in range(number_of_obstacles):
+      option = 'obstacle' + str(i)
+      structure_files = str.split(str(self.options.get(option)))
+      self.structures.append(structure_files)
+
+    # Create list with [vertex_file, clones_file, contraints_file] for each articulated
+    for i in range(number_of_articulated):
+      option = 'articulated' + str(i)
+      structure_files = str.split(str(self.options.get(option)))
+      head, tail = ntpath.split(structure_files[1])
+      # then, remove end (.clones)
+      tail = tail[:-7]
+      self.articulated_ID.append(tail)
+      self.articulated.append(structure_files)
+      
     # Create structures ID for each kind 
-    self.structures_ID = []
     for struct in self.structures:
       # First, remove directory from structure name
       head, tail = ntpath.split(struct[1])
@@ -140,5 +171,18 @@ class ReadInput(object):
       for k, struct in enumerate(self.structures):
         recovery_file = self.output_name + '.'  + self.structures_ID[k] + '.' + str(self.initial_step).zfill(8) + '.clones'
         struct[1] = recovery_file
+
+    # Obstacles are not implemented in some schemes
+    if number_of_obstacles > 0:
+      if (self.scheme == 'deterministic_forward_euler_dense_algebra') or \
+         (self.scheme == 'stochastic_first_order_RFD') or \
+         (self.scheme == 'stochastic_adams_bashforth') or \
+         (self.scheme == 'stochastic_first_order_RFD_dense_algebra') or \
+         (self.scheme == 'stochastic_traction_EM') or \
+         (self.scheme == 'Fixman') or \
+         (self.scheme == 'stochastic_traction_AB') or \
+         (self.scheme == 'stochastic_Slip_Mid_DLA'):
+        print('Obstacles are not implemented for scheme: ', self.scheme)
+        sys.exit()
 
     return

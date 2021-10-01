@@ -1,5 +1,5 @@
 ''' Fluid Mobilities near a wall, from Swan and Brady's paper.'''
-from __future__ import division, print_function
+
 import numpy as np
 import scipy.sparse
 import scipy.spatial as scsp
@@ -22,9 +22,10 @@ if found_pycuda:
     autoinit_pycuda = False
   if autoinit_pycuda:
     try:
-      import mobility_pycuda
+      from . import mobility_pycuda
     except ImportError:
-      from mobility import mobility_pycuda
+      from .mobility import mobility_pycuda
+
 # If numba is installed import mobility_numba
 try: 
   imp.find_module('numba')
@@ -34,9 +35,10 @@ except ImportError:
 if found_numba:
   from numba import njit, prange
   try:
-    import mobility_numba
+    from . import mobility_numba
   except ImportError:
-    from mobility import mobility_numba
+    import mobility_numba
+
 # Try to import the mobility fmm implementation
 try:
   import mobility_fmm as fmm
@@ -51,7 +53,7 @@ try:
   import mobility_cpp
 except ImportError:
   try:
-    from mobility import mobility_cpp
+    from . import mobility_cpp
   except ImportError:
     print('CPP not found')
     pass
@@ -548,6 +550,73 @@ def single_wall_mobility_trans_times_force_source_target_pycuda(source, target, 
   return velocities
 
 
+def single_wall_mobility_trans_times_force_source_target_numba(source, target, force, radius_source, radius_target, eta, *args, **kwargs):
+  '''
+  Returns the product of the mobility at the blob level by the force
+  on the blobs.
+  Mobility for particles near a wall.  This uses the expression from
+  the Swan and Brady paper for a finite size particle, as opposed to the
+  Blake paper point particle result.
+
+  If a component of periodic_length is larger than zero the
+  space is assume to be pseudo-periodic in that direction. In that case
+  the code will compute the interactions M*f between particles in
+  the minimal image convection and also in the first neighbor boxes.
+
+  For blobs overlaping the wall we use
+  Compute M = B^T * M_tilde(z_effective) * B.
+
+  This function uses numba.
+  '''
+  # Get domain size for Pseudo-PBC
+  L = kwargs.get('periodic_length', np.array([0.0, 0.0, 0.0]))
+  
+  # Compute effective heights
+  x = shift_heights_different_radius(target, radius_target)
+  y = shift_heights_different_radius(source, radius_source)
+
+  # Compute dumping matrices
+  B_target, overlap_target = damping_matrix_B_different_radius(target, radius_target, *args, **kwargs)
+  B_source, overlap_source = damping_matrix_B_different_radius(source, radius_source, *args, **kwargs)
+
+  # Compute B * force
+  if overlap_source is True:
+    force = B_source.dot(force.flatten())
+
+  # Compute M_tilde * B * force
+  velocities = mobility_numba.mobility_trans_times_force_source_target_numba(y, x, force, radius_source, radius_target, eta, L=L, wall=1)
+
+  # Compute B.T * M * B * vector
+  if overlap_target is True:
+    velocities = B_target.dot(velocities)
+  return velocities
+
+
+def no_wall_mobility_trans_times_force_source_target_numba(source, target, force, radius_source, radius_target, eta, *args, **kwargs):
+  '''
+  Returns the product of the mobility at the blob level by the force
+  on the blobs.
+  Mobility for particles in unbounded domain.  
+
+  If a component of periodic_length is larger than zero the
+  space is assume to be pseudo-periodic in that direction. In that case
+  the code will compute the interactions M*f between particles in
+  the minimal image convection and also in the first neighbor boxes.
+
+  For blobs overlaping the wall we use
+  Compute M = B^T * M_tilde(z_effective) * B.
+
+  This function uses numba.
+  '''
+  # Get domain size for Pseudo-PBC
+  L = kwargs.get('periodic_length', np.array([0.0, 0.0, 0.0]))
+
+  # Compute M_tilde * B * force
+  velocities = mobility_numba.mobility_trans_times_force_source_target_numba(source, target, force, radius_source, radius_target, eta, L=L, wall=0)
+
+  return velocities
+
+
 def single_wall_fluid_mobility_loops(r_vectors, eta, a, *args, **kwargs):
   ''' 
   Mobility for particles near a wall.  This uses the expression from
@@ -765,7 +834,7 @@ def mobility_vector_product_source_target_one_wall(source, target, force, radius
   WARNING: pseudo-PBC are not implemented for this function.
 
   Compute velocity of targets of radius radius_target due
-  to forces on sources of radius source_targer in half-space.
+  to forces on sources of radius source_target in half-space.
 
   That is, compute the matrix vector product
   velocities_target = M_tt * forces_sources
@@ -1602,4 +1671,35 @@ def fluid_interface_mobility_trans_times_force_cpp(r_vectors, force, eta, a, eta
   # Add all contributions
   return (1.0 / (1.0 + eta_ratio)) * vel_free + (eta_ratio / (1.0 + eta_ratio)) * vel_wall
 
+
+def no_wall_pressure_Stokeslet_numba(source, target, force, *args, **kwargs):
+  ''' 
+  Returns the pressure created by Stokeslets located at source in the positions
+  of the targets. The space is unbounded.
+  
+  This function uses numba.
+  '''
+  L = kwargs.get('periodic_length', np.array([0.0, 0.0, 0.0]))
+  p = mobility_numba.no_wall_pressure_Stokeslet_numba(source, target, force, L)
+  return p
+
+
+def single_wall_pressure_Stokeslet_numba(source, target, force, *args, **kwargs):
+  ''' 
+  Returns the pressure created by Stokeslets located at source in the positions
+  of the targets. Stokeslets above an infinite no-slip wall.
+
+  This function uses numba.
+  '''
+  L = kwargs.get('periodic_length', np.array([0.0, 0.0, 0.0]))
+  p = mobility_numba.single_wall_pressure_Stokeslet_numba(source, target, force, L)
+  return p
+
+
+def mobility_radii_trans_times_force(r_vectors, force, eta, a, radius_blobs, function, *args, **kwargs): 
+  '''
+  Mobility vector product M*f with blobs with different radii.
+  function should provide the appropiate implementation (python, numba, pycuda, above a wall or unbounded...).
+  '''
+  return function(r_vectors, r_vectors, force, radius_blobs, radius_blobs, eta, *args, **kwargs)
 

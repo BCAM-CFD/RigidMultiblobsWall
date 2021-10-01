@@ -4,7 +4,7 @@ loosely the paper Brownian dynamics of confined rigid
 bodies, Steven Delong et al. The Journal of Chemical
 Physics 143, 144107 (2015). doi: 10.1063/1.4932062
 '''
-from __future__ import division, print_function
+
 import numpy as np
 import copy
 from quaternion_integrator.quaternion import Quaternion 
@@ -19,25 +19,29 @@ class Body(object):
     Constructor. Take arguments like ...
     '''
     # Location as np.array.shape = 3
-    self.location = location
+    self.location = np.copy(location)
     self.location_new = np.copy(location)
     self.location_old = np.copy(location)
     # Orientation as Quaternion
-    self.orientation = orientation
+    self.orientation = copy.copy(orientation)
     self.orientation_new = copy.copy(orientation)
     self.orientation_old = copy.copy(orientation)
     # Number of blobs
-    self.Nblobs = reference_configuration.size // 3
+    self.Nblobs = reference_configuration.shape[0]
     # Reference configuration. Coordinates of blobs for quaternion [1, 0, 0, 0]
     # and location = np.array[0, 0, 0]) as a np.array.shape = (Nblobs, 3) 
     # or np.array.shape = (Nblobs * 3)
-    self.reference_configuration = np.reshape(reference_configuration, (self.Nblobs, 3))
+    self.reference_configuration = np.reshape(reference_configuration[:,0:3], (self.Nblobs, 3))
     # Blob masses
     self.blob_masses = np.ones(self.Nblobs)
     self.mg = 0
     self.k = 1.0
     # Blob radius
     self.blob_radius = blob_radius
+    if reference_configuration.shape[1] == 4:
+      self.blobs_radius = reference_configuration[:,3]
+    else:
+      self.blobs_radius = np.ones(self.Nblobs) * blob_radius
     # Body length
     self.body_length = None
     # Name of body and type of body. A string or number
@@ -53,6 +57,8 @@ class Body(object):
     self.function_force = self.default_none
     self.function_torque = self.default_none
     self.function_force_blobs = self.default_zero_blobs
+    self.prescribed_velocity = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    self.prescribed_kinematics = False
     self.mobility_blobs_cholesky = None
     self.ID = None
   
@@ -141,6 +147,13 @@ class Body(object):
     Return the slip on the blobs.
     '''
     return self.function_slip(self)
+
+
+  def calc_prescribed_velocity(self):
+    '''
+    Return the body prescribed velocity.
+    '''
+    return self.prescribed_velocity
 
 
   def calc_force(self):

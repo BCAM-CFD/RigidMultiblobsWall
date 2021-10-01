@@ -1,11 +1,11 @@
-from __future__ import division, print_function
+
 import numpy as np
 import time
 import sys
 import subprocess
 import os.path
 try:
-  import cPickle as cpickle
+  import pickle as cpickle
 except:
   try:
     import cpickle
@@ -119,6 +119,8 @@ if __name__ == '__main__':
       b.ID = read.structures_ID[ID]
       body_length = b.calc_body_length()
       max_body_length = (body_length if body_length > max_body_length else max_body_length)
+      if ID >= read.num_free_bodies:
+        b.prescribed_kinematics = True
       bodies.append(b)
   bodies = np.array(bodies)
 
@@ -156,9 +158,13 @@ if __name__ == '__main__':
   for step in range(read.initial_step, read.n_steps):
     blob_index = 0
     for i, body in enumerate(bodies): # distrub bodies
-      body.location_new = body.location + np.random.uniform(-max_translation, max_translation, 3) # make small change to location
-      quaternion_shift = Quaternion.from_rotation(np.random.normal(0,1,3) * max_angle_shift)
-      body.orientation_new = quaternion_shift * body.orientation
+      if body.prescribed_kinematics is False:
+        body.location_new = body.location + np.random.uniform(-max_translation, max_translation, 3) # make small change to location
+        quaternion_shift = Quaternion.from_rotation(np.random.normal(0,1,3) * max_angle_shift)
+        body.orientation_new = quaternion_shift * body.orientation
+      else:
+        body.location_new = body.location
+        body.orientation_new = body.orientation
       sample_r_vectors[blob_index : blob_index + bodies[i].Nblobs] = body.get_r_vectors(body.location_new, body.orientation_new)
       blob_index += body.Nblobs
 

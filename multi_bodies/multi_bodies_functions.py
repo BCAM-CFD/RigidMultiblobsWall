@@ -4,7 +4,7 @@ code multi_blobs.py. For example, functions to define the
 blobs-blobs interactions, the forces and torques on the rigid
 bodies or the slip on the blobs.
 '''
-from __future__ import division, print_function
+
 import numpy as np
 import sys
 import imp
@@ -28,9 +28,9 @@ if found_pycuda:
     autoinit_pycuda = False
   if autoinit_pycuda:
     try:
-      import forces_pycuda
+      from . import forces_pycuda
     except ImportError:
-      from multi_bodies import forces_pycuda
+      from .multi_bodies import forces_pycuda
 # If numba is installed import forces_numba
 try: 
   imp.find_module('numba')
@@ -53,8 +53,7 @@ if found_pycuda:
   if forces_pycuda_user_defined:
     del sys.modules['forces_pycuda']
     sys.modules['forces_pycuda'] = __import__('forces_pycuda_user_defined')
-    import forces_pycuda
-
+    from . import forces_pycuda
 
 # Override forces_numba with user defined functions.
 # If forces_pycuda_user_defined does not exists nothing happens.
@@ -99,7 +98,7 @@ def default_zero_bodies(bodies, *args, **kwargs):
   return np.zeros((2*len(bodies), 3))
   
 
-def set_slip_by_ID(body, slip):
+def set_slip_by_ID(body, slip, *args, **kwargs):
   '''
   This function assign a slip function to each body.
   If the body has an associated slip file the function
@@ -241,6 +240,14 @@ def calc_one_blob_forces(r_vectors, *args, **kwargs):
   # Loop over blobs
   force_blobs = blob_external_forces(r_vectors, *args, **kwargs)
   return force_blobs
+
+
+def calc_one_blob_torques(r_vectors, *args, **kwargs):
+  ''' 
+  Compute one-blob torques. It returns an array with shape (Nblobs, 3).
+  '''
+  Nblobs = r_vectors.size // 3
+  return np.zeros((Nblobs, 3)) 
 
 
 def set_blob_blob_forces(implementation):
@@ -418,7 +425,6 @@ def force_torque_calculator_sort_by_bodies(bodies, r_vectors, *args, **kwargs):
   # Compute blob-blob forces (same function for all pair of blobs)
   utils.timer('force_blobs_pair')
   force_blobs += calc_blob_blob_forces(r_vectors, blob_radius = blob_radius, *args, **kwargs)  
-  utils.timer('force_blobs_pair')
 
   # Compute body force-torque forces from blob forces
   utils.timer('force_blobs_to_body')
@@ -440,7 +446,6 @@ def force_torque_calculator_sort_by_bodies(bodies, r_vectors, *args, **kwargs):
   # Add body-body forces (same for all pair of bodies)
   utils.timer('force_body_pair')
   force_torque_bodies += calc_body_body_forces_torques(bodies, r_vectors, *args, **kwargs)
-  utils.timer('force_body_pair')
   return force_torque_bodies
 
 

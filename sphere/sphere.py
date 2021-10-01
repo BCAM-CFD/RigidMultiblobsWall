@@ -4,7 +4,7 @@ import os
 import sys
 sys.path.append('..')
 
-from fluids import mobility as mb
+from mobility import mobility as mb
 from general_application_utils import static_var
 
 import selfMobilityHuang as Huang

@@ -4,10 +4,10 @@ configuration of a multibody supensions and it can save some data like
 the velocities or forces on the bodies, the mobility of a body or
 the mobility of the blobs.
 '''
-from __future__ import division, print_function
+
 import argparse
 import numpy as np
-import scipy.linalg as sla
+import scipy.linalg as scla
 import scipy.sparse.linalg as spla
 import subprocess
 from functools import partial
@@ -28,6 +28,7 @@ while found_functions is False:
     from read_input import read_input
     from read_input import read_vertex_file
     from read_input import read_clones_file
+    from read_input import read_slip_file
     import general_application_utils as utils
     found_functions = True
   except ImportError:
@@ -45,14 +46,19 @@ except ImportError:
   pass
 
 
-# Callback generator
-def make_callback():
-  closure_variables = dict(counter=0, residuals=[]) 
-  def callback(residuals):
-    closure_variables["counter"] += 1
-    closure_variables["residuals"].append(residuals)
-    print(closure_variables["counter"], residuals)
-  return callback
+class gmres_counter(object):
+  '''
+  Callback generator to count iterations. 
+  '''
+  def __init__(self, print_residual = False):
+    self.print_residual = print_residual
+    self.niter = 0
+  def __call__(self, rk=None):
+    self.niter += 1
+    if self.print_residual is True:
+      if self.niter == 1:
+        print('gmres =  0 1')
+      print('gmres = ', self.niter, rk)
 
 
 def plot_velocity_field(grid, r_vectors_blobs, lambda_blobs, blob_radius, eta, output, tracer_radius, *args, **kwargs):
@@ -83,7 +89,7 @@ def plot_velocity_field(grid, r_vectors_blobs, lambda_blobs, blob_radius, eta, o
 
   # Compute velocity field 
   mobility_vector_prod_implementation = kwargs.get('mobility_vector_prod_implementation')
-  if mobility_vector_prod_implementation == 'python':
+  if mobility_vector_prod_implementation.find('python') > -1:
     grid_velocity = mob.mobility_vector_product_source_target_one_wall(r_vectors_blobs, 
                                                                        grid_coor, 
                                                                        lambda_blobs, 
@@ -101,15 +107,15 @@ def plot_velocity_field(grid, r_vectors_blobs, lambda_blobs, blob_radius, eta, o
                                                                       eta, 
                                                                       *args, 
                                                                       **kwargs)
-  elif mobility_vector_prod_implementation == 'numba':
-    grid_velocity = mob.mobility_vector_product_source_target_one_wall_numba(r_vectors_blobs, 
-                                                                             grid_coor, 
-                                                                             lambda_blobs, 
-                                                                             radius_source, 
-                                                                             radius_target, 
-                                                                             eta, 
-                                                                             *args, 
-                                                                             **kwargs) 
+  elif mobility_vector_prod_implementation.find('numba') > -1: 
+    grid_velocity = mob.single_wall_mobility_trans_times_force_source_target_numba(r_vectors_blobs, 
+                                                                                   grid_coor, 
+                                                                                   lambda_blobs, 
+                                                                                   radius_source, 
+                                                                                   radius_target, 
+                                                                                   eta, 
+                                                                                   *args, 
+                                                                                   **kwargs) 
   else:
     grid_velocity = mob.single_wall_mobility_trans_times_force_source_target_pycuda(r_vectors_blobs, 
                                                                                     grid_coor, 
@@ -188,6 +194,7 @@ if __name__ ==  '__main__':
       b.mobility_blobs = multi_bodies.set_mobility_blobs(read.mobility_blobs_implementation)
       b.ID = read.structures_ID[ID]
       multi_bodies_functions.set_slip_by_ID(b, slip)
+
       # Add body mass
       if ID < len(read.mg_bodies):
         b.mg = read.mg_bodies[ID]
@@ -217,6 +224,11 @@ if __name__ ==  '__main__':
         b.debye_length = read.debye_length_bodies[ID]
       else:
         b.debye_length = 1
+
+      if ID >= read.num_free_bodies:
+        b.prescribed_kinematics = True
+        b.prescribed_velocity = np.zeros(6)
+
       # Append bodies to total bodies list
       bodies.append(b)
   bodies = np.array(bodies)
@@ -225,7 +237,7 @@ if __name__ ==  '__main__':
   num_of_body_types = len(body_types)
   num_bodies = bodies.size
   Nblobs = sum([x.Nblobs for x in bodies])
-  multi_bodies.mobility_vector_prod = multi_bodies.set_mobility_vector_prod(read.mobility_vector_prod_implementation)
+  multi_bodies.mobility_vector_prod = multi_bodies.set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies) 
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
   multi_bodies.mobility_blobs = multi_bodies.set_mobility_blobs(read.mobility_blobs_implementation)
@@ -293,14 +305,26 @@ if __name__ ==  '__main__':
                                                                                    domain = read.domain,
                                                                                    harmonic_confinement = read.harmonic_confinement,
                                                                                    harmonic_confinement_plane = read.harmonic_confinement_plane,
-                                                                                   dipole_dipole = read.dipole_dipole) 
+                                                                                   dipole_dipole = read.dipole_dipole,
+                                                                                   omega_one_roller = read.omega_one_roller) 
+
 
     # Set right hand side
     System_size = Nblobs * 3 + num_bodies * 6
-    RHS = np.reshape(np.concatenate([slip, -force_torque]), (System_size))       
+    RHS = np.reshape(np.concatenate([slip, -force_torque]), (System_size))
+    # If prescribed velocity modify RHS
+    offset = 0
+    for k, b in enumerate(bodies):
+      if b.prescribed_kinematics is True:
+        # Add K*U to Right Hand side 
+        KU = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
+        RHS[3*offset : 3*(offset+b.Nblobs)] += KU.flatten()
+        # Set F to zero
+        RHS[3*Nblobs+k*6 : 3*Nblobs+(k+1)*6] = 0.0
+      offset += b.Nblobs
     
     # Set linear operators 
-    linear_operator_partial = partial(multi_bodies.linear_operator_rigid, bodies=bodies, r_vectors=r_vectors_blobs, eta=read.eta, a=read.blob_radius)
+    linear_operator_partial = partial(multi_bodies.linear_operator_rigid, bodies=bodies, r_vectors=r_vectors_blobs, eta=read.eta, a=read.blob_radius, periodic_length=read.periodic_length)
     A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
 
     # Set preconditioner
@@ -310,19 +334,37 @@ if __name__ ==  '__main__':
     for k, b in enumerate(bodies):
       # 1. Compute blobs mobility and invert it
       M = b.calc_mobility_blobs(read.eta, read.blob_radius)
-      M_inv = np.linalg.inv(M)
+      L, lower = scla.cho_factor(M)
+      L = np.triu(L)
+      M_inv = scla.solve_triangular(L, scla.solve_triangular(L, np.eye(b.Nblobs * 3), trans='T', check_finite=False), check_finite=False)
       mobility_inv_blobs.append(M_inv)
       # 2. Compute body mobility
-      N = b.calc_mobility_body(read.eta, read.blob_radius, M_inv = M_inv)
+      K = b.calc_K_matrix()
+      N = np.linalg.pinv(np.dot(K.T, scla.cho_solve((L,lower), K, check_finite=False)))
       mobility_bodies[k] = N
 
     # 4. Pack preconditioner
-    PC_partial = partial(multi_bodies.block_diagonal_preconditioner, bodies=bodies, mobility_bodies=mobility_bodies, \
-                           mobility_inv_blobs=mobility_inv_blobs, Nblobs=Nblobs)
+    PC_partial = partial(multi_bodies.block_diagonal_preconditioner, bodies=bodies, mobility_bodies=mobility_bodies,
+                         mobility_inv_blobs=mobility_inv_blobs, Nblobs=Nblobs)
     PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
 
+    # Scale RHS to norm 1
+    RHS_norm = np.linalg.norm(RHS)
+    if RHS_norm > 0:
+      RHS = RHS / RHS_norm
+    
     # Solve preconditioned linear system # callback=make_callback()
-    (sol_precond, info_precond) = utils.gmres(A, RHS, tol=read.solver_tolerance, M=PC, maxiter=1000, restart=60) 
+    counter = gmres_counter(print_residual = args.print_residual)
+    (sol_precond, info_precond) = utils.gmres(A, RHS, tol=read.solver_tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
+
+    # Scale RHS to norm 1
+    if RHS_norm > 0:
+      sol_precond = sol_precond * RHS_norm
+    
+    # If prescribed velocity we know the velocity
+    for k, b in enumerate(bodies):
+      if b.prescribed_kinematics is True:
+        sol_precond[3*Nblobs + 6*k : 3*Nblobs + 6*(k+1)] = b.calc_prescribed_velocity()
     
     # Extract velocities and constraint forces on blobs
     velocity = np.reshape(sol_precond[3*Nblobs: 3*Nblobs + 6*num_bodies], (num_bodies, 6))
@@ -331,6 +373,13 @@ if __name__ ==  '__main__':
     # Save velocity
     name = read.output_name + '.velocity.dat'
     np.savetxt(name, velocity, delimiter='  ')
+
+    # Compute force-torques on bodies
+    force = np.reshape(multi_bodies.K_matrix_T_vector_prod(bodies, lambda_blobs, Nblobs), (num_bodies, 6))
+    
+    # Save force
+    name = read.output_name + '.force.dat'
+    np.savetxt(name, force, delimiter='  ')
     print('Time to solve mobility problem =', time.time() - start_time )
 
     # Compute force-torques on bodies
@@ -344,7 +393,7 @@ if __name__ ==  '__main__':
     if read.plot_velocity_field.size > 1: 
       print('plot_velocity_field')
       plot_velocity_field(read.plot_velocity_field, r_vectors_blobs, lambda_blobs, read.blob_radius, read.eta, read.output_name, read.tracer_radius,
-                          mobility_vector_prod_implementation = read.mobility_vector_prod_implementation)
+                          mobility_vector_prod_implementation = read.mobility_vector_prod_implementation, periodic_length=read.periodic_length)
       
   # If scheme == resistance solve resistance problem 
   elif read.scheme == 'resistance': 
@@ -654,4 +703,4 @@ if __name__ ==  '__main__':
 
 
 
-
+      

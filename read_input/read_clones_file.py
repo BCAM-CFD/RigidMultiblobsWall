@@ -2,7 +2,7 @@
 Small module to read a file with the initial locations and orientation
 of the rigid bodies.
 '''
-from __future__ import division, print_function
+
 import numpy as np
 import sys
 sys.path.append('../')
@@ -43,6 +43,8 @@ def read_clones_file(name_file):
           locations.append(location)
           orientations.append(q)
         i += 1
+        if i == number_of_bodies+1:
+          break
 
     # Creat and return numpy arrays
     locations = np.array(locations)
