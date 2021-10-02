@@ -94,9 +94,6 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
   force = np.zeros((N, 3))
 
   # Copy arrays
-  Lx = L[0]
-  Ly = L[1]
-  Lz = L[2]
   rx_vec = np.copy(r_vectors[:,0])
   ry_vec = np.copy(r_vectors[:,1])
   rz_vec = np.copy(r_vectors[:,2])
@@ -133,6 +130,9 @@ def blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offse
   return force
 
 
+@utils.static_var('r_vectors_old', [])
+@utils.static_var('list_of_neighbors', [])
+@utils.static_var('offsets', [])
 def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
   '''
   This function computes the blob-blob forces and returns
@@ -158,30 +158,12 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
             r[:,i] -= ri_min
     return r
     
-  def project_to_periodic_image(r, L):
-    '''
-    Project a vector r to the minimal image representation
-    of size L=(Lx, Ly, Lz) and with a corner at (0,0,0). If 
-    any dimension of L is equal or smaller than zero the 
-    box is assumed to be infinite in that direction.
-    
-    If one dimension is not periodic shift all coordinates by min(r[:,i]) value.
-    '''
-    if L is not None:
-      for i in range(3):
-        if(L[i] > 0):
-          r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
-        else:
-          r[:,i] -= np.min(r[:,i])
-    return r
-
   # Get parameters from arguments
   L = kwargs.get('periodic_length')
   eps = kwargs.get('repulsion_strength')
   b = kwargs.get('debye_length')
   a = kwargs.get('blob_radius')
   d_max = 2 * a + 30 * b
-  r_copy = r_vectors
 
   # Project to PBC, this is necessary here to build the Kd-tree with scipy.
   # Copy is necessary because we don't want to modify the original vector here
@@ -213,7 +195,10 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
     for i in range(len(pairs)):
       offsets[i+1] = offsets[i] + len(pairs[i])
     list_of_neighbors = np.concatenate(pairs).ravel()
+    calc_blob_blob_forces_tree_numba.offsets = np.copy(offsets)
+    calc_blob_blob_forces_tree_numba.list_of_neighbors = np.copy(list_of_neighbors)
+    calc_blob_blob_forces_tree_numba.r_vectors_old = np.copy(r_vectors)
   
   # Compute forces
-  force_blobs = blob_blob_force_tree_numba(r_copy, L, eps, b, a, list_of_neighbors, offsets)
+  force_blobs = blob_blob_force_tree_numba(r_vectors, L, eps, b, a, list_of_neighbors, offsets)
   return force_blobs
