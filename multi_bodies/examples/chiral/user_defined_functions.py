@@ -76,15 +76,18 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   R_B = quaternion_B.rotation_matrix()
   B = B0 * np.array([np.cos(omega * time), np.sin(omega * time), 0.0])
   B = np.dot(R_B, B)
+  # zeros = np.zeros(3)
   
   for k, b in enumerate(bodies):
     # Rotate magnetic dipole
     rotation_matrix = b.orientation.rotation_matrix()
     mu_body = np.dot(rotation_matrix, mu)
-
+    # r_dipoles, mu_body = b.get_dipoles()
+     
     # Compute torque
     force_torque[2*k+1] = np.cross(mu_body, B)
-
+    # force_torque[2*k+1] = b.sum_dipoles(zeros, np.cross(mu_body, B), r_dipoles)[3:6]
+ 
     # Add harmonic potential
     force_torque[2*k,2] = -harmonic_confinement * b.k * (b.location[2] - harmonic_confinement_plane)
 
