@@ -1194,7 +1194,7 @@ if __name__ == '__main__':
         b.dipoles_r = np.zeros((line.size, 3))
         b.dipoles_r[:,int(read.dipole_line[3])] = line
         mu = np.zeros((line.size, 3))
-        mu[:] = read.mu
+        mu[:] = read.mu / line.size
         b.dipoles = mu
 
       # Compute the blobs offset for lambda in the whole system array
