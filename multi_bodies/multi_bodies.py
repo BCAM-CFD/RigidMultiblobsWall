@@ -1075,9 +1075,10 @@ def build_block_diagonal_preconditioner_articulated_single_blobs(bodies, articul
 
 if __name__ == '__main__':
   # MPI
-  comm = MPI.COMM_WORLD
-  rank = comm.Get_rank()
-
+  #comm = MPI.COMM_WORLD
+  #rank = comm.Get_rank()
+  comm = None
+  
   # Get command line arguments
   parser = argparse.ArgumentParser(description='Run a multi-body simulation and save trajectory.')
   parser.add_argument('--input-file', dest='input_file', type=str, default='data.main', help='name of the input file')
@@ -1188,6 +1189,13 @@ if __name__ == '__main__':
         b.debye_length = read.debye_length_bodies[ID]
       else:
         b.debye_length = 1
+      if True:
+        line = np.linspace(read.dipole_line[0], read.dipole_line[1], num=int(read.dipole_line[2]))
+        b.dipoles_r = np.zeros((line.size, 3))
+        b.dipoles_r[:,int(read.dipole_line[3])] = line
+        mu = np.zeros((line.size, 3))
+        mu[:] = read.mu
+        b.dipoles = mu
 
       # Compute the blobs offset for lambda in the whole system array
       b.blobs_offset = blobs_offset

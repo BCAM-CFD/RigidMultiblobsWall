@@ -153,35 +153,46 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
   '''
   Nbodies = len(bodies)
   force_torque_bodies = np.zeros((len(bodies), 6))
-  mu = kwargs.get('mu')
   vacuum_permeability = kwargs.get('vacuum_permeability')
   dipole_dipole = kwargs.get('dipole_dipole')
   L = kwargs.get('L')
   
   # Extract body locations and dipoles
+  r_dipoles = np.zeros((len(bodies), bodies[0].dipoles_r.size // 3, 3))
+  dipoles = np.zeros((len(bodies), bodies[0].dipoles.size // 3, 3))
   r_bodies = np.zeros((len(bodies), 3))
-  dipoles = np.zeros((len(bodies), 3))
   R = np.zeros(len(bodies))
   repulsion_strength = np.zeros(len(bodies))
   debye_length = np.zeros(len(bodies))
   for i, b in enumerate(bodies):
+    r, mu = b.get_dipoles()
+    r_dipoles[i,:,:] = r
+    dipoles[i,:,:] = mu
     r_bodies[i] = b.location
     R[i] = b.R
     repulsion_strength[i] = b.repulsion_strength
     debye_length[i] = b.debye_length
-    dipoles[i] = np.dot(b.orientation.rotation_matrix(), mu)
+  r_dipoles = r_dipoles.reshape((r_dipoles.size // 3, 3))
+  dipoles = dipoles.reshape((dipoles.size // 3, 3))
   
   # Compute forces and torques
   if dipole_dipole == 'True':
-    force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
+    # force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
+    force, torque = body_body_force_torque_numba_fast(r_dipoles, dipoles, vacuum_permeability)
   elif dipole_dipole == 'isotropic':
-    force, torque = body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability)
+    # force, torque = body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability)
+    pass
   else:
     force = np.zeros((Nbodies, 3))
     torque = np.zeros((Nbodies, 3))
-  force_torque_bodies[:,0:3] = force
-  force_torque_bodies[:,3:6] = torque
 
+  # Collect dipole forces-torques
+  num_dipoles_body = bodies[0].dipoles_r.size // 3
+  for k, b in enumerate(bodies):
+    force_torque_bodies[k,0:6] = b.sum_dipoles(force[num_dipoles_body * k : num_dipoles_body * (k+1)],
+                                               torque[num_dipoles_body * k : num_dipoles_body * (k+1)],
+                                               r_dipoles[num_dipoles_body * k : num_dipoles_body * (k+1)])
+    
   # Calc steric body-body force
   if np.max(repulsion_strength) > 0:
     force = calc_body_body_forces_tree_numba(r_bodies, L, repulsion_strength, debye_length, R)

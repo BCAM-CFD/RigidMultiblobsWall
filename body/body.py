@@ -232,5 +232,32 @@ class Body(object):
     self.body_length = max_distance + 2*self.blob_radius
     return self.body_length
 
+  
+  def get_dipoles(self):
+    '''
+    Return the position of the dipoles and their orientation.
+    '''
+    rotation_matrix = self.orientation.rotation_matrix()
+    r = self.location + np.dot(self.dipoles_r, rotation_matrix.T)
+    dipoles = np.dot(self.dipoles, rotation_matrix.T)
 
+    return r, dipoles
+
+
+  def sum_dipoles(self, force, torque, r=None):
+    '''
+    Sum the force-torque dipoles to give the total force-torque on the body.
+    '''
+    if r is None:
+      rotation_matrix = self.orientation.rotation_matrix()
+      r = np.dot(self.dipoles_r, rotation_matrix.T)
+    else:
+      r -= self.location
+
+    force_torque = np.zeros(6)
+    force_torque[3:6] = np.sum(torque, axis=0)
+    force_torque[0:3] = np.sum(force, axis=0)
+    force_torque[0:3] += np.sum(np.cross(r, force), axis=0)
+
+    return force_torque
     
