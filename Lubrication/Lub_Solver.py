@@ -79,8 +79,6 @@ class Lub_Solver(object):
         self.mobility_rot_times_torque = mob.no_wall_mobility_rot_times_torque_numba
         # self.mobilit_trans_times_force_torque = mob.no_wall_mobility_trans_times_force_torque_numba
 
-    print('mobility_vector_prod_implementation.find = ', mobility_vector_prod_implementation)
-        
     # #if domain is a 'single_wall'
     # self.mobility_trans_times_force_wall = mob.single_wall_mobility_trans_times_force_pycuda #pycuda
     # self.mobility_trans_times_torque_wall = mob.single_wall_mobility_trans_times_torque_pycuda #pycuda
@@ -106,7 +104,6 @@ class Lub_Solver(object):
       for i in range(3):
         if(L[i] > 0):
           r[i] = r[i] - int(r[i] / L[i] + 0.5 * (int(r[i]>0) - int(r[i]<0))) * L[i]
-    #print r
     return r 
   
   def put_r_vecs_in_periodic_box(self, r_vecs_np, L):
@@ -191,7 +188,6 @@ class Lub_Solver(object):
     self.Delta_R_cut_wall = R_sup_cut_wall - R_MB_cut_wall
     
     end = time.time()
-    #print 'mat create time : '+ str((end - start))
     
  
   def Compute_DeltaR(self, r_vecs_np):
@@ -261,8 +257,6 @@ class Lub_Solver(object):
     Delta_R = R_Sup - R_MB
     
     end = time.time()
-    #print 'mat create time : '+ str((end - start))
-    
     return Delta_R
  
  
@@ -288,10 +282,9 @@ class Lub_Solver(object):
 
     out = Mob_U
     end = time.time()
-    #print 'time for mult op: '+ str((end - start))
-    
     return out
-    
+
+  
   def Lub_Mobility_RFD_RHS(self):
     '''
     Computes the RHS for a Lubrication Corrected Euler Maruyama scheme. Two RHS vectors are returned to be used in the function Lubrucation_solve
@@ -372,9 +365,6 @@ class Lub_Solver(object):
     DRL = factor.L()
     DRhalf = factor.apply_Pt(DRL.dot(W1))
     end = time.time()
-    #print 'time for DR root: '+ str((end - start)) 
-    
-    
     
     start = time.time()
     
@@ -386,8 +376,6 @@ class Lub_Solver(object):
                                                                     print_residual = print_res, 
                                                                     z=W2)
     end = time.time()
-    #print 'time for M + MDRM root: '+ str((end - start))
-    
     RHS_Xm = np.sqrt(2*self.kT / self.dt)*(DRhalf)
     RHS_X = np.sqrt(2*self.kT / self.dt)*(WallCutHalf)
     
@@ -402,14 +390,10 @@ class Lub_Solver(object):
     start = time.time()
     D_R = self.Delta_R.dot(X) 
     end = time.time()
-    #print 'time for DR mult : '+ str((end - start))
-    
     start = time.time()
     M_Delta_R = self.Wall_Mobility_Mult(D_R)
     out = X + M_Delta_R
     end = time.time()
-    #print 'time for M mult : '+ str((end - start))
-    
     return out  
   
   
@@ -429,7 +413,6 @@ class Lub_Solver(object):
       Y_F[6*k:6*k+6] = X[6*k:6*k+6]
 
     end = time.time()
-    #print 'time for PC op: '+ str((end - start))
     return Y_F
   
   
@@ -443,7 +426,6 @@ class Lub_Solver(object):
     Y_F = R_fact(RHS)
 
     end = time.time()
-    #print 'time for PC op: '+ str((end - start))
     return Y_F
   
   
@@ -492,7 +474,6 @@ class Lub_Solver(object):
       Eig_Shift_R_Sup = self.R_Sup + sp.diags(small*np.ones(6*num_particles),0,format='csc')
       factor = cholesky(Eig_Shift_R_Sup)
       end = time.time()
-      #print 'factor time : '+ str((end - start))
       PC_operator_partial = partial(self.IpDRM_PC, R_fact=factor)
       PC = spla.LinearOperator((6*num_particles, 6*num_particles), matvec = PC_operator_partial, dtype='float64')
     else:
@@ -503,7 +484,6 @@ class Lub_Solver(object):
     (U_gmres, info_precond) = pyamg.krylov.gmres(A,RHS, x0=X0, tol=self.tolerance, M=PC, maxiter=min(its_out,A.shape[0]), restrt = min(100,A.shape[0]), residuals=res_list)
     if RHS_norm > 0:
       U_gmres = U_gmres * RHS_norm
-    #print res_list
     return U_gmres, res_list#
   
   
@@ -652,9 +632,6 @@ class Lub_Solver(object):
     Root_X = Root_X[:,np.newaxis]
  
     center = self.Lub_Mobility_Centered_RFD()
-    #print "centered RFD"
-    #print  self.kT*center
-    
     FT = FT[:,np.newaxis]
     
     RHS_Xm = Root_Xm + FT
@@ -935,7 +912,6 @@ class Lub_Solver(object):
     res_list = []
     (VT_gmres, info_precond) = pyamg.krylov.gmres(A, RHS, M=PC, x0 = X0_vt, tol=self.tolerance, maxiter=100, restrt = min(100,A.shape[0]),residuals=res_list)
 
-    print(res_list)
     # Scale solution with RHS norm
     if RHS_norm > 0:
       VT_gmres = VT_gmres * RHS_norm
