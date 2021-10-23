@@ -1200,7 +1200,6 @@ if __name__ == '__main__':
       # Compute the blobs offset for lambda in the whole system array
       b.blobs_offset = blobs_offset
       blobs_offset += b.Nblobs
-      multi_bodies_functions.set_slip_by_ID(b, slip)
       # If structure is an obstacle
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
