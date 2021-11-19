@@ -1340,7 +1340,8 @@ if __name__ == '__main__':
                                  g = g) 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation, eta_ratio=read.eta_ratio)
-
+  integrator.mobility_vector_prod = mobility_vector_prod
+  
   integrator.force_torque_calculator = partial(multi_bodies_functions.force_torque_calculator_sort_by_bodies, 
                                                g = g, 
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
