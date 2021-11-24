@@ -7,7 +7,8 @@ scheme                                   deterministic_forward_euler
 # We recommend to use the C++ implementation which is faster,
 # see documentation
 mobility_blobs_implementation            C++
-mobility_vector_prod_implementation      C++
+mobility_vector_prod_implementation      stkfmm_single_wall
+# mobility_vector_prod_implementation      C++
 domain                                   single_wall
 
 # Select implementation to compute the blobs-blob interactions
@@ -28,12 +29,12 @@ n_save                                   1
 initial_step                             0
 
 # Solver params
-solver_tolerance                         1.0e-13
+solver_tolerance                         1.0e-10
 update_PC                                1
 
 # Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
 eta                                      1e-03
-g                                        0 
+g                                        0.01 
 blob_radius                              0.577009424015244
 
 # Stochastic parameters
@@ -41,7 +42,7 @@ blob_radius                              0.577009424015244
 kT                                       0
 
 # Set interaction with the wall
-repulsion_strength_wall                  0
+repulsion_strength_wall                  0.1
 debye_length_wall                        0.05770
 
 # Define implementation to compute the blobs-blob force and pass its arguments
@@ -52,7 +53,7 @@ debye_length                             0.05770
 quaternion_B                             1 0 0 0
 mu                                       4.798541882470477860e-03 4.798541882470477860e-03 7.344929652784522034e-03
 vacuum_permeability                      1.25663706143592e+06
-B0                                       0e+03
+B0                                       1e+03
 omega                                    6.28318530717959
 
 # More about interactions
@@ -64,7 +65,7 @@ dipole_dipole                            True
 structure Structures/shell_N_12_Rg_1.0976_Rh_1.3856.vertex Structures/shell.clones
 
 # Set output name
-output_name                              /home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run2000/run2000/run2000.0.0.0
+output_name                              /home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run
 save_clones                              one_file
 
 

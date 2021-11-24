@@ -1532,12 +1532,12 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
       L_box = np.max(L)
     else:
       L_box = np.max([Lx_pvfmm, Ly_pvfmm, Lz_pvfmm])
-
+      
     # Buid FMM tree
-    rpy_fmm.setBox(np.array([x_min, y_min, z_min]), L_box)
-    rpy_fmm.setPoints(N, r_vectors, N, r_vectors, 0, 0)
-    rpy_fmm.setupTree(PySTKFMM.KERNEL.RPY)
-
+    rpy_fmm.set_box(np.array([x_min, y_min, z_min]), L_box)
+    rpy_fmm.set_points(r_vectors, r_vectors, np.zeros(0))
+    rpy_fmm.setup_tree(PySTKFMM.KERNEL.RPY)
+    
     # Build tree in python and neighbors lists
     d_max = 2 * a
     if L[0] > 0 or L[1] > 0 or L[2] > 0:
@@ -1561,8 +1561,8 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
   src_SL_value[:,3] = a
     
   # Evaluate fmm; format p = trg_value[:,0], v = trg_value[:,1:4], Lap = trg_value[:,4:]
-  rpy_fmm.clearFMM(PySTKFMM.KERNEL.RPY)
-  rpy_fmm.evaluateFMM(PySTKFMM.KERNEL.RPY, N, src_SL_value, N, trg_value, 0, 0)
+  rpy_fmm.clear_fmm(PySTKFMM.KERNEL.RPY)
+  rpy_fmm.evaluate_fmm(PySTKFMM.KERNEL.RPY, src_SL_value, trg_value, np.zeros(0))
   comm = kwargs.get('comm')
   comm.Barrier()
 
