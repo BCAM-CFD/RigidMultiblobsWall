@@ -19,6 +19,9 @@ try:
 except ImportError:
   print('It didn\'t find mpi4py!')
 
+# Add path for PySTKFMM
+# sys.path.append('/home/fbalboa/sfw/FMM/STKFMM-lib-gnu/lib/python/')
+PySTKFMM_found = False
 
 # Add path to HydroGrid and import module
 # sys.path.append('../../HydroGrid/src/')
@@ -53,6 +56,7 @@ while found_functions is False:
       found_HydroGrid = False
     try:
       import PySTKFMM
+      PySTKFMM_found = True
     except ImportError:
       pass
     found_functions = True
@@ -200,7 +204,7 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     return partial(mb.fluid_interface_mobility_trans_times_force_cpp, eta_ratio = eta_ratio)
   elif implementation == 'stkfmm_single_wall':
     # STKFMM parameters
-    mult_order = kwargs.get('stkfmm_mult_order')
+    mult_order = kwargs.get('stkfmm_mult_order')    
     pbc_string = kwargs.get('stkfmm_pbc')
     max_pts = 512
     if pbc_string == 'None':
@@ -1075,9 +1079,11 @@ def build_block_diagonal_preconditioner_articulated_single_blobs(bodies, articul
 
 if __name__ == '__main__':
   # MPI
-  #comm = MPI.COMM_WORLD
-  #rank = comm.Get_rank()
-  comm = None
+  if PySTKFMM_found:
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+  else:
+    comm = None
   
   # Get command line arguments
   parser = argparse.ArgumentParser(description='Run a multi-body simulation and save trajectory.')
