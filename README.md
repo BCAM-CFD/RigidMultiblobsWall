@@ -1,3 +1,5 @@
+# Floren's branch to study chiral fluids. It will not be merged with master.
+
 # Rigid Multiblobs in half-space
 
 Rotational and Translational Diffusion of Confined Rigid Bodies
