@@ -255,9 +255,9 @@ class Body(object):
       r -= self.location
 
     force_torque = np.zeros(6)
-    force_torque[3:6] = np.sum(torque, axis=0)
     force_torque[0:3] = np.sum(force, axis=0)
-    force_torque[0:3] += np.sum(np.cross(r, force), axis=0)
+    force_torque[3:6] = np.sum(torque, axis=0)
+    force_torque[3:6] += np.sum(np.cross(r, force), axis=0)
 
     return force_torque
     

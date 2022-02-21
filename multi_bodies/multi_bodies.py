@@ -1196,7 +1196,10 @@ if __name__ == '__main__':
       else:
         b.debye_length = 1
       if True:
-        line = np.linspace(read.dipole_line[0], read.dipole_line[1], num=int(read.dipole_line[2]))
+        if int(read.dipole_line[2]) == 1:
+          line = np.array([(read.dipole_line[0] + read.dipole_line[1]) / 2.0])
+        else:
+          line = np.linspace(read.dipole_line[0], read.dipole_line[1], num=int(read.dipole_line[2]))
         b.dipoles_r = np.zeros((line.size, 3))
         b.dipoles_r[:,int(read.dipole_line[3])] = line
         mu = np.zeros((line.size, 3))

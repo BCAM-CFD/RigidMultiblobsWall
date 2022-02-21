@@ -183,8 +183,7 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
     # force, torque = body_body_force_torque_numba_fast(r_bodies, dipoles, vacuum_permeability)
     force, torque = body_body_force_torque_numba_fast(r_dipoles, dipoles, vacuum_permeability)
   elif dipole_dipole == 'isotropic':
-    # force, torque = body_body_force_torque_numba_isotropic(r_bodies, dipoles, vacuum_permeability)
-    pass
+    force, torque = body_body_force_torque_numba_isotropic(r_dipoles, dipoles, vacuum_permeability)
   else:
     force = np.zeros((Nbodies, 3))
     torque = np.zeros((Nbodies, 3))
@@ -199,7 +198,8 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
   # Calc steric body-body force
   if np.max(repulsion_strength) > 0:
     force = calc_body_body_forces_tree_numba(r_bodies, L, repulsion_strength, debye_length, R)
-    force_torque_bodies[:, 0:3] += force 
+    force_torque_bodies[:, 0:3] += force
+    
   return force_torque_bodies.reshape((2*len(bodies),3))
 
 
