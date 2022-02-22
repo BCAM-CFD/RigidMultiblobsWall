@@ -291,6 +291,13 @@ class QuaternionIntegrator(object):
       
       # Solve mobility problem
       sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, PC_partial=PC_partial, step = kwargs.get('step'), dt = dt)
+
+      # Plot velocity field 
+      if self.plot_velocity_field.size > 1: 
+        lambda_blobs = sol_precond[0:3*self.Nblobs]
+        output = self.output_prefix + '.step.' + str(kwargs.get('step'))  + '.vtk'
+        pvf.plot_velocity_field(self.plot_velocity_field, r_vectors_blobs_n, lambda_blobs, self.a, self.eta, output, 0, 
+                                mobility_vector_prod_implementation='numba')
       
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -1547,10 +1554,10 @@ class QuaternionIntegrator(object):
 
       # Solve preconditioned linear system
       counter = gmres_counter(print_residual = self.print_residual)
-      (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
-      self.det_iterations_count += counter.niter
-      # (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, verbose=self.print_residual, convergence='presid')
-      # self.det_iterations_count += len(resnorms)
+      # (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
+      # self.det_iterations_count += counter.niter
+      (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=400, restart=200, verbose=self.print_residual, convergence='presid')
+      self.det_iterations_count += len(resnorms)
     else:
       sol_precond = np.zeros_like(RHS)
 
