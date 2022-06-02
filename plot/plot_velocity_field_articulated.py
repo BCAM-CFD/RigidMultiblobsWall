@@ -151,3 +151,107 @@ def plot_velocity_field(bodies, lambda_blobs, eta, sphere_radius, p, output, fra
   np.savetxt(output, result, header=header) 
   return
 
+
+
+
+
+def plot_velocity_line(bodies, lambda_blobs, eta, grid, output, frame_body=-1, *args, **kwargs):
+  '''
+  This function plots the velocity field to a Chebyshev-Fourier spherical grid of radius "sphere_radius" centered at (0,0,0).
+  If frame_body=index the bodies are translated and rotated so the configuration of body index is x=(0,0,0, 1,0,0,0).
+  '''
+
+  grid_length_x = grid[3] - grid[0]
+  grid_length_y = grid[4] - grid[1]
+  grid_length_z = grid[5] - grid[2]
+  grid_points = int(grid[6])
+  num_points = grid_points
+  dx_grid = grid_length_x / (grid_points - 1) if grid_points > 0 else 0
+  dy_grid = grid_length_y / (grid_points - 1) if grid_points > 0 else 0
+  dz_grid = grid_length_z / (grid_points - 1) if grid_points > 0 else 0
+  grid_coor = np.zeros((num_points, 3))
+  grid_coor[:,0] = np.array([grid[0] + dx_grid * (x) for x in range(grid_points)])
+  grid_coor[:,1] = np.array([grid[1] + dy_grid * (x) for x in range(grid_points)])
+  grid_coor[:,2] = np.array([grid[2] + dz_grid * (x) for x in range(grid_points)])
+  
+  # Get r_vectors, rotation to body 0 frame of reference if frame_body=True
+  r_vectors = np.empty((lambda_blobs.size // 3, 3))
+  offset = 0
+  if frame_body >= 0:
+    R0 = bodies[frame_body].orientation.rotation_matrix().T
+    theta0 = bodies[frame_body].orientation.inverse()
+    for b in bodies:
+      location = np.dot(R0, (b.location - bodies[frame_body].location))
+      orientation = theta0 * b.orientation
+      num_blobs = b.Nblobs
+      r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
+      offset += num_blobs
+    lambda_blobs = lambda_blobs.reshape((lambda_blobs.size // 3, 3))
+    for i in range(lambda_blobs.shape[0]):
+      lambda_blobs[i] = np.dot(R0, lambda_blobs[i])
+  else:    
+    for b in bodies:
+      location = b.location
+      orientation = b.orientation
+      num_blobs = b.Nblobs
+      r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
+      offset += num_blobs
+
+  # Set radius of blobs and grid nodes (= 0)
+  radius_source = np.zeros(r_vectors.size // 3) 
+  offset = 0
+  for b in bodies:
+    num_blobs = b.Nblobs
+    radius_source[offset:(offset+num_blobs)] = b.blobs_radius
+    offset += num_blobs
+  radius_target = np.zeros(grid_coor.size // 3) 
+  
+  # Compute velocity field 
+  mobility_vector_prod_implementation = kwargs.get('mobility_vector_prod_implementation')
+  if mobility_vector_prod_implementation == 'python':
+    grid_velocity = mob.mobility_vector_product_source_target_one_wall(r_vectors, 
+                                                                       grid_coor, 
+                                                                       lambda_blobs, 
+                                                                       radius_source, 
+                                                                       radius_target, 
+                                                                       eta, 
+                                                                       *args, 
+                                                                       **kwargs) 
+  elif mobility_vector_prod_implementation == 'C++':
+    grid_velocity = mob.boosted_mobility_vector_product_source_target(r_vectors, 
+                                                                      grid_coor, 
+                                                                      lambda_blobs, 
+                                                                      radius_source, 
+                                                                      radius_target, 
+                                                                      eta, 
+                                                                      *args, 
+                                                                      **kwargs)
+  elif mobility_vector_prod_implementation == 'numba_no_wall':
+    grid_velocity = mob.no_wall_mobility_trans_times_force_source_target_numba(r_vectors, 
+                                                                               grid_coor, 
+                                                                               lambda_blobs, 
+                                                                               radius_source, 
+                                                                               radius_target, 
+                                                                               eta, 
+                                                                               *args, 
+                                                                               **kwargs) 
+  else:
+    grid_velocity = mob.single_wall_mobility_trans_times_force_source_target_pycuda(r_vectors, 
+                                                                                    grid_coor, 
+                                                                                    lambda_blobs, 
+                                                                                    radius_source, 
+                                                                                    radius_target, 
+                                                                                    eta, 
+                                                                                    *args, 
+                                                                                    **kwargs) 
+ 
+  # Write velocity field.
+  result = np.zeros((grid_coor.shape[0], 6))
+  result[:,0:3] = grid_coor
+  grid_velocity = grid_velocity.reshape((grid_velocity.size // 3, 3)) 
+  result[:,3:] = grid_velocity
+  np.savetxt(output, result) 
+  return
+
+
+

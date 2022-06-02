@@ -52,6 +52,7 @@ class QuaternionIntegrator(object):
     self.det_iterations_count = 0
     self.stoch_iterations_count = 0
     self.domain = domain
+    self.n_steps = None
 
     # Optional variables
     self.periodic_length = None
@@ -1583,15 +1584,21 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)]
 
-      if np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere):
+      if np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line):
         # Save bodies velocities
-        output = self.output_name + '.step.' + str(step).zfill(8) + '.velocities.dat'
-        np.savetxt(output, velocities)
+        # Floren: save every n_steps, something like: if step % self.n_steps == 0:
+        #         Do the same for all the options to save files in this part of the code.
+        if (step==self.n_steps-1):
+          output = self.output_name + '.step.' + str(step).zfill(8) + '.velocities.dat'
+          np.savetxt(output, velocities)
         
         # Extract blob forces 
         lambda_blobs = sol_precond[0 : 3*self.Nblobs]
-        output = self.output_name + '.step.' + str(step).zfill(8) + '.lambda_blobs.dat'
-        np.savetxt(output, lambda_blobs)
+        if (step==self.n_steps-1):
+          output = self.output_name + '.step.' + str(step).zfill(8) + '.lambda_blobs.dat'
+          np.savetxt(output, lambda_blobs)
+        
+        
 
         # Save velocity fields
         if np.any(self.plot_velocity_field):
@@ -1605,6 +1612,9 @@ class QuaternionIntegrator(object):
                                   0,
                                   radius_source=self.radius_blobs,
                                   mobility_vector_prod_implementation='numba_no_wall')
+        
+                                  
+                                                           
         if np.any(self.plot_velocity_field_sphere):
           pvfa.plot_velocity_field(self.bodies,
                                    lambda_blobs,
@@ -1614,6 +1624,17 @@ class QuaternionIntegrator(object):
                                    self.output_name + '.step.' + str(step).zfill(8) + '.velocity_field_sphere.dat',
                                    frame_body=self.plot_velocity_field_sphere[2],
                                    mobility_vector_prod_implementation='numba_no_wall')
+                                   
+                                   
+        if np.any(self.plot_velocity_line):
+          pvfa.plot_velocity_line(self.bodies,
+                                   lambda_blobs,
+                                   self.eta,
+                                   self.plot_velocity_line,
+                                   self.output_name + '.step.' + str(step).zfill(8) + '.velocity_field_line.dat',
+                                   frame_body=-1,
+                                   mobility_vector_prod_implementation='numba_no_wall')
+                           
 
       # Compute center of mass velocity and update
       for art in self.articulated:
