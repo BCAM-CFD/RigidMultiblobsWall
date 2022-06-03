@@ -1593,7 +1593,7 @@ class QuaternionIntegrator(object):
         output = self.output_name + '.step.' + str(step).zfill(8) + '.lambda_blobs.dat'
         np.savetxt(output, lambda_blobs)
          
-        # Save velocity fields
+        # Save velocity fields, hello hari.
         if np.any(self.plot_velocity_field):
           r_vectors_blobs, lambda_blobs_frame = get_r_vectors_frame_body(lambda_blobs, frame_body=-1)
           pvf.plot_velocity_field(self.plot_velocity_field,
