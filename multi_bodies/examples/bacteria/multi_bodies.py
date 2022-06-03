@@ -1251,6 +1251,8 @@ if __name__ == '__main__':
   integrator.output_name = output_name
   integrator.plot_velocity_field = read.plot_velocity_field
   integrator.plot_velocity_field_sphere = read.plot_velocity_field_sphere
+  integrator.plot_velocity_line = read.plot_velocity_line
+  integrator.n_steps = read.n_steps
   radius_blobs = []
   for k, b in enumerate(bodies):
     radius_blobs.append(b.blobs_radius)
