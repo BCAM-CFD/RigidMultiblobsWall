@@ -155,7 +155,7 @@ def plot_velocity_field(bodies, lambda_blobs, eta, sphere_radius, p, output, fra
 
 
 
-def plot_velocity_line(bodies, lambda_blobs, eta, grid, output, frame_body=-1, *args, **kwargs):
+def plot_velocity_line(bodies, lambda_blobs, eta, grid, output, *args, **kwargs):
   '''
   This function plots the velocity field to a Chebyshev-Fourier spherical grid of radius "sphere_radius" centered at (0,0,0).
   If frame_body=index the bodies are translated and rotated so the configuration of body index is x=(0,0,0, 1,0,0,0).
@@ -173,6 +173,7 @@ def plot_velocity_line(bodies, lambda_blobs, eta, grid, output, frame_body=-1, *
   grid_coor[:,0] = np.array([grid[0] + dx_grid * (x) for x in range(grid_points)])
   grid_coor[:,1] = np.array([grid[1] + dy_grid * (x) for x in range(grid_points)])
   grid_coor[:,2] = np.array([grid[2] + dz_grid * (x) for x in range(grid_points)])
+  frame_body = grid[7]
   
   # Get r_vectors, rotation to body 0 frame of reference if frame_body=True
   r_vectors = np.empty((lambda_blobs.size // 3, 3))
