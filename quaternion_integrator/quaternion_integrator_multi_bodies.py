@@ -53,6 +53,7 @@ class QuaternionIntegrator(object):
     self.stoch_iterations_count = 0
     self.domain = domain
     self.n_steps = None
+    self.n_save = None
 
     # Optional variables
     self.periodic_length = None
@@ -1584,7 +1585,8 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)]
 
-      if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line)) and (step % self.n_save) == 0:
+      if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line) and (step % self.n_save) == 0):
+      
         output = self.output_name + '.step.' + str(step).zfill(8) + '.velocities.dat'
         np.savetxt(output, velocities)
         
@@ -1625,7 +1627,6 @@ class QuaternionIntegrator(object):
                                    self.eta,
                                    self.plot_velocity_line,
                                    self.output_name + '.step.' + str(step).zfill(8) + '.velocity_field_line.dat',
-                                   frame_body=-1,
                                    mobility_vector_prod_implementation='numba_no_wall')
                            
 
