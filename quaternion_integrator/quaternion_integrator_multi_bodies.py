@@ -1584,22 +1584,15 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)]
 
-      if np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line):
-        # Save bodies velocities
-        # Floren: save every n_steps, something like: if step % self.n_steps == 0:
-        #         Do the same for all the options to save files in this part of the code.
-        if (step==self.n_steps-1):
-          output = self.output_name + '.step.' + str(step).zfill(8) + '.velocities.dat'
-          np.savetxt(output, velocities)
+      if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line)) and (step % self.n_save) == 0:
+        output = self.output_name + '.step.' + str(step).zfill(8) + '.velocities.dat'
+        np.savetxt(output, velocities)
         
         # Extract blob forces 
         lambda_blobs = sol_precond[0 : 3*self.Nblobs]
-        if (step==self.n_steps-1):
-          output = self.output_name + '.step.' + str(step).zfill(8) + '.lambda_blobs.dat'
-          np.savetxt(output, lambda_blobs)
-        
-        
-
+        output = self.output_name + '.step.' + str(step).zfill(8) + '.lambda_blobs.dat'
+        np.savetxt(output, lambda_blobs)
+         
         # Save velocity fields
         if np.any(self.plot_velocity_field):
           r_vectors_blobs, lambda_blobs_frame = get_r_vectors_frame_body(lambda_blobs, frame_body=-1)
