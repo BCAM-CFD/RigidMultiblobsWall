@@ -62,6 +62,13 @@ for i in range(1,num_steps):
   
 vel_avg = vel_sum /count 
 
+if True:
+
+  mesh.cell_data = {'velocity': [vel_avg]}
+  meshio.write("foo.vtk", mesh)
+
+
+
 
 #meshio.write_points_cells("foo.vtk", points, cells) 
 
