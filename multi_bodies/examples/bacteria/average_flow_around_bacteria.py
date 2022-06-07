@@ -43,25 +43,23 @@ except ImportError as e:
   print(e)
   pass
 
-#grid = [-10, 10, 10, -10, 10, 10, -10, 10, 10]
 
+num_steps = 25
 string = 'plot_velocity_field'
 file_name = 'inputfile_bacteria_constant_torque.dat'
 file = open(file_name, "r")
 
 flag = 0
-index = 0
-  
+index = 0  
 for line in file:  
-    index  = index + 1 
-    if string in line:
-        
-      flag = 1
-      break 
+  index  = index + 1 
+  if string in line:
+    flag = 1
+    break 
 if flag == 0: 
-   print('String', string , 'Not Found') 
+  print('String', string , 'Not Found') 
 else: 
-   print('String', string, 'Found In Line', index)
+  print('String', string, 'Found In Line', index)
 file.close() 
 
 string_line = linecache.getline(file_name, index)
@@ -79,7 +77,6 @@ velocity = vel['velocity'][0]
 vel_sum = np.zeros(velocity.shape)
 
 count = 0
-num_steps = 25
 for i in range(1,num_steps):
   name = 'run_constant_torque.step.'  + str(i).zfill(8)  + '.velocity_field.vtk'
   print(name)
@@ -147,18 +144,5 @@ visit_writer.boost_write_rectilinear_mesh(name,      # File's name
                                             varnames,  # Variables' names
                                             variables) # Variables
   
-
-
-if False:
-  mesh.cell_data = {'velocity': [vel_avg]}
-  mesh = meshio.Mesh(
-    points,
-    cells,
-    cell_data={'velocity': [vel_avg]},
-)
-  
-  meshio.write("foo.vtk",mesh)
-
-
 
 
