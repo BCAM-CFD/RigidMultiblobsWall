@@ -139,6 +139,41 @@ def active_body_slip(body, slip):
   return slip_rotated
 
 
+def calc_slip(bodies, Nblobs, *args, **kwargs):
+  '''
+  Function to calculate the slip in all the blobs.
+  '''
+  slip = np.zeros((Nblobs, 3))
+  a = kwargs.get('blob_radius')
+  eta = kwargs.get('eta')
+  g = kwargs.get('g')
+  r_vectors = get_blobs_r_vectors(bodies, Nblobs)
+
+  #1) Compute slip due to external torques on bodies with single blobs only
+  torque_blobs = multi_bodies_functions.calc_one_blob_torques(r_vectors, blob_radius = a, g = g) 
+
+  if np.amax(np.absolute(torque_blobs))>0:
+    implementation = kwargs.get('implementation')
+    offset = 0
+    for b in bodies:
+      if b.Nblobs>1:
+        torque_blobs[offset:offset+b.Nblobs] = 0.0  
+      offset += b.Nblobs
+    if implementation == 'pycuda':
+      slip_blobs = mb.single_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
+    elif implementation == 'pycuda_no_wall':
+      slip_blobs = mb.no_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
+    slip = np.reshape(-slip_blobs, (Nblobs, 3) ) 
+ 
+  #2) Add prescribed slip 
+  offset = 0
+  for b in bodies:
+    slip_b = b.calc_slip()
+    slip[offset:offset+b.Nblobs] += slip_b
+    offset += b.Nblobs
+  return slip
+
+
 def bodies_external_force_torque(bodies, r_vectors, *args, **kwargs):
   '''
   This function returns the external force-torques acting on the bodies.
