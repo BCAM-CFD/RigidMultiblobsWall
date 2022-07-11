@@ -1179,7 +1179,7 @@ if __name__ == '__main__':
     integrator.first_guess = np.zeros(num_bodies*6 + len(constraints)*3)
 
     
-  integrator.calc_slip = partial(calc_slip,
+  integrator.calc_slip = partial(multi_bodies_functions.calc_slip,
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
                                  eta = a, 
