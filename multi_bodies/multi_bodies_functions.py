@@ -96,7 +96,20 @@ def default_zero_bodies(bodies, *args, **kwargs):
   Return a zero array of shape (2*len(bodies), 3)
   '''
   return np.zeros((2*len(bodies), 3))
-  
+
+
+def get_blobs_r_vectors(bodies, Nblobs):
+  '''
+  Return coordinates of all the blobs with shape (Nblobs, 3).
+  '''
+  r_vectors = np.empty((Nblobs, 3))
+  offset = 0
+  for b in bodies:
+    num_blobs = b.Nblobs
+    r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors()
+    offset += num_blobs
+  return r_vectors
+
 
 def set_slip_by_ID(body, slip, *args, **kwargs):
   '''

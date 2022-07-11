@@ -56,19 +56,6 @@ while found_functions is False:
       sys.exit()
 
 
-def get_blobs_r_vectors(bodies, Nblobs):
-  '''
-  Return coordinates of all the blobs with shape (Nblobs, 3).
-  '''
-  r_vectors = np.empty((Nblobs, 3))
-  offset = 0
-  for b in bodies:
-    num_blobs = b.Nblobs
-    r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors()
-    offset += num_blobs
-  return r_vectors
-
-
 def set_mobility_blobs(implementation):
   '''
   Set the function to compute the dense mobility
@@ -1184,7 +1171,7 @@ if __name__ == '__main__':
                                  blob_radius = a, 
                                  eta = a, 
                                  g = g) 
-  integrator.get_blobs_r_vectors = get_blobs_r_vectors 
+  integrator.get_blobs_r_vectors = multi_bodies_functions.get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
   mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies) 
@@ -1232,7 +1219,7 @@ if __name__ == '__main__':
                                dt * read.sample_HydroGrid, 
                                Nblobs, 
                                0, 
-                               get_blobs_r_vectors(bodies, Nblobs))
+                               multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
 
   # Loop over time steps
@@ -1315,7 +1302,7 @@ if __name__ == '__main__':
                                  dt * read.sample_HydroGrid, 
                                  Nblobs, 
                                  1, 
-                                 get_blobs_r_vectors(bodies, Nblobs))
+                                 multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
     
     # Save HydroGrid data
     if read.save_HydroGrid > 0 and found_HydroGrid and read.call_HydroGrid:
@@ -1331,7 +1318,7 @@ if __name__ == '__main__':
                                    dt * read.sample_HydroGrid, 
                                    Nblobs, 
                                    2, 
-                                   get_blobs_r_vectors(bodies, Nblobs))
+                                   multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
     # Advance time step
     integrator.advance_time_step(dt, step = step)
@@ -1404,7 +1391,7 @@ if __name__ == '__main__':
                                dt * read.sample_HydroGrid, 
                                Nblobs, 
                                1, 
-                               get_blobs_r_vectors(bodies, Nblobs))
+                               multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
   # Save HydroGrid data
   if read.save_HydroGrid > 0 and found_HydroGrid and read.call_HydroGrid:
@@ -1420,7 +1407,7 @@ if __name__ == '__main__':
                                  dt * read.sample_HydroGrid, 
                                  Nblobs, 
                                  2, 
-                                 get_blobs_r_vectors(bodies, Nblobs))
+                                 multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
 
   # Free HydroGrid
@@ -1436,7 +1423,7 @@ if __name__ == '__main__':
                                dt * read.sample_HydroGrid, 
                                Nblobs, 
                                3, 
-                               get_blobs_r_vectors(bodies, Nblobs))
+                               multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
 
   # Save wallclock time 
