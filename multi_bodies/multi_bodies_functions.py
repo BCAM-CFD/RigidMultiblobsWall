@@ -115,7 +115,6 @@ def set_ghost_blobs(b, ghost_blobs):
   '''
   Save into the body b the information of ghost blobs, r_vectors, blobs_radius, force_blobs and K.T * force_blobs.
   '''
-  print('set_ghost_blobs ************************************************')
   b.ghost_reference = ghost_blobs[:,0:3]
   b.ghost_blobs_radius = ghost_blobs[:,3]
   b.ghost_reference_forces = ghost_blobs[:,4:7]
@@ -137,16 +136,10 @@ def set_ghost_blobs(b, ghost_blobs):
   J[2::3,2] = 1.0
 
   # Get K
-  print('J = ', J.shape)
-  print('R = ', rot_matrix.shape)
-  print('\n\n\n')
   K = np.concatenate([J, rot_matrix], axis=1)
-
-  print('b.ghost_reference_forces.flatten() = ', b.ghost_reference_forces.flatten())
   
   # Save K.T * force_blobs
   b.ghost_force_torque = np.dot(K.T, b.ghost_reference_forces.flatten()).reshape((2, 3))
-  print('b.force_torque = ', b.ghost_force_torque)
   return
 
 
