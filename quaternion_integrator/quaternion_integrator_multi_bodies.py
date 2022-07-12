@@ -1601,7 +1601,7 @@ class QuaternionIntegrator(object):
           
         
           r_vectors_blobs, lambda_blobs_frame = self.get_r_vectors_frame_body(lambda_blobs, frame_body=frame_body)
-          pvf.plot_velocity_field(self.plot_velocity_field,
+          pvf.plot_velocity_field(self.plot_velocity_field[0:9],
                                   r_vectors_blobs,
                                   lambda_blobs_frame,
                                   self.a,
@@ -1609,9 +1609,7 @@ class QuaternionIntegrator(object):
                                   self.output_name + '.step.' + str(step).zfill(8),
                                   0,
                                   radius_source=self.radius_blobs,
-                                  mobility_vector_prod_implementation='numba_no_wall')
-        
-                                  
+                                  mobility_vector_prod_implementation='numba_no_wall')                                   
                                                            
         if np.any(self.plot_velocity_field_sphere):
           pvfa.plot_velocity_field(self.bodies,
@@ -1825,7 +1823,7 @@ class QuaternionIntegrator(object):
         r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
         offset += num_blobs
       lambda_blobs_frame = np.copy(lambda_blobs)
-    return r_vectors_frame, lambda_blobs_frame
+    return r_vectors_frame, lambda_blobs_frame.flatten()
   
 
 class gmres_counter(object):

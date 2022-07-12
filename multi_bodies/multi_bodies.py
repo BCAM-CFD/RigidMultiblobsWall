@@ -1206,6 +1206,19 @@ if __name__ == '__main__':
   integrator.calc_C_matrix_constraints = calc_C_matrix_constraints
   integrator.articulated = articulated
   integrator.nonlinear_solver_tolerance = read.nonlinear_solver_tolerance
+  # if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line) and (step % self.n_save) == 0)
+  integrator.n_save = read.n_save
+  integrator.plot_velocity_field = read.plot_velocity_field
+  integrator.plot_velocity_field_sphere = read.plot_velocity_field_sphere
+  integrator.plot_velocity_line = read.plot_velocity_line
+  radius_blobs = []
+  for k, b in enumerate(bodies):
+    radius_blobs.append(b.blobs_radius)
+  radius_blobs = np.concatenate(radius_blobs, axis=0)
+  integrator.radius_blobs = radius_blobs
+  integrator.output_name = output_name
+
+  
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:
