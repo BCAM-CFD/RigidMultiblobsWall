@@ -1169,7 +1169,7 @@ if __name__ == '__main__':
   integrator.calc_slip = partial(multi_bodies_functions.calc_slip,
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
-                                 eta = a, 
+                                 eta = eta, 
                                  g = g,
                                  periodic_length=read.periodic_length) 
   integrator.get_blobs_r_vectors = multi_bodies_functions.get_blobs_r_vectors 
