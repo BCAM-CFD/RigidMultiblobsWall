@@ -1013,9 +1013,6 @@ if __name__ == '__main__':
     slip = None
     if(len(structure) > 2):
       slip = read_slip_file.read_slip_file(structure[2])
-    # Set ghost blobs
-    if (len(structure) > 3) and False:
-      slip = read_slip_file.read_slip_file(structure[3])
     body_types.append(num_bodies_struct)
     body_names.append(structures_ID[ID])
     # Create each body of type structure
@@ -1038,6 +1035,9 @@ if __name__ == '__main__':
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
         b.prescribed_velocity = np.zeros(6)
+      # Set ghost blobs
+      if (len(structure) > 3):
+        multi_bodies_functions.set_ghost_blobs(b, read_vertex_file.read_vertex_file(structure[3]))
       # Append bodies to total bodies list
       bodies.append(b)
 
@@ -1170,7 +1170,8 @@ if __name__ == '__main__':
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
                                  eta = a, 
-                                 g = g) 
+                                 g = g,
+                                 periodic_length=read.periodic_length) 
   integrator.get_blobs_r_vectors = multi_bodies_functions.get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)

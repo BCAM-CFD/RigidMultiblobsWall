@@ -80,6 +80,7 @@ def project_to_periodic_image(r, L):
         r[i] = r[i] - int(r[i] / L[i] + 0.5 * (int(r[i]>0) - int(r[i]<0))) * L[i]
   return r
 
+
 def default_zero_r_vectors(r_vectors, *args, **kwargs):
   return np.zeros((r_vectors.size // 3, 3))
 
@@ -109,6 +110,44 @@ def get_blobs_r_vectors(bodies, Nblobs):
     r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors()
     offset += num_blobs
   return r_vectors
+
+def set_ghost_blobs(b, ghost_blobs):
+  '''
+  Save into the body b the information of ghost blobs, r_vectors, blobs_radius, force_blobs and K.T * force_blobs.
+  '''
+  print('set_ghost_blobs ************************************************')
+  b.ghost_reference = ghost_blobs[:,0:3]
+  b.ghost_blobs_radius = ghost_blobs[:,3]
+  b.ghost_reference_forces = ghost_blobs[:,4:7]
+
+  # Get rot_matrix
+  rot_matrix = np.zeros((b.ghost_reference.shape[0], 3, 3))
+  rot_matrix[:,0,1] = b.ghost_reference[:,2]
+  rot_matrix[:,0,2] = -b.ghost_reference[:,1]
+  rot_matrix[:,1,0] = -b.ghost_reference[:,2]
+  rot_matrix[:,1,2] = b.ghost_reference[:,0]
+  rot_matrix[:,2,0] = b.ghost_reference[:,1]
+  rot_matrix[:,2,1] = -b.ghost_reference[:,0]
+  rot_matrix = rot_matrix.reshape((rot_matrix.size // 3, 3))
+
+  # Get J matrix
+  J = np.zeros((b.ghost_reference.size, 3))
+  J[0::3,0] = 1.0
+  J[1::3,1] = 1.0
+  J[2::3,2] = 1.0
+
+  # Get K
+  print('J = ', J.shape)
+  print('R = ', rot_matrix.shape)
+  print('\n\n\n')
+  K = np.concatenate([J, rot_matrix], axis=1)
+
+  print('b.ghost_reference_forces.flatten() = ', b.ghost_reference_forces.flatten())
+  
+  # Save K.T * force_blobs
+  b.ghost_force_torque = np.dot(K.T, b.ghost_reference_forces.flatten()).reshape((2, 3))
+  print('b.force_torque = ', b.ghost_force_torque)
+  return
 
 
 def set_slip_by_ID(body, slip, *args, **kwargs):
