@@ -111,6 +111,66 @@ def get_blobs_r_vectors(bodies, Nblobs):
     offset += num_blobs
   return r_vectors
 
+
+def get_vectors_frame_body(bodies, lambda_blobs, radius_blobs, frame_body):
+  '''
+  Get blobs r_vectors, forces and blob_radius in the frame of reference of one body if frame_body >= 0.
+  '''
+  r_vectors_frame = np.empty((lambda_blobs.size // 3, 3))
+  lambda_blobs_frame = np.empty((lambda_blobs.size // 3, 3))
+  offset = 0
+  if frame_body >= 0:
+    R0 = bodies[frame_body].orientation.rotation_matrix().T
+    theta0 = bodies[frame_body].orientation.inverse()
+
+    lambda_blobs = np.copy(lambda_blobs.reshape((lambda_blobs.size // 3, 3)))
+    for i in range(lambda_blobs.shape[0]):
+      lambda_blobs_frame[i] = np.dot(R0, lambda_blobs[i])
+
+    r_vectors_all = [r_vectors_frame]
+    lambda_blobs_all = [lambda_blobs_frame]
+    radius_blobs_all = [radius_blobs]
+    for b in bodies:
+      location = np.dot(R0, (b.location - bodies[frame_body].location))
+      orientation = theta0 * b.orientation
+      num_blobs = b.Nblobs
+      r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
+      offset += num_blobs
+
+      if hasattr(b, 'ghost_force_torque'):
+        r_vectors_all.append(location + np.dot(b.ghost_reference, orientation.rotation_matrix().T))
+        lambda_blobs_all.append(np.dot(b.ghost_reference_forces, orientation.rotation_matrix().T))
+        radius_blobs_all.append(b.ghost_blobs_radius)
+
+    # Concatenate blobs and ghost blobs info
+    r_vectors_all = np.vstack(r_vectors_all)
+    lambda_blobs_all = np.vstack(lambda_blobs_all)
+    radius_source_all = np.concatenate(radius_blobs_all)
+
+  else:
+    r_vectors_all = [r_vectors_frame]
+    lambda_blobs_all = [lambda_blobs.reshape((lambda_blobs.size // 3, 3))]
+    radius_blobs_all = [radius_blobs]
+    for b in bodies:
+      location = b.location
+      orientation = b.orientation
+      num_blobs = b.Nblobs
+      r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
+      offset += num_blobs
+
+      if hasattr(b, 'ghost_force_torque'):
+        r_vectors_all.append(b.location + np.dot(b.ghost_reference, b.orientation.rotation_matrix().T))
+        lambda_blobs_all.append(np.dot(b.ghost_reference_forces, b.orientation.rotation_matrix().T))
+        radius_blobs_all.append(b.ghost_blobs_radius)
+
+    # Concatenate blobs and ghost blobs info
+    r_vectors_all = np.vstack(r_vectors_all)
+    lambda_blobs_all = np.vstack(lambda_blobs_all)
+    radius_source_all = np.concatenate(radius_blobs_all)
+
+  return r_vectors_all, lambda_blobs_all.flatten(), radius_source_all
+
+
 def set_ghost_blobs(b, ghost_blobs):
   '''
   Save into the body b the information of ghost blobs, r_vectors, blobs_radius, force_blobs and K.T * force_blobs.
