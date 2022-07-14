@@ -1600,7 +1600,7 @@ class QuaternionIntegrator(object):
           frame_body = int(-1 if self.plot_velocity_field.size < 10 else self.plot_velocity_field[9])
           
         
-          r_vectors_blobs, lambda_blobs_frame = self.get_r_vectors_frame_body(lambda_blobs, frame_body=frame_body)
+          r_vectors_blobs, lambda_blobs_frame, radius_source = self.get_vectors_frame_body(lambda_blobs, frame_body=frame_body)        
           pvf.plot_velocity_field(self.plot_velocity_field[0:9],
                                   r_vectors_blobs,
                                   lambda_blobs_frame,
@@ -1608,7 +1608,7 @@ class QuaternionIntegrator(object):
                                   self.eta,
                                   self.output_name + '.step.' + str(step).zfill(8),
                                   0,
-                                  radius_source=self.radius_blobs,
+                                  radius_source=radius_source,
                                   mobility_vector_prod_implementation='numba_no_wall')                                   
                                                            
         if np.any(self.plot_velocity_field_sphere):
@@ -1795,36 +1795,63 @@ class QuaternionIntegrator(object):
     # Return true or false
     return valid_configuration
 
-  def get_r_vectors_frame_body(self,lambda_blobs, frame_body):
+  def get_vectors_frame_body(self,lambda_blobs, frame_body):
     '''
-    Get blobs r_vectors and forces in the frame of reference of one body. 
+    Get blobs r_vectors, forces and blob_radius in the frame of reference of one body if frame_body >= 0.
     '''
-    # Get r_vectors, rotation to body 0 frame of reference if frame_body=True
     r_vectors_frame = np.empty((lambda_blobs.size // 3, 3))
     lambda_blobs_frame = np.empty((lambda_blobs.size // 3, 3))
     offset = 0
     if frame_body >= 0:
       R0 = self.bodies[frame_body].orientation.rotation_matrix().T
       theta0 = self.bodies[frame_body].orientation.inverse()
+
+      lambda_blobs = np.copy(lambda_blobs.reshape((lambda_blobs.size // 3, 3)))
+      for i in range(lambda_blobs.shape[0]):
+        lambda_blobs_frame[i] = np.dot(R0, lambda_blobs[i])
+      
+      r_vectors_all = [r_vectors_frame]
+      lambda_blobs_all = [lambda_blobs_frame]
+      radius_blobs_all = [self.radius_blobs]
       for b in self.bodies:
         location = np.dot(R0, (b.location - self.bodies[frame_body].location))
         orientation = theta0 * b.orientation
         num_blobs = b.Nblobs
         r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
         offset += num_blobs
-      lambda_blobs = np.copy(lambda_blobs.reshape((lambda_blobs.size // 3, 3)))
-      for i in range(lambda_blobs.shape[0]):
-        lambda_blobs_frame[i] = np.dot(R0, lambda_blobs[i])
-    else:    
+
+        if hasattr(b, 'ghost_force_torque'):
+          r_vectors_all.append(location + np.dot(b.ghost_reference, orientation.rotation_matrix().T))
+          lambda_blobs_all.append(np.dot(b.ghost_reference_forces, orientation.rotation_matrix().T))
+          radius_blobs_all.append(b.ghost_blobs_radius)
+
+      # Concatenate blobs and ghost blobs info
+      r_vectors_all = np.vstack(r_vectors_all)
+      lambda_blobs_all = np.vstack(lambda_blobs_all)
+      radius_source_all = np.concatenate(radius_blobs_all)
+
+    else:
+      r_vectors_all = [r_vectors_frame]
+      lambda_blobs_all = [lambda_blobs.reshape((lambda_blobs.size // 3, 3))]
+      radius_blobs_all = [self.radius_blobs]
       for b in self.bodies:
         location = b.location
         orientation = b.orientation
         num_blobs = b.Nblobs
         r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
         offset += num_blobs
-      lambda_blobs_frame = np.copy(lambda_blobs)
-    return r_vectors_frame, lambda_blobs_frame.flatten()
-  
+
+        if hasattr(b, 'ghost_force_torque'):
+          r_vectors_all.append(b.location + np.dot(b.ghost_reference, b.orientation.rotation_matrix().T))
+          lambda_blobs_all.append(np.dot(b.ghost_reference_forces, b.orientation.rotation_matrix().T))
+          radius_blobs_all.append(b.ghost_blobs_radius)
+
+      # Concatenate blobs and ghost blobs info
+      r_vectors_all = np.vstack(r_vectors_all)
+      lambda_blobs_all = np.vstack(lambda_blobs_all)
+      radius_source_all = np.concatenate(radius_blobs_all)
+
+    return r_vectors_all, lambda_blobs_all.flatten(), radius_source_all
 
 class gmres_counter(object):
   '''
