@@ -80,6 +80,7 @@ def project_to_periodic_image(r, L):
         r[i] = r[i] - int(r[i] / L[i] + 0.5 * (int(r[i]>0) - int(r[i]<0))) * L[i]
   return r
 
+
 def default_zero_r_vectors(r_vectors, *args, **kwargs):
   return np.zeros((r_vectors.size // 3, 3))
 
@@ -96,7 +97,111 @@ def default_zero_bodies(bodies, *args, **kwargs):
   Return a zero array of shape (2*len(bodies), 3)
   '''
   return np.zeros((2*len(bodies), 3))
+
+
+def get_blobs_r_vectors(bodies, Nblobs):
+  '''
+  Return coordinates of all the blobs with shape (Nblobs, 3).
+  '''
+  r_vectors = np.empty((Nblobs, 3))
+  offset = 0
+  for b in bodies:
+    num_blobs = b.Nblobs
+    r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors()
+    offset += num_blobs
+  return r_vectors
+
+
+def get_vectors_frame_body(bodies, lambda_blobs, radius_blobs, frame_body):
+  '''
+  Get blobs r_vectors, forces and blob_radius in the frame of reference of one body if frame_body >= 0.
+  '''
+  r_vectors_frame = np.empty((lambda_blobs.size // 3, 3))
+  lambda_blobs_frame = np.empty((lambda_blobs.size // 3, 3))
+  offset = 0
+  if frame_body >= 0:
+    R0 = bodies[frame_body].orientation.rotation_matrix().T
+    theta0 = bodies[frame_body].orientation.inverse()
+
+    lambda_blobs = np.copy(lambda_blobs.reshape((lambda_blobs.size // 3, 3)))
+    for i in range(lambda_blobs.shape[0]):
+      lambda_blobs_frame[i] = np.dot(R0, lambda_blobs[i])
+
+    r_vectors_all = [r_vectors_frame]
+    lambda_blobs_all = [lambda_blobs_frame]
+    radius_blobs_all = [radius_blobs]
+    for b in bodies:
+      location = np.dot(R0, (b.location - bodies[frame_body].location))
+      orientation = theta0 * b.orientation
+      num_blobs = b.Nblobs
+      r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
+      offset += num_blobs
+
+      if hasattr(b, 'ghost_force_torque'):
+        r_vectors_all.append(location + np.dot(b.ghost_reference, orientation.rotation_matrix().T))
+        lambda_blobs_all.append(np.dot(b.ghost_reference_forces, orientation.rotation_matrix().T))
+        radius_blobs_all.append(b.ghost_blobs_radius)
+
+    # Concatenate blobs and ghost blobs info
+    r_vectors_all = np.vstack(r_vectors_all)
+    lambda_blobs_all = np.vstack(lambda_blobs_all)
+    radius_source_all = np.concatenate(radius_blobs_all)
+
+  else:
+    r_vectors_all = [r_vectors_frame]
+    lambda_blobs_all = [lambda_blobs.reshape((lambda_blobs.size // 3, 3))]
+    radius_blobs_all = [radius_blobs]
+    for b in bodies:
+      location = b.location
+      orientation = b.orientation
+      num_blobs = b.Nblobs
+      r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
+      offset += num_blobs
+
+      if hasattr(b, 'ghost_force_torque'):
+        r_vectors_all.append(b.location + np.dot(b.ghost_reference, b.orientation.rotation_matrix().T))
+        lambda_blobs_all.append(np.dot(b.ghost_reference_forces, b.orientation.rotation_matrix().T))
+        radius_blobs_all.append(b.ghost_blobs_radius)
+
+    # Concatenate blobs and ghost blobs info
+    r_vectors_all = np.vstack(r_vectors_all)
+    lambda_blobs_all = np.vstack(lambda_blobs_all)
+    radius_source_all = np.concatenate(radius_blobs_all)
+
+  return r_vectors_all, lambda_blobs_all.flatten(), radius_source_all
+
+
+def set_ghost_blobs(b, ghost_blobs):
+  '''
+  Save into the body b the information of ghost blobs, r_vectors, blobs_radius, force_blobs and K.T * force_blobs.
+  '''
+  b.ghost_reference = ghost_blobs[:,0:3]
+  b.ghost_blobs_radius = ghost_blobs[:,3]
+  b.ghost_reference_forces = ghost_blobs[:,4:7]
+
+  # Get rot_matrix
+  rot_matrix = np.zeros((b.ghost_reference.shape[0], 3, 3))
+  rot_matrix[:,0,1] = b.ghost_reference[:,2]
+  rot_matrix[:,0,2] = -b.ghost_reference[:,1]
+  rot_matrix[:,1,0] = -b.ghost_reference[:,2]
+  rot_matrix[:,1,2] = b.ghost_reference[:,0]
+  rot_matrix[:,2,0] = b.ghost_reference[:,1]
+  rot_matrix[:,2,1] = -b.ghost_reference[:,0]
+  rot_matrix = rot_matrix.reshape((rot_matrix.size // 3, 3))
+
+  # Get J matrix
+  J = np.zeros((b.ghost_reference.size, 3))
+  J[0::3,0] = 1.0
+  J[1::3,1] = 1.0
+  J[2::3,2] = 1.0
+
+  # Get K
+  K = np.concatenate([J, rot_matrix], axis=1)
   
+  # Save K.T * force_blobs
+  b.ghost_force_torque = np.dot(K.T, b.ghost_reference_forces.flatten()).reshape((2, 3))
+  return
+
 
 def set_slip_by_ID(body, slip, *args, **kwargs):
   '''
@@ -137,6 +242,41 @@ def active_body_slip(body, slip):
   for i in range(body.Nblobs):
     slip_rotated[i] = np.dot(rotation_matrix, slip[i])
   return slip_rotated
+
+
+def calc_slip(bodies, Nblobs, *args, **kwargs):
+  '''
+  Function to calculate the slip in all the blobs.
+  '''
+  slip = np.zeros((Nblobs, 3))
+  a = kwargs.get('blob_radius')
+  eta = kwargs.get('eta')
+  g = kwargs.get('g')
+  r_vectors = get_blobs_r_vectors(bodies, Nblobs)
+
+  #1) Compute slip due to external torques on bodies with single blobs only
+  torque_blobs = calc_one_blob_torques(r_vectors, blob_radius = a, g = g)
+
+  if np.amax(np.absolute(torque_blobs))>0:
+    implementation = kwargs.get('implementation')
+    offset = 0
+    for b in bodies:
+      if b.Nblobs>1:
+        torque_blobs[offset:offset+b.Nblobs] = 0.0  
+      offset += b.Nblobs
+    if implementation == 'pycuda':
+      slip_blobs = mb.single_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
+    elif implementation == 'pycuda_no_wall':
+      slip_blobs = mb.no_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
+    slip = np.reshape(-slip_blobs, (Nblobs, 3) ) 
+ 
+  #2) Add prescribed slip 
+  offset = 0
+  for b in bodies:
+    slip_b = b.calc_slip()
+    slip[offset:offset+b.Nblobs] += slip_b
+    offset += b.Nblobs
+  return slip
 
 
 def bodies_external_force_torque(bodies, r_vectors, *args, **kwargs):

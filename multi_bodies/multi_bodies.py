@@ -54,52 +54,6 @@ while found_functions is False:
     if len(path_to_append) > 21:
       print('\nProjected functions not found. Edit path in multi_bodies.py')
       sys.exit()
-def calc_slip(bodies, Nblobs, *args, **kwargs):
-  '''
-  Function to calculate the slip in all the blobs.
-  '''
-  slip = np.zeros((Nblobs, 3))
-  a = kwargs.get('blob_radius')
-  eta = kwargs.get('eta')
-  g = kwargs.get('g')
-  r_vectors = get_blobs_r_vectors(bodies, Nblobs)
-
-  #1) Compute slip due to external torques on bodies with single blobs only
-  torque_blobs = multi_bodies_functions.calc_one_blob_torques(r_vectors, blob_radius = a, g = g) 
-
-  if np.amax(np.absolute(torque_blobs))>0:
-    implementation = kwargs.get('implementation')
-    offset = 0
-    for b in bodies:
-      if b.Nblobs>1:
-        torque_blobs[offset:offset+b.Nblobs] = 0.0  
-      offset += b.Nblobs
-    if implementation == 'pycuda':
-      slip_blobs = mb.single_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
-    elif implementation == 'pycuda_no_wall':
-      slip_blobs = mb.no_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
-    slip = np.reshape(-slip_blobs, (Nblobs, 3) ) 
- 
-  #2) Add prescribed slip 
-  offset = 0
-  for b in bodies:
-    slip_b = b.calc_slip()
-    slip[offset:offset+b.Nblobs] += slip_b
-    offset += b.Nblobs
-  return slip
-
-
-def get_blobs_r_vectors(bodies, Nblobs):
-  '''
-  Return coordinates of all the blobs with shape (Nblobs, 3).
-  '''
-  r_vectors = np.empty((Nblobs, 3))
-  offset = 0
-  for b in bodies:
-    num_blobs = b.Nblobs
-    r_vectors[offset:(offset+num_blobs)] = b.get_r_vectors()
-    offset += num_blobs
-  return r_vectors
 
 
 def set_mobility_blobs(implementation):
@@ -1081,6 +1035,9 @@ if __name__ == '__main__':
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
         b.prescribed_velocity = np.zeros(6)
+      # Set ghost blobs
+      if (len(structure) > 3):
+        multi_bodies_functions.set_ghost_blobs(b, read_vertex_file.read_vertex_file(structure[3]))
       # Append bodies to total bodies list
       bodies.append(b)
 
@@ -1209,12 +1166,13 @@ if __name__ == '__main__':
     integrator.first_guess = np.zeros(num_bodies*6 + len(constraints)*3)
 
     
-  integrator.calc_slip = partial(calc_slip,
+  integrator.calc_slip = partial(multi_bodies_functions.calc_slip,
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
-                                 eta = a, 
-                                 g = g) 
-  integrator.get_blobs_r_vectors = get_blobs_r_vectors 
+                                 eta = eta, 
+                                 g = g,
+                                 periodic_length=read.periodic_length) 
+  integrator.get_blobs_r_vectors = multi_bodies_functions.get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
   mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies) 
@@ -1248,6 +1206,19 @@ if __name__ == '__main__':
   integrator.calc_C_matrix_constraints = calc_C_matrix_constraints
   integrator.articulated = articulated
   integrator.nonlinear_solver_tolerance = read.nonlinear_solver_tolerance
+  # if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line) and (step % self.n_save) == 0)
+  integrator.n_save = read.n_save
+  integrator.plot_velocity_field = read.plot_velocity_field
+  integrator.plot_velocity_field_sphere = read.plot_velocity_field_sphere
+  integrator.plot_velocity_line = read.plot_velocity_line
+  radius_blobs = []
+  for k, b in enumerate(bodies):
+    radius_blobs.append(b.blobs_radius)
+  radius_blobs = np.concatenate(radius_blobs, axis=0)
+  integrator.radius_blobs = radius_blobs
+  integrator.output_name = output_name
+
+  
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:
@@ -1262,7 +1233,7 @@ if __name__ == '__main__':
                                dt * read.sample_HydroGrid, 
                                Nblobs, 
                                0, 
-                               get_blobs_r_vectors(bodies, Nblobs))
+                               multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
 
   # Loop over time steps
@@ -1345,7 +1316,7 @@ if __name__ == '__main__':
                                  dt * read.sample_HydroGrid, 
                                  Nblobs, 
                                  1, 
-                                 get_blobs_r_vectors(bodies, Nblobs))
+                                 multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
     
     # Save HydroGrid data
     if read.save_HydroGrid > 0 and found_HydroGrid and read.call_HydroGrid:
@@ -1361,7 +1332,7 @@ if __name__ == '__main__':
                                    dt * read.sample_HydroGrid, 
                                    Nblobs, 
                                    2, 
-                                   get_blobs_r_vectors(bodies, Nblobs))
+                                   multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
     # Advance time step
     integrator.advance_time_step(dt, step = step)
@@ -1434,7 +1405,7 @@ if __name__ == '__main__':
                                dt * read.sample_HydroGrid, 
                                Nblobs, 
                                1, 
-                               get_blobs_r_vectors(bodies, Nblobs))
+                               multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
   # Save HydroGrid data
   if read.save_HydroGrid > 0 and found_HydroGrid and read.call_HydroGrid:
@@ -1450,7 +1421,7 @@ if __name__ == '__main__':
                                  dt * read.sample_HydroGrid, 
                                  Nblobs, 
                                  2, 
-                                 get_blobs_r_vectors(bodies, Nblobs))
+                                 multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
 
   # Free HydroGrid
@@ -1466,7 +1437,7 @@ if __name__ == '__main__':
                                dt * read.sample_HydroGrid, 
                                Nblobs, 
                                3, 
-                               get_blobs_r_vectors(bodies, Nblobs))
+                               multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs))
 
 
   # Save wallclock time 
