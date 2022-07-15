@@ -357,7 +357,7 @@ if __name__ ==  '__main__':
   if read.scheme == 'mobility':
     start_time = time.time()  
     # Get blobs coordinates
-    r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs)
+    r_vectors_blobs = multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs)
 
     # Use the code to compute force-torques on bodies if a file was not given
     if read.force_file is None:
@@ -409,7 +409,7 @@ if __name__ ==  '__main__':
     A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
 
     # 4. Pack preconditioner 
-    r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs)
+    r_vectors_blobs = multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs)
     PC_partial = multi_bodies.build_block_diagonal_preconditioner(bodies, articulated, r_vectors_blobs, Nblobs, read.eta, read.blob_radius, step=0, update_PC=1)
     PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
 
@@ -457,7 +457,7 @@ if __name__ ==  '__main__':
   elif read.scheme == 'resistance': 
     start_time = time.time() 
     # Get blobs coordinates 
-    r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs) 
+    r_vectors_blobs = multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs) 
     
     # Calculate block-diagonal matrix K
     K = multi_bodies.calc_K_matrix(bodies, Nblobs)
@@ -489,7 +489,7 @@ if __name__ ==  '__main__':
   
   elif read.scheme == 'body_mobility': 
     start_time = time.time()
-    r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs)
+    r_vectors_blobs = multi_bodies_functions.get_blobs_r_vectors(bodies, Nblobs)
     mobility_blobs = multi_bodies.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius)
     resistance_blobs = np.linalg.inv(mobility_blobs)
     K = multi_bodies.calc_K_matrix(bodies, Nblobs)

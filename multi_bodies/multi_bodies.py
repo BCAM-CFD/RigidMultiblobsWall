@@ -1172,7 +1172,8 @@ if __name__ == '__main__':
                                  eta = eta, 
                                  g = g,
                                  periodic_length=read.periodic_length) 
-  integrator.get_blobs_r_vectors = multi_bodies_functions.get_blobs_r_vectors 
+  integrator.get_blobs_r_vectors = multi_bodies_functions.get_blobs_r_vectors
+  integrator.get_vectors_frame_body = multi_bodies_functions..get_vectors_frame_body
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
   mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies) 
