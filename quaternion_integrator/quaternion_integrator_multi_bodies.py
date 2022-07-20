@@ -1585,7 +1585,7 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)]
 
-      if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line) and (step % self.n_save) == 0):
+      if (np.any(self.plot_velocity_field) or np.any(self.plot_velocity_field_sphere) or np.any(self.plot_velocity_line)) and (step % self.n_save) == 0:
         
         output = self.output_name + '.step.' + str(step).zfill(8) + '.velocities.dat'
         np.savetxt(output, velocities)
