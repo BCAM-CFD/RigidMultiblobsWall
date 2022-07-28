@@ -144,6 +144,7 @@ if __name__ == '__main__':
     cutoff = read.Lub_Cut         
     n_steps = read.n_steps 
     n_save = read.n_save
+    initial_step = read.initial_step
     dt = read.dt 
 
     # Create integrator
@@ -200,7 +201,7 @@ if __name__ == '__main__':
 
     # Time loop
     start_time = time.time()
-    for n in range(n_steps):      
+    for n in range(initial_step, n_steps): 
       # Save data if...
       if (n % n_save) == 0 and n >= 0:
         elapsed_time = time.time() - start_time
