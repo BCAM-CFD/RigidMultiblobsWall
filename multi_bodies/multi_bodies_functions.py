@@ -548,13 +548,17 @@ def force_torque_calculator_sort_by_bodies(bodies, r_vectors, *args, **kwargs):
   # Create auxiliar variables
   Nblobs = r_vectors.size // 3
   force_torque_bodies = np.zeros((2*len(bodies), 3))
-  force_blobs = np.zeros((Nblobs, 3))
   blob_mass = 1.0
   blob_radius = bodies[0].blob_radius
 
+  # # Get ghost blobs
+  # r_ghosts = user_defined_functions.get_ghost_blobs_r_vectors(bodies)
+  # if r_ghosts.size > 0:
+  #   r_vectors = np.vstack([r_vectors, r_ghosts])
+    
   # Compute one-blob forces (same function for all blobs)
-  force_blobs += calc_one_blob_forces(r_vectors, blob_radius = blob_radius, blob_mass = blob_mass, *args, **kwargs)
-
+  force_blobs = calc_one_blob_forces(r_vectors, blob_radius = blob_radius, blob_mass = blob_mass, *args, **kwargs)
+  
   # Compute blob-blob forces (same function for all pair of blobs)
   force_blobs += calc_blob_blob_forces(r_vectors, blob_radius = blob_radius, *args, **kwargs)  
   # Compute body force-torque forces from blob forces
@@ -567,6 +571,14 @@ def force_torque_calculator_sort_by_bodies(bodies, r_vectors, *args, **kwargs):
     force_torque_bodies[2*k+1:2*k+2] += np.dot(R.T, np.reshape(force_blobs[offset:(offset+b.Nblobs)], 3*b.Nblobs))
     offset += b.Nblobs
 
+    # if hasattr(b, 'ghost_reference'):
+    #   # Add force to the body ghost
+    #   force_torque_bodies[2*k:(2*k+1)] += sum(force_blobs[offset:(offset+b.ghost_reference.shape[0])])
+    #   # Add torque to the body
+    #   R = b.calc_rot_matrix_ghost()  
+    #   force_torque_bodies[2*k+1:2*k+2] += np.dot(R.T, np.reshape(force_blobs[offset:(offset+b.ghost_reference.shape[0])], 3*b.ghost_reference.shape[0]))
+    #   offset += b.ghost_reference.shape[0]
+    
   # Add one-body external force-torque
   force_torque_bodies += bodies_external_force_torque(bodies, r_vectors, *args, **kwargs)
 
@@ -603,4 +615,3 @@ if os.path.isfile('user_defined_functions.py'):
   user_defined_functions_found = True
 if user_defined_functions_found:
   import user_defined_functions
-

@@ -232,3 +232,55 @@ class Body(object):
 
 
     
+  def get_r_vectors_ghost(self, location = None, orientation = None):
+    '''
+    Return the coordinates of the blobs.
+    '''
+    # Get location and orientation
+    if location is None:
+      location = self.location
+    if orientation is None:
+      orientation = self.orientation
+
+    # Compute blobs coordinates
+    rotation_matrix = orientation.rotation_matrix()
+    r_vectors = np.dot(self.ghost_reference, rotation_matrix.T)
+    r_vectors += location
+    return r_vectors   
+
+
+  def calc_rot_matrix_ghost(self, location = None, orientation = None):
+    ''' 
+    Calculate the matrix R, where the i-th 3x3 block of R gives
+    (R_i x) = -1 (r_i cross x).
+    R has shape (3*Nblobs_ghost, 3).
+    '''
+    r_vectors = self.get_r_vectors_ghost(location, orientation) - (self.location if location is None else location)    
+    rot_matrix = np.zeros((r_vectors.shape[0], 3, 3))
+    rot_matrix[:,0,1] = r_vectors[:,2]
+    rot_matrix[:,0,2] = -r_vectors[:,1]
+    rot_matrix[:,1,0] = -r_vectors[:,2]
+    rot_matrix[:,1,2] = r_vectors[:,0]
+    rot_matrix[:,2,0] = r_vectors[:,1]
+    rot_matrix[:,2,1] = -r_vectors[:,0]
+
+    return np.reshape(rot_matrix, (3*self.ghost_reference.shape[0], 3))
+
+
+  def calc_J_matrix_ghost(self):
+    '''
+    Returns a block matrix with dimensions (Nblobs_ghost, 1)
+    with each block being a 3x3 identity matrix.
+    '''  
+    J = np.zeros((3*self.ghost_reference.shape[0], 3))
+    J[0::3,0] = 1.0
+    J[1::3,1] = 1.0
+    J[2::3,2] = 1.0
+    return J
+
+
+  def calc_K_matrix_ghost(self, location = None, orientation = None):
+    '''
+    Return geometric matrix K = [J, rot] with shape (3*Nblobs_ghost, 6)
+    '''
+    return np.concatenate([self.calc_J_matrix_ghost(), self.calc_rot_matrix_ghost(location, orientation)], axis=1)

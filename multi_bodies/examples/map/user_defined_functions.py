@@ -7,7 +7,6 @@ from mobility import mobility as mob
 import multi_bodies_functions
 from multi_bodies_functions import *
 
-
 def set_slip_by_ID_new(body, slip, *args, **kwargs):
   '''
   This function assign a slip function to each body.
@@ -142,3 +141,4 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
       force_torque[2*k + 1] = -np.dot(b.ghost_force_torque[1], b.orientation.rotation_matrix().T)
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
+
