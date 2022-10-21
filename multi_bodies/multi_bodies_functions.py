@@ -115,25 +115,47 @@ def get_blobs_r_vectors(bodies, Nblobs):
 def get_vectors_frame_body(bodies, lambda_blobs, radius_blobs, frame_body):
   '''
   Get blobs r_vectors, forces and blob_radius in the frame of reference of one body if frame_body >= 0.
+
+  Inputs:
+  bodies = list of bodies objects.
+  lambda_blobs = force on all blobs.
+  radius_blobs = radius of all blobs.
+  frame_body = body to use as reference frame. If frame_body < 0 use laboratory reference frame.
+
+  Outputs:
+  r_vectors_blobs = blob positions in the body "frame_body" frame  of reference.
+  lambda_blobs_frame = blob on forces in the body "frame_body" frame  of reference. 
+                       Note that forces are not translated but are rotated.
+  radius_source = radius of the blobs.
   '''
+
+  # Prepare arrays
   r_vectors_frame = np.empty((lambda_blobs.size // 3, 3))
   lambda_blobs_frame = np.empty((lambda_blobs.size // 3, 3))
+
+  # Blobs offset, each body can have different number of blobs.
   offset = 0
   if frame_body >= 0:
+    # Get reference body rotation matrix. R0 rotates vectors to the body frame of reference.
     R0 = bodies[frame_body].orientation.rotation_matrix().T
     theta0 = bodies[frame_body].orientation.inverse()
 
+    # Rotate force on blobs
     lambda_blobs = np.copy(lambda_blobs.reshape((lambda_blobs.size // 3, 3)))
     for i in range(lambda_blobs.shape[0]):
       lambda_blobs_frame[i] = np.dot(R0, lambda_blobs[i])
 
+    # Translate and rotate blob postions
     r_vectors_all = [r_vectors_frame]
     lambda_blobs_all = [lambda_blobs_frame]
     radius_blobs_all = [radius_blobs]
     for b in bodies:
+      # The position of body b is translated and rotated to the frame reference of "frame_body"
       location = np.dot(R0, (b.location - bodies[frame_body].location))
+      # The orientation of body b is rotated to the frame reference of "frame_body"
       orientation = theta0 * b.orientation
       num_blobs = b.Nblobs
+      # The blobs positions are computed at the new position and orientation
       r_vectors_frame[offset:(offset+num_blobs)] = b.get_r_vectors(location=location, orientation=orientation)
       offset += num_blobs
 
@@ -148,6 +170,7 @@ def get_vectors_frame_body(bodies, lambda_blobs, radius_blobs, frame_body):
     radius_source_all = np.concatenate(radius_blobs_all)
 
   else:
+    # If frame_body < 0 use the lab frame of reference; i.e. do not translate or rotate anything
     r_vectors_all = [r_vectors_frame]
     lambda_blobs_all = [lambda_blobs.reshape((lambda_blobs.size // 3, 3))]
     radius_blobs_all = [radius_blobs]
