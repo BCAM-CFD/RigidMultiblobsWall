@@ -194,6 +194,37 @@ def calc_K_matrix(bodies, Nblobs):
     offset += b.Nblobs
   return K
 
+##########################################################################################
+def calc_Pll_matrix(bodies, Nblobs):
+  '''
+  Calculate the geometric block-diagonal matrix P.
+  Shape (3*Nblobs, 6*Nbodies).
+  '''
+  Pll = np.zeros((3*Nblobs, 6*len(bodies)))
+  offset = 0
+  for k, b in enumerate(bodies):
+    Pll_body = b.calc_Pll_matrix()
+    Pll[3*offset:3*(offset+b.Nblobs), 6*k:6*k+6] = Pll_body
+    offset += b.Nblobs
+  return Pll
+##########################################################################################
+# Python code to print identity matrix  https://www.geeksforgeeks.org/program-print-identity-matrix/
+# Function to print identity matrix
+def calc_Id_matrix(bodies, Nblobs):
+    
+    Id = np.zeros((3*Nblobs, 6*len(bodies)))
+    offset = 0
+    for row in range(0, Nblobs):
+        for col in range(0, bodies):
+            # Here end is used to stay in same line
+            if (row == col):
+                Id[row,col] = 1 
+            else:
+                Id[row,col] = 0
+        print()
+        offset += b.Nblobs
+    return Id
+##########################################################################################
 
 def calc_K_matrix_bodies(bodies, Nblobs):
   '''
@@ -206,6 +237,21 @@ def calc_K_matrix_bodies(bodies, Nblobs):
     K.append(K_body)
   return K
 
+############################################################
+def calc_Pll_matrix_bodies(bodies, Nblobs):
+  '''
+  Calculate the geometric matrix K for
+  each body. List of shape (3*Nblobs, 6*Nbodies).
+  '''
+  Pll = []
+  for k, b in enumerate(bodies):
+    Pll_body = b.calc_Pll_matrix()
+    Pll.append(Pll_body)
+  return Pll
+#vector=np.array([1,2,3])
+#unit_vector = vector / (vector**2).sum()**0.5
+#unit_vector = vector / np.linalg.norm(vector)
+############################################################
 
 def calc_C_matrix_constraints(constraints):
   '''
@@ -239,6 +285,48 @@ def K_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
     result[offset : offset+b.Nblobs] = np.reshape(np.dot(K, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
     offset += b.Nblobs    
   return result
+
+#########################################################################################33
+def Pll_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
+  '''
+  Compute the matrix vector product Pll*vector where
+  Pll is the Projector operator matrix.
+  ''' 
+  # Prepare variables
+  result = np.empty((Nblobs, 3))
+  v = np.reshape(vector, (len(bodies) * 6))
+
+  # Loop over bodies
+  offset = 0
+  for k, b in enumerate(bodies):
+    if K_bodies is None:
+      Pll = b.calc_Pll_matrix()
+    else:
+      Pll = K_bodies[k] 
+    result[offset : offset+b.Nblobs] = np.reshape(np.dot(Pll, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
+    offset += b.Nblobs    
+  return result
+
+def Id_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
+  '''
+  Compute the matrix vector product I*vector where
+  I is the Identity matrix 
+  ''' 
+  # Prepare variables
+  result = np.empty((Nblobs, 3))
+  v = np.reshape(vector, (len(bodies) * 6))
+
+  # Loop over bodies
+  offset = 0
+  for k, b in enumerate(bodies):
+    if K_bodies is None:
+      Id = b.calc_Id_matrix()
+    else:
+      Id = K_bodies[k] 
+    result[offset : offset+b.Nblobs] = np.reshape(np.dot(Id, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
+    offset += b.Nblobs    
+  return result
+############################################################################################
 
 
 def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
@@ -333,7 +421,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   Ncomp_phi = 3 * Nconstraints
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
   res = np.empty((Ncomp_tot))
-  v = np.reshape(vector, (vector.size//3, 3))
+  v = np.reshape(vector, (.size//3, 3))
   
   # Compute the "slip" part
   res[0:Ncomp_blobs] = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
@@ -343,6 +431,40 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
   # Add constraint forces if any
+
+##############################################################################################
+def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, *args, **kwargs):
+  '''
+  The linear operator is
+  |  M   -K     I  ||lambda| = |  0 + noise_1|
+  | -K^T  0     0  ||  U   |   | -F + noise_2|
+  |  Pll  0   chiI || phi  |   |  0 + noise_3|
+  ''' 
+  # Reserve memory for the solution and create some variables
+  L = kwargs.get('periodic_length')
+  Ncomp_blobs = r_vectors.size
+  Nblobs = r_vectors.size // 3
+  Nbodies = len(bodies)
+  Nconstraints = len(constraints)
+  Ncomp_bodies = 6 * Nbodies
+  Ncomp_phi = 3 * Nconstraints
+  Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
+  res = np.empty((Ncomp_tot))
+  v = np.reshape(vector, (vector.size//3, 3))
+  chi = slip ###indicar valor de entrada
+  
+  # Compute the "lambda" part
+  res[0:Ncomp_blobs] = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
+  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
+  Identity_times_phi = Id_matrix_vector_prod(bodies, v[Nblobs : Nblobs+3*Nbodies], Nblobs, K_bodies = K_bodies)
+  res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))
+  # Compute the "-force_torque" part
+  K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
+  # Add constraint "slip" if any
+  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
+  Identity_times_phi = chi*Id_matrix_vector_prod(bodies, v[Nblobs : Nblobs+3*Nbodies], Nblobs, K_bodies = K_bodies)
+
+############################################################################################################3333
   if Nconstraints > 0:
     C_T_times_phi = C_matrix_T_vector_prod(bodies, constraints, vector[Ncomp_blobs + Ncomp_bodies:Ncomp_tot], Nconstraints, C_constraints = C_constraints)
     res[Ncomp_blobs : Ncomp_blobs+Ncomp_bodies] = np.reshape(-K_T_times_lambda + C_T_times_phi, (Ncomp_bodies))
@@ -1228,8 +1350,12 @@ if __name__ == '__main__':
                                                omega_one_roller = read.omega_one_roller) 
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
-
-  integrator.linear_operator = linear_operator_rigid
+##
+  if read.slip_cond =='slip_c':
+     integrator.linear_operator = linear_operator_projector
+  else:
+     integrator.linear_operator = linear_operator_rigid
+##
   integrator.build_block_diagonal_preconditioners_det_stoch = build_block_diagonal_preconditioners_det_stoch
   integrator.build_block_diagonal_preconditioners_det_identity_stoch = build_block_diagonal_preconditioners_det_identity_stoch
   integrator.eta = eta
