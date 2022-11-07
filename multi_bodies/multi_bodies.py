@@ -62,6 +62,7 @@ def calc_slip(bodies, Nblobs, *args, **kwargs):
   a = kwargs.get('blob_radius')
   eta = kwargs.get('eta')
   g = kwargs.get('g')
+  chi = kwargs.get('chi')
   r_vectors = get_blobs_r_vectors(bodies, Nblobs)
 
   #1) Compute slip due to external torques on bodies with single blobs only
@@ -200,30 +201,13 @@ def calc_Pll_matrix(bodies, Nblobs):
   Calculate the geometric block-diagonal matrix P.
   Shape (3*Nblobs, 6*Nbodies).
   '''
-  Pll = np.zeros((3*Nblobs, 6*len(bodies)))
+  Pll = np.zeros((3*Nblobs, 3*Nblobs))
   offset = 0
-  for k, b in enumerate(bodies):
+  for k, b in enumerate(Nblobs):
     Pll_body = b.calc_Pll_matrix()
-    Pll[3*offset:3*(offset+b.Nblobs), 6*k:6*k+6] = Pll_body
+    Pll[3*offset:3*(offset+b.Nblobs), 3*k:3*k+3] = Pll_body
     offset += b.Nblobs
   return Pll
-##########################################################################################
-# Python code to print identity matrix  https://www.geeksforgeeks.org/program-print-identity-matrix/
-# Function to print identity matrix
-def calc_Id_matrix(bodies, Nblobs):
-    
-    Id = np.zeros((3*Nblobs, 6*len(bodies)))
-    offset = 0
-    for row in range(0, Nblobs):
-        for col in range(0, bodies):
-            # Here end is used to stay in same line
-            if (row == col):
-                Id[row,col] = 1 
-            else:
-                Id[row,col] = 0
-        print()
-        offset += b.Nblobs
-    return Id
 ##########################################################################################
 
 def calc_K_matrix_bodies(bodies, Nblobs):
@@ -244,7 +228,7 @@ def calc_Pll_matrix_bodies(bodies, Nblobs):
   each body. List of shape (3*Nblobs, 6*Nbodies).
   '''
   Pll = []
-  for k, b in enumerate(bodies):
+  for k, b in enumerate(Nblobs):
     Pll_body = b.calc_Pll_matrix()
     Pll.append(Pll_body)
   return Pll
@@ -287,46 +271,26 @@ def K_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
   return result
 
 #########################################################################################33
-def Pll_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
+def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   '''
   Compute the matrix vector product Pll*vector where
   Pll is the Projector operator matrix.
   ''' 
   # Prepare variables
   result = np.empty((Nblobs, 3))
-  v = np.reshape(vector, (len(bodies) * 6))
+  v = np.reshape(vector, (Nblobs * 3))
 
   # Loop over bodies
   offset = 0
-  for k, b in enumerate(bodies):
+  for k, b in enumerate(Nblobs):
     if K_bodies is None:
       Pll = b.calc_Pll_matrix()
     else:
-      Pll = K_bodies[k] 
-    result[offset : offset+b.Nblobs] = np.reshape(np.dot(Pll, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
+      Pll = Pll_body[k] 
+    result[offset : offset+b.Nblobs] = np.reshape(np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]))
     offset += b.Nblobs    
   return result
 
-def Id_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
-  '''
-  Compute the matrix vector product I*vector where
-  I is the Identity matrix 
-  ''' 
-  # Prepare variables
-  result = np.empty((Nblobs, 3))
-  v = np.reshape(vector, (len(bodies) * 6))
-
-  # Loop over bodies
-  offset = 0
-  for k, b in enumerate(bodies):
-    if K_bodies is None:
-      Id = b.calc_Id_matrix()
-    else:
-      Id = K_bodies[k] 
-    result[offset : offset+b.Nblobs] = np.reshape(np.dot(Id, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
-    offset += b.Nblobs    
-  return result
-############################################################################################
 
 
 def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
@@ -433,13 +397,12 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   # Add constraint forces if any
 
 ##############################################################################################
-def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, *args, **kwargs):
+def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, chi, K_bodies = None, C_constraints = None, *args, **kwargs):
   '''
   The linear operator is
-  |  M   -K     I  ||lambda| = |  0 + noise_1|
-  | -K^T  0     0  ||  U   |   | -F + noise_2|
-  |  Pll  0   chiI || phi  |   |  0 + noise_3|
-  ''' 
+  |  M+(chi^-1)Pll  -K ||lambda| = |  0 + noise_1|
+  |       -K^T      0 ||  U   | = | -F + noise_2|
+''' 
   # Reserve memory for the solution and create some variables
   L = kwargs.get('periodic_length')
   Ncomp_blobs = r_vectors.size
@@ -454,15 +417,13 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   chi = slip ###indicar valor de entrada
   
   # Compute the "lambda" part
-  res[0:Ncomp_blobs] = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
+  mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
+  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_bodies = Pll_bodies)
+  res[0:Ncomp_blobs] = mobility_times_lambda+Pll_times_lambda*(1/chi)
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
-  Identity_times_phi = Id_matrix_vector_prod(bodies, v[Nblobs : Nblobs+3*Nbodies], Nblobs, K_bodies = K_bodies)
   res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
-  # Add constraint "slip" if any
-  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
-  Identity_times_phi = chi*Id_matrix_vector_prod(bodies, v[Nblobs : Nblobs+3*Nbodies], Nblobs, K_bodies = K_bodies)
 
 ############################################################################################################3333
   if Nconstraints > 0:
@@ -1144,6 +1105,7 @@ if __name__ == '__main__':
   eta = read.eta 
   g = read.g 
   a = read.blob_radius
+  chi = read.chi
   scheme  = read.scheme 
   output_name = read.output_name 
   structures = read.structures
@@ -1335,7 +1297,8 @@ if __name__ == '__main__':
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
                                  eta = a, 
-                                 g = g) 
+                                 g = g
+                                 chi = chi) 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
@@ -1360,6 +1323,7 @@ if __name__ == '__main__':
   integrator.build_block_diagonal_preconditioners_det_identity_stoch = build_block_diagonal_preconditioners_det_identity_stoch
   integrator.eta = eta
   integrator.a = a
+  integrator.chi = chi
   integrator.kT = read.kT
   integrator.K_matrix_T_vector_prod = K_matrix_T_vector_prod
   integrator.K_matrix_vector_prod = K_matrix_vector_prod
@@ -1535,7 +1499,7 @@ if __name__ == '__main__':
     # Save mobilities
     if read.save_blobs_mobility == 'True' or read.save_body_mobility == 'True':
       r_vectors_blobs = integrator.get_blobs_r_vectors(bodies, Nblobs)
-      mobility_blobs = integrator.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius)
+      mobility_blobs = integrator.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius, read.chi)
       if read.save_blobs_mobility == 'True':
         name = output_name + '.blobs_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_blobs, delimiter='  ')
