@@ -278,7 +278,7 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   ''' 
   # Prepare variables
   result = np.empty((Nblobs, 3))
-  v = np.reshape(vector, (Nblobs * 3))
+  v = vector.flatten()
 
   # Loop over bodies
   offset = 0
@@ -287,7 +287,8 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
       Pll = b.calc_Pll_matrix()
     else:
       Pll = Pll_body[k] 
-    result[offset : offset+b.Nblobs] = np.reshape(np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]))
+#    result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]), (b.Nblobs, 3))
+    result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
 
@@ -385,7 +386,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   Ncomp_phi = 3 * Nconstraints
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
   res = np.empty((Ncomp_tot))
-  v = np.reshape(vector, (.size//3, 3))
+  v = np.reshape(vector, (vector.size//3, 3))  
   
   # Compute the "slip" part
   res[0:Ncomp_blobs] = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
