@@ -295,7 +295,7 @@ class QuaternionIntegrator(object):
       # Plot velocity field 
       if self.plot_velocity_field.size > 1: 
         lambda_blobs = sol_precond[0:3*self.Nblobs]
-        output = self.output_prefix + '.step.' + str(kwargs.get('step'))  + '.vtk'
+        output = self.output_prefix + '.step.' + str(kwargs.get('step'))  
         pvf.plot_velocity_field(self.plot_velocity_field, r_vectors_blobs_n, lambda_blobs, self.a, self.eta, output, 0, 
                                 mobility_vector_prod_implementation='numba')
       
