@@ -62,7 +62,6 @@ def calc_slip(bodies, Nblobs, *args, **kwargs):
   a = kwargs.get('blob_radius')
   eta = kwargs.get('eta')
   g = kwargs.get('g')
-  chi = kwargs.get('chi')
   r_vectors = get_blobs_r_vectors(bodies, Nblobs)
 
   #1) Compute slip due to external torques on bodies with single blobs only
@@ -209,6 +208,16 @@ def calc_Pll_matrix(bodies, Nblobs):
     offset += b.Nblobs
   return Pll
 ##########################################################################################
+def slip_xi_vector(bodies, Nblobs):
+  xi = np.empty((Nblobs, 1))
+  offset = 0
+  for b in enumerate(Nblobs):
+       xi_v = b.Nblobs
+       xi[offset:(offset+Nblobs)] = b.slip_xi_vector()
+       offset += xi_v
+  return xi
+
+##########################################################################################
 
 def calc_K_matrix_bodies(bodies, Nblobs):
   '''
@@ -283,7 +292,7 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   # Loop over bodies
   offset = 0
   for k, b in enumerate(Nblobs):
-    if K_bodies is None:
+    if Pll_body is None:
       Pll = b.calc_Pll_matrix()
     else:
       Pll = Pll_body[k] 
@@ -291,7 +300,6 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
     result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
-
 
 
 def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
@@ -398,7 +406,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   # Add constraint forces if any
 
 ##############################################################################################
-def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, chi, K_bodies = None, C_constraints = None, *args, **kwargs):
+def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None,Pll_bodies=None, *args, **kwargs):
   '''
   The linear operator is
   |  M+(chi^-1)Pll  -K ||lambda| = |  0 + noise_1|
@@ -415,12 +423,11 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, ch
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
-  chi = slip ###indicar valor de entrada
   
   # Compute the "lambda" part
   mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
   Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_bodies = Pll_bodies)
-  res[0:Ncomp_blobs] = mobility_times_lambda+Pll_times_lambda*(1/chi)
+  res[0:Ncomp_blobs] = mobility_times_lambda+Pll_times_lambda*(1/slip_xi_vector[0:Ncomp_blobs])
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
   res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))
   # Compute the "-force_torque" part
@@ -1106,7 +1113,6 @@ if __name__ == '__main__':
   eta = read.eta 
   g = read.g 
   a = read.blob_radius
-  chi = read.chi
   scheme  = read.scheme 
   output_name = read.output_name 
   structures = read.structures
@@ -1298,8 +1304,7 @@ if __name__ == '__main__':
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
                                  eta = a, 
-                                 g = g
-                                 chi = chi) 
+                                 g = g) 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
@@ -1324,7 +1329,6 @@ if __name__ == '__main__':
   integrator.build_block_diagonal_preconditioners_det_identity_stoch = build_block_diagonal_preconditioners_det_identity_stoch
   integrator.eta = eta
   integrator.a = a
-  integrator.chi = chi
   integrator.kT = read.kT
   integrator.K_matrix_T_vector_prod = K_matrix_T_vector_prod
   integrator.K_matrix_vector_prod = K_matrix_vector_prod
@@ -1500,7 +1504,7 @@ if __name__ == '__main__':
     # Save mobilities
     if read.save_blobs_mobility == 'True' or read.save_body_mobility == 'True':
       r_vectors_blobs = integrator.get_blobs_r_vectors(bodies, Nblobs)
-      mobility_blobs = integrator.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius, read.chi)
+      mobility_blobs = integrator.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius, read.splip_c)
       if read.save_blobs_mobility == 'True':
         name = output_name + '.blobs_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_blobs, delimiter='  ')
