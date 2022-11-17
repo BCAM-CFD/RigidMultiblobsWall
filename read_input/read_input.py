@@ -96,6 +96,9 @@ class ReadInput(object):
     self.zmin = float(self.options.get('zmin') or 0)
     self.zmax = float(self.options.get('zmax') or 1e7)
     self.domType = str(self.options.get('domType') or 'RPB')
+# opción para que el código sepa si vamos a usar el esquema con slip o no. 1 o slip_cond para asignar condicion. 
+    self.slip_cond = str(self.options.get('slip_cond') or 'slip_c')
+	
 
     # Create list with [vertex_file, clones_file] for each structure
     self.num_free_bodies = number_of_structures
