@@ -7,7 +7,8 @@ import numpy as np
 try:
   import visit_writer_interface
 except ImportError:
-  from visit import visit_writer_interface
+    pass
+#  from visit import visit_writer_interface
     
 
 def boost_write_rectilinear_mesh(name,       # File's name

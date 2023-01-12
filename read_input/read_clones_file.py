@@ -37,14 +37,12 @@ def read_clones_file(name_file):
         else:
           data = line.split()
           location = [float(data[0]), float(data[1]), float(data[2])]
-          orientation = [float(data[3]), float(data[4]), float(data[5]), float(data[6])]
+          orientation = [float(data[3]), float(data[4]), float(data[5])]
           norm_orientation = np.linalg.norm(orientation)
           q = Quaternion(orientation / norm_orientation)
           locations.append(location)
           orientations.append(q)
         i += 1
-        if i == number_of_bodies+1:
-          break
 
     # Creat and return numpy arrays
     locations = np.array(locations)

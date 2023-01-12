@@ -1,7 +1,7 @@
 
 import numpy as np
 
-import visit_writer
+from . import visit_writer
 
 
 if __name__ == '__main__':

@@ -38,6 +38,10 @@ class Body(object):
     self.blob_radius = blob_radius
     if reference_configuration.shape[1] == 4:
       self.blobs_radius = reference_configuration[:,3]
+    elif reference_configuration.shape[1] == 7:
+      self.normal = reference_configuration[:,3:6]   #normal
+      self.slip_l=reference_configuration[:,7]   #slip
+      #self.blobs_radius = np.ones(self.Nblobs) * blob_radius   
     else:
       self.blobs_radius = np.ones(self.Nblobs) * blob_radius
     # Body length
@@ -59,6 +63,7 @@ class Body(object):
     self.prescribed_kinematics = False
     self.mobility_blobs_cholesky = None
     self.ID = None
+
   
   
   def get_r_vectors(self, location = None, orientation = None):
@@ -230,5 +235,14 @@ class Body(object):
     self.body_length = max_distance + 2*self.blob_radius
     return self.body_length
 
+#######################################################################################
+  def normal(self, VectNorm, location = None):
+      if location is None:
+        location = self.location
+        l = np.linalg.norm(location)
+        VectNorm.append(2*location[0]/l,2*location[1]/l,2*location[2]/l)   
+      return VectNorm[0],VectNorm[1],VectNorm[2]
 
-    
+  def slip_l(self, location = None):
+      return self.sliplength(self)
+#######################################################################################   

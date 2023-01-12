@@ -409,7 +409,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
 def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None,Pll_bodies=None, *args, **kwargs):
   '''
   The linear operator is
-  |  M+(chi^-1)Pll  -K ||lambda| = |  0 + noise_1|
+  |  M+(xi^-1)Pll  -K ||lambda| = |  0 + noise_1|
   |       -K^T      0 ||  U   | = | -F + noise_2|
 ''' 
   # Reserve memory for the solution and create some variables
@@ -1143,8 +1143,8 @@ if __name__ == '__main__':
   blobs_offset = 0
   for ID, structure in enumerate(structures):
     print('Creating structures = ', structure[1])
-    # Read vertex and clones files
-    struct_ref_config = read_vertex_file.read_vertex_file(structure[0])
+    # Read vertex and clones files. struct[0] edited by DMC add  struc_nomal_v,struc_slip_length 
+    struct_ref_config,struc_nomal_v,struc_slip_length = read_vertex_file.read_vertex_file(structure[0])
     num_bodies_struct, struct_locations, struct_orientations = read_clones_file.read_clones_file(structure[1])
     # Read slip file if it exists
     slip = None
@@ -1154,6 +1154,7 @@ if __name__ == '__main__':
     body_names.append(structures_ID[ID])
     # Create each body of type structure
     for i in range(num_bodies_struct):
+      ##  edited by DMC add  struc_nomal_v,struc_slip_length 
       b = body.Body(struct_locations[i], struct_orientations[i], struct_ref_config, a)
       b.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
       b.ID = structures_ID[ID]
@@ -1320,7 +1321,7 @@ if __name__ == '__main__':
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
 ##
-  if read.slip_cond =='slip_c':
+  if read.slip_mode =='True':
      integrator.linear_operator = linear_operator_projector
   else:
      integrator.linear_operator = linear_operator_rigid

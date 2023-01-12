@@ -11,14 +11,14 @@ class ReadInput(object):
   Simple class to read the input files to run a simulation.
   '''
 
-  def __init__(self, entries):
+  def __init__(self, entries,idvir=''):
     ''' Construnctor takes the name of the input file '''
     self.entries = entries
     self.input_file = entries
+    self.idvir = idvir
     self.options = {}
-    number_of_structures = 0 
-    number_of_obstacles = 0 
-    number_of_articulated = 0 
+    number_of_structures = 0
+    number_of_obstacles = 0
 
     # Read input file
     comment_symbols = ['#']   
@@ -39,9 +39,6 @@ class ReadInput(object):
           if option == 'obstacle':
             option += str(number_of_obstacles)
             number_of_obstacles += 1
-          if option == 'articulated':
-            option += str(number_of_articulated)
-            number_of_articulated += 1
           self.options[option] = value
 
     # Set option to file or default values
@@ -57,7 +54,12 @@ class ReadInput(object):
     self.tracer_radius = float(self.options.get('tracer_radius') or 0.0)
     self.kT = float(self.options.get('kT') or 1.0)
     self.scheme = str(self.options.get('scheme') or 'deterministic_forward_euler')
+    
+    
     self.output_name = str(self.options.get('output_name') or 'run')
+    ##NMC add
+   # self.idban = istr(self.options.get('idban'))
+    
     self.random_state = self.options.get('random_state')
     self.seed = self.options.get('seed')
     self.repulsion_strength_wall = float(self.options.get('repulsion_strength_wall') or 1.0)
@@ -75,7 +77,6 @@ class ReadInput(object):
     self.force_file = self.options.get('force_file')
     self.velocity_file = self.options.get('velocity_file')
     self.solver_tolerance = float(self.options.get('solver_tolerance') or 1e-08)
-    self.nonlinear_solver_tolerance = float(self.options.get('nonlinear_solver_tolerance') or 1e-08)
     self.rf_delta = float(self.options.get('rf_delta') or 1e-03)
     self.save_clones = str(self.options.get('save_clones') or 'one_file_per_step')
     self.periodic_length = np.fromstring(self.options.get('periodic_length') or '0 0 0', sep=' ')
@@ -93,22 +94,17 @@ class ReadInput(object):
     self.repulsion_strength_firm = float(self.options.get('repulsion_strength_firm') or 0.0)
     self.firm_delta = float(self.options.get('firm_delta') or 1e-02)
     self.Lub_Cut = float(self.options.get('Lub_Cut') or 4.5)
-    self.zmin = float(self.options.get('zmin') or 0)
-    self.zmax = float(self.options.get('zmax') or 1e7)
-    self.domType = str(self.options.get('domType') or 'RPB')
-# opción para que el código sepa si vamos a usar el esquema con slip o no. 1 o slip_cond para asignar condicion. 
-    self.slip_cond = str(self.options.get('slip_cond') or 'slip_c')
-	
+    self.slip_mode = str(self.options.get('slip_mode') or 'False')
+
 
     # Create list with [vertex_file, clones_file] for each structure
     self.num_free_bodies = number_of_structures
     self.structures = []
-    self.structures_ID = []
-    self.articulated = []
-    self.articulated_ID = []
     for i in range(number_of_structures):
       option = 'structure' + str(i)
       structure_files = str.split(str(self.options.get(option)))
+      ##NMC modified
+      structure_files[0]+=self.idvir
       self.structures.append(structure_files)
 
     # Create list with [vertex_file, clones_file] for each obstacle
@@ -116,18 +112,9 @@ class ReadInput(object):
       option = 'obstacle' + str(i)
       structure_files = str.split(str(self.options.get(option)))
       self.structures.append(structure_files)
-
-    # Create list with [vertex_file, clones_file, contraints_file] for each articulated
-    for i in range(number_of_articulated):
-      option = 'articulated' + str(i)
-      structure_files = str.split(str(self.options.get(option)))
-      head, tail = ntpath.split(structure_files[1])
-      # then, remove end (.clones)
-      tail = tail[:-7]
-      self.articulated_ID.append(tail)
-      self.articulated.append(structure_files)
       
     # Create structures ID for each kind 
+    self.structures_ID = []
     for struct in self.structures:
       # First, remove directory from structure name
       head, tail = ntpath.split(struct[1])

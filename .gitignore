@@ -24,3 +24,7 @@
 # Exclude some folders #
 ########################
 
+# Exclude files ending with virus.....
+*virus*.data
+*virus*.xyz
+*key*
