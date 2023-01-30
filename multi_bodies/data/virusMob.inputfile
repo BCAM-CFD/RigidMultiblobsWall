@@ -14,6 +14,6 @@ output_name                              RigidMultiblobsWall/multi_bodies/data/v
 
 # Load rigid bodies configuration
 
-structure	RigidMultiblobsWall/multi_bodies/Structures/virus RigidMultiblobsWall/multi_bodies/Structures/blob.clones
+structure	RigidMultiblobsWall/multi_bodies/Structures/blob.vertex RigidMultiblobsWall/multi_bodies/Structures/blob.clones
 
 #plot_velocity_field -20 20 40 -20 20 40 -20 20 40

@@ -37,7 +37,7 @@ def read_clones_file(name_file):
         else:
           data = line.split()
           location = [float(data[0]), float(data[1]), float(data[2])]
-          orientation = [float(data[3]), float(data[4]), float(data[5])]
+          orientation = [float(data[3]), float(data[4]), float(data[5]), float(data[6])]
           norm_orientation = np.linalg.norm(orientation)
           q = Quaternion(orientation / norm_orientation)
           locations.append(location)
