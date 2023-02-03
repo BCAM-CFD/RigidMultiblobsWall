@@ -36,15 +36,13 @@ class Body(object):
     self.blob_masses = np.ones(self.Nblobs)
     # Blob radius
     self.blob_radius=blob_radius
-    print("dddddddddddddddddddddddd", reference_configuration)
-    if reference_configuration.shape[1] == 4:   #### Is according the .vertex file?? or .clones???
+    if reference_configuration.shape[1] == 4:   #### 
       self.blobs_radius = reference_configuration[:,3]
     if reference_configuration.shape[1] == 7:
-      print("jjjjjjjjjjjjjjjjjjjjjjjjjj", reference_configuration)
+      #self.blobs_radius = reference_configuration[:,3]
       self.blobs_radius = np.ones(self.Nblobs) * blob_radius
       self.normal = reference_configuration[:,3:6]   #normal
       self.slip_l=reference_configuration[:,6]   #slip
-      
     else:
       self.blobs_radius = np.ones(self.Nblobs) * blob_radius
     

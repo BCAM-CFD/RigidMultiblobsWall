@@ -10,10 +10,10 @@ eta                                      1.0
 blob_radius                              0.14
 
 # Set output name
-output_name                              RigidMultiblobsWall/multi_bodies/data/virustest
+output_name                              RigidMultiblobsWall/multi_bodies/data/virusMob
                                  
 # Load rigid bodies configuration
 
-structure	RigidMultiblobsWall/multi_bodies/Structures/blob.vertex RigidMultiblobsWall/multi_bodies/Structures/blob.clones
+structure	RigidMultiblobsWall/multi_bodies/Structures/virustest RigidMultiblobsWall/multi_bodies/Structures/blob.clones
 
 #plot_velocity_field -20 20 40 -20 20 40 -20 20 40
