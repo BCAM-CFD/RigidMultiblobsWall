@@ -251,7 +251,7 @@ class Body(object):
   
   def slip_l(self, location = None):
     '''
-    Floren: What is this form?
+    Floren: What is this for?
     '''
     return self.sliplength(self)
 
