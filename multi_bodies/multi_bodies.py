@@ -315,6 +315,73 @@ def C_matrix_T_vector_prod(bodies, constraints, vector, Nconstraints, C_constrai
   return result
 
 
+##########################################################################################
+def calc_Pll_matrix(bodies, Nblobs):
+  '''
+  Calculate the geometric block-diagonal matrix P.
+  Shape (3*Nblobs, 6*Nbodies).
+  '''
+  Pll = np.zeros((3*Nblobs, 3*Nblobs))
+  offset = 0
+  for k, b in enumerate(Nblobs):
+    Pll_body = b.calc_Pll_matrix()
+    Pll[3*offset:3*(offset+b.Nblobs), 3*k:3*k+3] = Pll_body
+    offset += b.Nblobs
+  return Pll
+##########################################################################################
+def slip_xi_vector(bodies, Nblobs):
+  xi = np.empty((Nblobs, 1))
+  offset = 0
+  for b in enumerate(Nblobs):
+       xi_v = b.Nblobs
+       xi[offset:(offset+Nblobs)] = b.slip_xi_vector()
+       offset += xi_v
+  return xi
+
+
+############################################################
+def calc_Pll_matrix_bodies(bodies, Nblobs):
+  '''
+  Calculate the geometric matrix K for
+  each body. List of shape (3*Nblobs, 6*Nbodies).
+  '''
+  Pll = []
+  for k, b in enumerate(Nblobs):
+    Pll_body = b.calc_Pll_matrix()
+    Pll.append(Pll_body)
+  return Pll
+#vector=np.array([1,2,3])
+#unit_vector = vector / (vector**2).sum()**0.5
+#unit_vector = vector / np.linalg.norm(vector)
+############################################################
+
+
+#########################################################################################33
+def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
+  '''
+  Compute the matrix vector product Pll*vector where
+  Pll is the Projector operator matrix.
+  ''' 
+  # Prepare variables
+  result = np.empty((Nblobs, 3))
+  v = vector.flatten()
+
+  # Loop over bodies
+  offset = 0
+  for k, b in enumerate(Nblobs):
+    if Pll_body is None:
+      Pll = b.calc_Pll_matrix()
+    else:
+      Pll = Pll_body[k] 
+#    result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]), (b.Nblobs, 3))
+    result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
+    offset += b.Nblobs    
+  return result
+
+
+
+
+
 def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, *args, **kwargs):
   '''
   RetC_matrix_vector_produrn the action of the linear operator of the articulated rigid bodies on vector v.
@@ -1276,7 +1343,10 @@ if __name__ == '__main__':
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
 
-  integrator.linear_operator = linear_operator_rigid
+  if read.slip_mode =='True':
+    integrator.linear_operator = linear_operator_projector
+  else:
+    integrator.linear_operator = linear_operator_rigid
   integrator.build_block_diagonal_preconditioners_det_stoch = build_block_diagonal_preconditioners_det_stoch
   integrator.build_block_diagonal_preconditioners_det_identity_stoch = build_block_diagonal_preconditioners_det_identity_stoch
   integrator.eta = eta
