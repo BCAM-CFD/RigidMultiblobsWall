@@ -194,30 +194,6 @@ def calc_K_matrix(bodies, Nblobs):
     offset += b.Nblobs
   return K
 
-##########################################################################################
-def calc_Pll_matrix(bodies, Nblobs):
-  '''
-  Calculate the geometric block-diagonal matrix P.
-  Shape (3*Nblobs, 6*Nbodies).
-  '''
-  Pll = np.zeros((3*Nblobs, 3*Nblobs))
-  offset = 0
-  for k, b in enumerate(Nblobs):
-    Pll_body = b.calc_Pll_matrix()
-    Pll[3*offset:3*(offset+b.Nblobs), 3*k:3*k+3] = Pll_body
-    offset += b.Nblobs
-  return Pll
-##########################################################################################
-def slip_xi_vector(bodies, Nblobs):
-  xi = np.empty((Nblobs, 1))
-  offset = 0
-  for b in enumerate(Nblobs):
-       xi_v = b.Nblobs
-       xi[offset:(offset+Nblobs)] = b.slip_xi_vector()
-       offset += xi_v
-  return xi
-
-##########################################################################################
 
 def calc_K_matrix_bodies(bodies, Nblobs):
   '''
@@ -230,21 +206,6 @@ def calc_K_matrix_bodies(bodies, Nblobs):
     K.append(K_body)
   return K
 
-############################################################
-def calc_Pll_matrix_bodies(bodies, Nblobs):
-  '''
-  Calculate the geometric matrix K for
-  each body. List of shape (3*Nblobs, 6*Nbodies).
-  '''
-  Pll = []
-  for k, b in enumerate(Nblobs):
-    Pll_body = b.calc_Pll_matrix()
-    Pll.append(Pll_body)
-  return Pll
-#vector=np.array([1,2,3])
-#unit_vector = vector / (vector**2).sum()**0.5
-#unit_vector = vector / np.linalg.norm(vector)
-############################################################
 
 def calc_C_matrix_constraints(constraints):
   '''
@@ -276,28 +237,6 @@ def K_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
     else:
       K = K_bodies[k] 
     result[offset : offset+b.Nblobs] = np.reshape(np.dot(K, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
-    offset += b.Nblobs    
-  return result
-
-#########################################################################################33
-def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
-  '''
-  Compute the matrix vector product Pll*vector where
-  Pll is the Projector operator matrix.
-  ''' 
-  # Prepare variables
-  result = np.empty((Nblobs, 3))
-  v = vector.flatten()
-
-  # Loop over bodies
-  offset = 0
-  for k, b in enumerate(Nblobs):
-    if Pll_body is None:
-      Pll = b.calc_Pll_matrix()
-    else:
-      Pll = Pll_body[k] 
-#    result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]), (b.Nblobs, 3))
-    result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
 
@@ -394,7 +333,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   Ncomp_phi = 3 * Nconstraints
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
   res = np.empty((Ncomp_tot))
-  v = np.reshape(vector, (vector.size//3, 3))  
+  v = np.reshape(vector, (vector.size//3, 3))
   
   # Compute the "slip" part
   res[0:Ncomp_blobs] = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
@@ -404,36 +343,6 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
   # Add constraint forces if any
-
-##############################################################################################
-def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None,Pll_bodies=None, *args, **kwargs):
-  '''
-  The linear operator is
-  |  M+(xi^-1)Pll  -K ||lambda| = |  0 + noise_1|
-  |       -K^T      0 ||  U   | = | -F + noise_2|
-''' 
-  # Reserve memory for the solution and create some variables
-  L = kwargs.get('periodic_length')
-  Ncomp_blobs = r_vectors.size
-  Nblobs = r_vectors.size // 3
-  Nbodies = len(bodies)
-  Nconstraints = len(constraints)
-  Ncomp_bodies = 6 * Nbodies
-  Ncomp_phi = 3 * Nconstraints
-  Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
-  res = np.empty((Ncomp_tot))
-  v = np.reshape(vector, (vector.size//3, 3))
-  
-  # Compute the "lambda" part
-  mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
-  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_bodies = Pll_bodies)
-  res[0:Ncomp_blobs] = mobility_times_lambda+Pll_times_lambda*(1/slip_xi_vector[0:Ncomp_blobs])
-  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
-  res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))
-  # Compute the "-force_torque" part
-  K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
-
-############################################################################################################3333
   if Nconstraints > 0:
     C_T_times_phi = C_matrix_T_vector_prod(bodies, constraints, vector[Ncomp_blobs + Ncomp_bodies:Ncomp_tot], Nconstraints, C_constraints = C_constraints)
     res[Ncomp_blobs : Ncomp_blobs+Ncomp_bodies] = np.reshape(-K_T_times_lambda + C_T_times_phi, (Ncomp_bodies))
@@ -1117,8 +1026,6 @@ if __name__ == '__main__':
   output_name = read.output_name 
   structures = read.structures
   structures_ID = read.structures_ID
-  # mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation) 
-  multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
   # Copy input file to output
@@ -1143,8 +1050,8 @@ if __name__ == '__main__':
   blobs_offset = 0
   for ID, structure in enumerate(structures):
     print('Creating structures = ', structure[1])
-    # Read vertex and clones files. struct[0] edited by DMC add  struc_nomal_v,struc_slip_length 
-    struct_ref_config,struc_nomal_v,struc_slip_length = read_vertex_file.read_vertex_file(structure[0])
+    # Read vertex and clones files
+    struct_ref_config = read_vertex_file.read_vertex_file(structure[0])
     num_bodies_struct, struct_locations, struct_orientations = read_clones_file.read_clones_file(structure[1])
     # Read slip file if it exists
     slip = None
@@ -1154,7 +1061,6 @@ if __name__ == '__main__':
     body_names.append(structures_ID[ID])
     # Create each body of type structure
     for i in range(num_bodies_struct):
-      ##  edited by DMC add  struc_nomal_v,struc_slip_length 
       b = body.Body(struct_locations[i], struct_orientations[i], struct_ref_config, a)
       b.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
       b.ID = structures_ID[ID]
@@ -1309,7 +1215,7 @@ if __name__ == '__main__':
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
   integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
-  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies) 
+  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
   integrator.force_torque_calculator = partial(multi_bodies_functions.force_torque_calculator_sort_by_bodies, 
                                                g = g, 
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
@@ -1320,12 +1226,8 @@ if __name__ == '__main__':
                                                omega_one_roller = read.omega_one_roller) 
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
-##
-  if read.slip_mode =='True':
-     integrator.linear_operator = linear_operator_projector
-  else:
-     integrator.linear_operator = linear_operator_rigid
-##
+
+  integrator.linear_operator = linear_operator_rigid
   integrator.build_block_diagonal_preconditioners_det_stoch = build_block_diagonal_preconditioners_det_stoch
   integrator.build_block_diagonal_preconditioners_det_identity_stoch = build_block_diagonal_preconditioners_det_identity_stoch
   integrator.eta = eta
@@ -1344,6 +1246,13 @@ if __name__ == '__main__':
   integrator.calc_C_matrix_constraints = calc_C_matrix_constraints
   integrator.articulated = articulated
   integrator.nonlinear_solver_tolerance = read.nonlinear_solver_tolerance
+  multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation, bodies=bodies)  
+  integrator.plot_velocity_field = read.plot_velocity_field
+  integrator.output_name = read.output_name
+  try:
+    integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
+  except:
+    pass
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:
@@ -1505,7 +1414,7 @@ if __name__ == '__main__':
     # Save mobilities
     if read.save_blobs_mobility == 'True' or read.save_body_mobility == 'True':
       r_vectors_blobs = integrator.get_blobs_r_vectors(bodies, Nblobs)
-      mobility_blobs = integrator.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius, read.splip_c)
+      mobility_blobs = integrator.mobility_blobs(r_vectors_blobs, read.eta, read.blob_radius)
       if read.save_blobs_mobility == 'True':
         name = output_name + '.blobs_mobility.' + str(step+1).zfill(8) + '.dat'
         np.savetxt(name, mobility_blobs, delimiter='  ')
