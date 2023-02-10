@@ -109,11 +109,9 @@ class ReadInput(object):
       option = 'structure' + str(i)
       structure_files = str.split(str(self.options.get(option)))
       # NMC modified
-      structure_files[0]+=self.idvir
+      structure_files[0] += self.idvir
       self.structures.append(structure_files)
-
-      self.structures.append(structure_files)
-
+      
     # Create list with [vertex_file, clones_file] for each obstacle
     for i in range(number_of_obstacles):
       option = 'obstacle' + str(i)
