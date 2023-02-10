@@ -189,10 +189,9 @@ if __name__ ==  '__main__':
   parser.add_argument('--print-residual', action='store_true', help='print gmres and lanczos residuals')
 
   # mod by NMC 
-  parser.add_argument('--idvir', dest='idvir')
+  parser.add_argument('--idvir', dest='idvir', type=str, default='')
   args=parser.parse_args()
   input_file = args.input_file
-  idvir =''
   idvir = args.idvir
 
   # Read input file
