@@ -239,14 +239,11 @@ class Body(object):
     self.body_length = max_distance + 2*self.blob_radius
     return self.body_length
 
-#######################################################################################
-  def normal(self, VectNorm, location = None):
-      if location is None:
-        location = self.location
-        l = np.linalg.norm(location)
-        VectNorm.append(2*location[0]/l,2*location[1]/l,2*location[2]/l)   
-      return VectNorm[0],VectNorm[1],VectNorm[2]
 
-  def slip_l(self, location = None):
-      return self.sliplength(self)
-#######################################################################################   
+  def normal(self):
+    '''
+    Return normals in the laboratory frame of reference.
+    '''
+    rotation_matrix = self.orientation.rotation_matrix()
+    normal = np.dot(self.normal, rotation_matrix.T)
+    return normal
