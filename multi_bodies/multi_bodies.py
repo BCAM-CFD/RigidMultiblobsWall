@@ -425,7 +425,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   return res
 
 
-def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None,Pll_bodies=None, *args, **kwargs):
+def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None,Pll_body=None, *args, **kwargs):
   '''
   The linear operator is
   |  M+(xi^-1)Pll  -K ||lambda| = |  0 + noise_1|
@@ -445,7 +445,7 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   
   # Compute the "lambda" part
   mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
-  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_bodies = Pll_bodies)
+  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body)
   res[0:Ncomp_blobs] = mobility_times_lambda+Pll_times_lambda*(1/slip_xi_vector[0:Ncomp_blobs])
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
   res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))
