@@ -1,5 +1,7 @@
 # Select problem to solve
 scheme                                   body_mobility
+#scheme                                    mobility
+
 
 # Select implementation to compute the blobs mobility
 # Options: python and boost
@@ -14,6 +16,6 @@ output_name                              RigidMultiblobsWall/multi_bodies/data/v
 
 # Load rigid bodies configuration
 
-structure	RigidMultiblobsWall/multi_bodies/Structures/virustest RigidMultiblobsWall/multi_bodies/Structures/blob.clones
+structure	RigidMultiblobsWall/multi_bodies/Structures/virus RigidMultiblobsWall/multi_bodies/Structures/blob.clones
 
 #plot_velocity_field -20 20 40 -20 20 40 -20 20 40

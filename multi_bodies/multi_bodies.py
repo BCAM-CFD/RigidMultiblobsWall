@@ -338,7 +338,6 @@ def slip_xi_vector(bodies, Nblobs):
        offset += xi_v
   return xi
 
-
 ############################################################
 def calc_Pll_matrix_bodies(bodies, Nblobs):
   '''
@@ -353,8 +352,6 @@ def calc_Pll_matrix_bodies(bodies, Nblobs):
 #vector=np.array([1,2,3])
 #unit_vector = vector / (vector**2).sum()**0.5
 #unit_vector = vector / np.linalg.norm(vector)
-############################################################
-
 
 #########################################################################################33
 def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
@@ -377,9 +374,6 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
     result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
-
-
-
 
 
 def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, *args, **kwargs):

@@ -247,11 +247,3 @@ class Body(object):
     rotation_matrix = self.orientation.rotation_matrix()
     normal = np.dot(self.normal, rotation_matrix.T)
     return normal
-
-  
-  def slip_l(self, location = None):
-    '''
-    Floren: What is this for?
-    '''
-    return self.sliplength(self)
-
