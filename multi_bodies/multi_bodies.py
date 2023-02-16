@@ -339,13 +339,13 @@ def slip_xi_vector(bodies, Nblobs):
   return xi
 
 ############################################################
-def calc_Pll_matrix_bodies(bodies, Nblobs):
+def calc_Pll_matrix_bodies(bodies):
   '''
   Calculate the geometric matrix K for
   each body. List of shape (3*Nblobs, 6*Nbodies).
   '''
   Pll = []
-  for k, b in enumerate(Nblobs):
+  for k, b in enumerate(bodies):
     Pll_body = b.calc_Pll_matrix()
     Pll.append(Pll_body)
   return Pll
@@ -426,7 +426,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   return res
 
 
-def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None,Pll_bodies=None, *args, **kwargs):
+def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_bodies=None, *args, **kwargs):
   '''
   The linear operator is
   |  M+(xi^-1)Pll  -K ||lambda| = |  0 + noise_1|
