@@ -502,6 +502,58 @@ if __name__ ==  '__main__':
     name = read.output_name +idvir+'.body_mobility.dat'    
     np.savetxt(name, mobility_bodies, delimiter='  ')
     print('Time to compute body mobility =', time.time() - start_time)
+
+  elif read.scheme == 'body_mobility_gmres':
+    start_time = time.time()
+    
+    # Get blobs coordinates
+    r_vectors_blobs = multi_bodies.get_blobs_r_vectors(bodies, Nblobs)
+
+    # Set system size
+    System_size = Nblobs * 3 + num_bodies * 6
+
+    # Calculate K matrix
+    K = multi_bodies.calc_K_matrix_bodies(bodies, Nblobs)
+
+    # Calculate C matrix if any constraint
+    Nconstraints = len(constraints)
+    if Nconstraints > 0:
+      C = multi_bodies.calc_C_matrix_constraints(constraints)
+    else:
+      C = None
+      
+    # Set linear operators
+    linear_operator_partial = partial(multi_bodies.linear_operator_rigid,
+                                      bodies = bodies,
+                                      constraints = constraints,
+                                      r_vectors = r_vectors_blobs,
+                                      eta = read.eta,
+                                      a = read.blob_radius,
+                                      K_bodies = K,
+                                      C_constraints = C,
+                                      periodic_length = read.periodic_length)    
+    A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
+
+    # Set preconditioner 
+    PC_partial = multi_bodies.build_block_diagonal_preconditioner(bodies, articulated, r_vectors_blobs, Nblobs, read.eta, read.blob_radius, step=0, update_PC=1)
+    PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
+
+    # Solve preconditioned linear system
+    velocity = np.zeros(6)
+    mobility_body_gmres = np.zeros((6,6))
+    for i in range(6):
+      # Set RHS
+      RHS = np.zeros(System_size)
+      RHS[3 * Nblobs + i] = -1.0
+      
+      counter = gmres_counter(print_residual = args.print_residual)
+      (sol_precond, info_precond) = utils.gmres(A, RHS, tol=read.solver_tolerance, M=PC, maxiter=200, restart=1000, callback=counter)
+      mobility_body_gmres[:,i] = sol_precond[3 * Nblobs:]
+
+    name = read.output_name + '.body_mobility.dat'
+    np.savetxt(name, mobility_body_gmres, delimiter='  ')
+    print('Time to compute body mobility =', time.time() - start_time)
+    
     
   elif (read.scheme == 'plot_velocity_field' and False):
     print('plot_velocity_field')
