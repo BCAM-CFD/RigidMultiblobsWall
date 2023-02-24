@@ -371,8 +371,8 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
       Pll = b.calc_Pll_matrix()
     else:
       Pll = Pll_body[k] 
-    result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*k : 3*(k+1)]), (b.Nblobs, 3))
-    #result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
+    #result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*k : 3*(k+1)]), (b.Nblobs, 3))
+    result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
 
