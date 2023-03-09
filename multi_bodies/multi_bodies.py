@@ -21,7 +21,7 @@ except:
 
 # Find project functions
 found_functions = False
-path_to_append = ''
+path_to_append = 'RigidMultiblobsWall'
 while found_functions is False:
   try:
     import multi_bodies_functions
@@ -48,7 +48,7 @@ while found_functions is False:
     found_functions = True
   except ImportError as exc:
     sys.stderr.write('Error: failed to import settings module ({})\n'.format(exc))
-    path_to_append += '../'
+    path_to_append += '/'
     print('searching functions in path ', path_to_append)
     sys.path.append(path_to_append)
     if len(path_to_append) > 21:
@@ -315,7 +315,7 @@ def C_matrix_T_vector_prod(bodies, constraints, vector, Nconstraints, C_constrai
   return result
 
 
-##########################################################################################
+#############################################################
 def calc_Pll_matrix(bodies, Nblobs):
   '''
   Calculate the geometric block-diagonal matrix P.
@@ -328,7 +328,7 @@ def calc_Pll_matrix(bodies, Nblobs):
     Pll[3*offset:3*(offset+b.Nblobs), 3*k:3*k+3] = Pll_body
     offset += b.Nblobs
   return Pll
-##########################################################################################
+#############################################################
 def slip_xi_vector(bodies):
   xi = np.empty((bodies))
   offset = 0
@@ -354,7 +354,7 @@ def calc_Pll_matrix_bodies(bodies):
 #unit_vector = vector / (vector**2).sum()**0.5
 #unit_vector = vector / np.linalg.norm(vector)
 
-#########################################################################################33
+###############################################################
 def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   '''
   Compute the matrix vector product Pll*vector where

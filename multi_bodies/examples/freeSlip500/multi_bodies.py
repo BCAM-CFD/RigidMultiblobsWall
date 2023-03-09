@@ -446,7 +446,7 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body)
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
 
-  res[0:Ncomp_blobs] += np.reshape(Pll_times_lambda, (3*Nblobs ))
+  res[0:Ncomp_blobs] -= np.reshape(Pll_times_lambda, (3*Nblobs ))
   res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))  # Mobility_times_lambda + Pll_times_lambda - K_times_U
   print(res)
   # Compute the "-force_torque" part

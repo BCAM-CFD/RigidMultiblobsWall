@@ -1,8 +1,7 @@
-# Select integrator 
+# Select integrator
 scheme                                   deterministic_forward_euler
 
 # Select implementation to compute M and M*f
-
 mobility_blobs_implementation            python_no_wall
 mobility_vector_prod_implementation      numba_no_wall
 domain                                   no_wall
@@ -12,13 +11,13 @@ blob_blob_force_implementation           None
 
 # Set time step, number of steps and save frequency
 dt                                       0.1
-n_steps                                  1
+n_steps                                  10
 n_save                                   1
 
 # Set fluid viscosity (eta), gravity (g) and blob radius
 eta                                      1e-03
-g                                        10
-blob_radius                              0.067527675333
+g                                        0.00155763239875389
+blob_radius 0.06914158677358383 
 
 # Set parameters for the blob-blob interation
 repulsion_strength                       0
@@ -30,11 +29,10 @@ debye_length_wall                        1.0
 
 # Slip mode
 slip_mode                                True
-save_body_mobility 			 True
 
 # Load rigid bodies configuration, provide
-structure	RigidMultiblobsWall/multi_bodies/Structures/virus	RigidMultiblobsWall/multi_bodies/Structures/blob.clones
+structure	RigidMultiblobsWall/multi_bodies/Structures/virus  RigidMultiblobsWall/multi_bodies/Structures/blob.clones
 
 # Set output name
-output_name                              RigidMultiblobsWall/multi_bodies/data/virusMob
+output_name                              virusMob
 save_clones                              one_file

@@ -315,7 +315,7 @@ def C_matrix_T_vector_prod(bodies, constraints, vector, Nconstraints, C_constrai
   return result
 
 
-#############################################################
+##########################################################################################
 def calc_Pll_matrix(bodies, Nblobs):
   '''
   Calculate the geometric block-diagonal matrix P.
@@ -323,19 +323,18 @@ def calc_Pll_matrix(bodies, Nblobs):
   '''
   Pll = np.zeros((3*Nblobs, 3*Nblobs))
   offset = 0
-  for k, b in enumerate(bodies):
+  for k, b in enumerate(Nblobs):
     Pll_body = b.calc_Pll_matrix()
     Pll[3*offset:3*(offset+b.Nblobs), 3*k:3*k+3] = Pll_body
     offset += b.Nblobs
   return Pll
-#############################################################
-def slip_xi_vector(bodies):
-  xi = np.empty((bodies))
+##########################################################################################
+def slip_xi_vector(bodies, Nblobs):
+  xi = np.empty((Nblobs, 1))
   offset = 0
-  for k, b in enumerate(bodies):
+  for b in enumerate(Nblobs):
        xi_v = b.Nblobs
-       slip_l = b.slip_xi_vector
-       xi[offset:(offset+Nblobs),k] = slip_l
+       xi[offset:(offset+Nblobs)] = b.slip_xi_vector()
        offset += xi_v
   return xi
 
@@ -350,7 +349,11 @@ def calc_Pll_matrix_bodies(bodies):
     Pll_body = b.calc_Pll_matrix()
     Pll.append(Pll_body)
   return Pll
-###############################################################
+#vector=np.array([1,2,3])
+#unit_vector = vector / (vector**2).sum()**0.5
+#unit_vector = vector / np.linalg.norm(vector)
+
+#########################################################################################33
 def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   '''
   Compute the matrix vector product Pll*vector where
@@ -367,7 +370,7 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
       Pll = b.calc_Pll_matrix()
     else:
       Pll = Pll_body[k] 
-    #result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*k : 3*(k+1)]), (b.Nblobs, 3))
+#    result[offset : offset+b.Nblobs] =  np.reshape(np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]), (b.Nblobs, 3))
     result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
@@ -423,7 +426,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
   return res
 
 
-def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, *args, **kwargs):
+def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_bodies=None, *args, **kwargs):
   '''
   The linear operator is
   |  M+(xi^-1)Pll  -K ||lambda| = |  0 + noise_1|
@@ -442,13 +445,11 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   v = np.reshape(vector, (vector.size//3, 3))
   
   # Compute the "lambda" part
-  res[0:Ncomp_blobs] = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
-  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body)
+  mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
+  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_bodies = Pll_bodies)
+  res[0:Ncomp_blobs] = mobility_times_lambda+Pll_times_lambda*(1/slip_xi_vector[0:Ncomp_blobs])
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
-
-  res[0:Ncomp_blobs] += np.reshape(Pll_times_lambda, (3*Nblobs ))
-  res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))  # Mobility_times_lambda + Pll_times_lambda - K_times_U
-  print(res)
+  res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
 

@@ -1,5 +1,5 @@
 # Select problem to solve
-scheme                                   body_mobility
+scheme                                   deterministic_forward_euler
 #scheme                                    mobility
 
 

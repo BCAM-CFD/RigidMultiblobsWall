@@ -46,8 +46,6 @@ class Body(object):
     else:
       self.blobs_radius = np.ones(self.Nblobs) * blob_radius
     
-    
-    
     # Body length
     self.body_length = None
     # Name of body and type of body. A string or number
@@ -249,24 +247,20 @@ class Body(object):
     return normal
 
   
-  def calc_Pll_matrix(self, location = None, orientation = None):
-    '''
+  def calc_Pll_matrix(self):
+    '''cd 
     Return matrix Pll with shape (3*Nblobs, 3)
-    normal = (n^t*n) I= Jmatrix. Pll = I-normal
+    normal = (n^t*n) I= matrix. Pll = I-normal
     xi(Pll)
     '''
     
     P = np.zeros((3*self.Nblobs,3*self.Nblobs))
     
-    print(np.shape(self.normal_V()))
-    vnormal_Vec = self.normal_V().transpose()
-    
     for i in range(0,self.Nblobs):
-      P_ii=self.slip_l[i]*(np.eye(3)-np.outer(self.normal_V()[i],self.normal_V()[i]))
+      P_ii=self.slip_l[i]*(np.eye(3)-(np.outer(self.normal_V()[i],self.normal_V()[i])))
       P[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii
       
-    print(np.shape(P))
-
-    Pll_mult_xi = P #np.reshape(mult_xi,(3*self.Nblobs,3))
+    Pll_mult_xi = P 
+    print(P)
         
     return Pll_mult_xi

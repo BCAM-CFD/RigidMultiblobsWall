@@ -358,7 +358,8 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   ''' 
   # Prepare variables
   result = np.empty((Nblobs, 3))
-  v = vector.flatten()
+  #v = vector.flatten()
+  v = np.reshape(vector, (Nblobs * 3))
 
   # Loop over bodies
   offset = 0
@@ -371,8 +372,7 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
     result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
   return result
-
-
+  
 def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, *args, **kwargs):
   '''
   RetC_matrix_vector_produrn the action of the linear operator of the articulated rigid bodies on vector v.
