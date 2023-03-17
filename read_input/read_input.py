@@ -122,6 +122,8 @@ class ReadInput(object):
     self.repulsion_strength_bodies = np.fromstring(self.options.get('repulsion_strength_bodies') or 'None', sep=' ')
     self.debye_length_bodies = np.fromstring(self.options.get('debye_length_bodies') or 'None', sep=' ')
     self.shear_rate = float(self.options.get('shear_rate') or 0.0)
+    self.shear_mode = int(self.options.get('shear_mode') or 1)
+    self.shear_omega = float(self.options.get('shear_omega') or 0.0)
     self.dipole_line = np.fromstring(self.options.get('dipole_line') or '0 0 1 0', sep=' ')
     
     # Info for STKFMM

@@ -23,6 +23,7 @@ import numpy as np
 import scipy.special as scsp
 import scipy.spatial as scspatial
 import math
+from mobility import mobility as mob
 import multi_bodies_functions
 from multi_bodies_functions import *
 import general_application_utils as utils
@@ -569,8 +570,10 @@ def set_slip_by_ID_new(body, slip, *args, **kwargs):
   '''
   if 'rod_resolved_shear' in body.ID:
     body.function_slip = partial(slip_rod_resolved, *args, **kwargs)
+  elif 'shear_mode' in body.ID:
+    body.function_slip = partial(slip_shear_mode, *args, **kwargs)
   else:
-    body.function_slip = default_zero_blobs
+    body.function_slip = default_zero_blobs    
   return
 multi_bodies_functions.set_slip_by_ID = set_slip_by_ID_new
 
@@ -590,3 +593,100 @@ def slip_rod_resolved(body, *args, **kwargs):
   slip[:,0] -= shear_rate * r_configuration[:,2]
 
   return slip
+
+
+def slip_shear_mode(body, *args, **kwargs):
+  '''
+  Apply shear mode.
+  '''
+  shear_rate = kwargs.get('shear_rate')
+  shear_mode = kwargs.get('shear_mode')
+  r_configuration = body.get_r_vectors()
+  slip = np.zeros((body.Nblobs, 3))
+  
+  if shear_mode == 1:
+    slip[:,0] -= shear_rate * r_configuration[:,0]
+    slip[:,1] += shear_rate * r_configuration[:,1]
+  elif shear_mode == 2:
+    slip[:,0] -= shear_rate * r_configuration[:,1]
+
+  return slip 
+
+
+def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle_radius, p, output, radius_source=None, frame_body=None, *args, **kwargs):
+  '''
+  This function plots the velocity field to a circle.
+  The grid is defined in the body frame of reference of body "frame_body".
+  If frame_body < 0 the grid is defined in the laboratory frame of reference.
+  '''
+  # Create circle
+  t = np.arange(p)
+  grid_coor_ref = np.zeros((p, 3))
+  grid_coor_ref[:,0] = circle_radius * np.cos(2 * np.pi * t / p)
+  grid_coor_ref[:,1] = circle_radius * np.sin(2 * np.pi * t / p)
+  
+
+  # Transform grid to the body frame of reference
+  if frame_body is not None:
+    grid_coor = utils.get_vectors_frame_body(grid_coor_ref, body=frame_body)
+  else:
+    grid_coor = grid_coor_ref
+    
+  # Set radius of blobs (= a) and grid nodes (= 0)
+  if radius_source is None:
+    radius_source = np.ones(r_vectors.size // 3) * blob_radius
+  radius_target = np.zeros(grid_coor.size // 3) 
+  
+  # Compute velocity field 
+  mobility_vector_prod_implementation = kwargs.get('mobility_vector_prod_implementation')
+  if mobility_vector_prod_implementation == 'python':
+    grid_velocity = mob.mobility_vector_product_source_target_one_wall(r_vectors, 
+                                                                       grid_coor, 
+                                                                       lambda_blobs, 
+                                                                       radius_source, 
+                                                                       radius_target, 
+                                                                       eta, 
+                                                                       *args, 
+                                                                       **kwargs) 
+  elif mobility_vector_prod_implementation == 'C++':
+    grid_velocity = mob.boosted_mobility_vector_product_source_target(r_vectors, 
+                                                                      grid_coor, 
+                                                                      lambda_blobs, 
+                                                                      radius_source, 
+                                                                      radius_target, 
+                                                                      eta, 
+                                                                      *args, 
+                                                                      **kwargs)
+  elif mobility_vector_prod_implementation == 'numba_no_wall':
+    grid_velocity = mob.no_wall_mobility_trans_times_force_source_target_numba(r_vectors, 
+                                                                               grid_coor, 
+                                                                               lambda_blobs, 
+                                                                               radius_source, 
+                                                                               radius_target, 
+                                                                               eta, 
+                                                                               *args, 
+                                                                               **kwargs) 
+  else:
+    grid_velocity = mob.single_wall_mobility_trans_times_force_source_target_pycuda(r_vectors, 
+                                                                                    grid_coor, 
+                                                                                    lambda_blobs, 
+                                                                                    radius_source, 
+                                                                                    radius_target, 
+                                                                                    eta, 
+                                                                                    *args, 
+                                                                                    **kwargs)
+    
+  # Tranform velocity to the body frame of reference
+  if frame_body is not None:
+    grid_velocity = utils.get_vectors_frame_body(grid_velocity, body=frame_body, translate=False, transpose=True)
+ 
+  # Write velocity field.
+  header = 'R=' + str(circle_radius) + ', p=' + str(p) + ', N=' + str(p) + ', centered body=' + str(frame_body) + ', 7 Columns: grid point (x,y,z), quadrature weight, velocity (vx,vy,vz)'
+  result = np.zeros((grid_coor.shape[0], 7))
+  result[:,0:3] = grid_coor_ref
+  result[:,3] = 2 * np.pi * circle_radius / p
+  grid_velocity = grid_velocity.reshape((grid_velocity.size // 3, 3)) 
+  result[:,4:] = grid_velocity
+  np.savetxt(output, result, header=header) 
+  return
+multi_bodies_functions.plot_velocity_field_circle = plot_velocity_field_circle
