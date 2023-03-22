@@ -300,12 +300,78 @@ class QuaternionIntegrator(object):
                                 mobility_vector_prod_implementation='numba')
       
       # Extract velocities
-      velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+      velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))      
 
       # Extract force on blobs and bodies velocities
       self.blobs_lambda = sol_precond[0:3*self.Nblobs]
       self.bodies_velocity = np.reshape(sol_precond[3*self.Nblobs:], (len(self.bodies), 6))
 
+      step = kwargs.get('step')
+      if (step % self.n_save) == 0:
+        # Save bodies velocity
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.bodies_velocities.dat'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
+        
+        # Set radius of blobs 
+        radius_source = np.zeros(self.Nblobs)
+        offset = 0
+        for b in self.bodies:
+          num_blobs = b.Nblobs
+          radius_source[offset:(offset+num_blobs)] = b.blobs_radius
+          offset += num_blobs
+
+        # Extract blob forces 
+        lambda_blobs = sol_precond[0 : 3*self.Nblobs]
+
+        # Get blobs vectors
+        r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
+        
+        # Plot flow in rectangular in the body frame of reference of body zero 
+        if self.plot_velocity_field.size > 0:
+          pvf.plot_velocity_field(self.plot_velocity_field,
+                                  r_vectors_blobs,
+                                  lambda_blobs,
+                                  self.a,
+                                  self.eta,
+                                  self.output_name + '.step.' + str(step).zfill(8),
+                                  0,
+                                  radius_source=radius_source,
+                                  frame_body = self.bodies[0],
+                                  mobility_vector_prod_implementation='numba_no_wall')
+
+        # Plot flow on a shell
+        if True:
+          circle_radius = 16
+          p = 32
+          grid_coor, grid_velocity = self.plot_velocity_field_circle(r_vectors_blobs,
+                                                                     lambda_blobs,
+                                                                     self.a,
+                                                                     self.eta,
+                                                                     circle_radius,
+                                                                     p,
+                                                                     radius_source=None,
+                                                                     mobility_vector_prod_implementation='numba_no_wall')
+          # Reshape
+          grid_coor = grid_coor.reshape((grid_coor.size // 3, 3))
+          grid_velocity = grid_coor.reshape((grid_velocity.size // 3, 3))
+
+          # Compute modes
+          r_mode = np.zeros_like(grid_coor)
+          r_mode[:,0] = grid_coor[:,0]
+          r_mode[:,1] = -grid_coor[:,1]
+          mode_1 = np.einsum('ij,ij->', r_mode, grid_velocity)
+          r_mode[:,:] = 0
+          r_mode[:,0] = grid_coor[:,1]
+          mode_2 = np.einsum('ij,ij->', r_mode, grid_velocity)
+
+          # Save bodies velocity
+          mode = 'w' if step == 0 else 'a'
+          name = self.output_name + '.shear_modes.dat'
+          with open(name, mode) as f_handle:
+            f_handle.write(str(step * dt) + ' ' + str(mode_1) + ' ' + str(mode_2))
+      
       # Update location orientation to midpoint
       for k, b in enumerate(self.bodies):
         b.location = b.location_old + velocities[6*k:6*k+3] * dt * 0.5
@@ -1481,7 +1547,7 @@ class QuaternionIntegrator(object):
     if RHS is None:
       # Calculate slip on blobs
       if self.calc_slip is not None:
-        slip = self.calc_slip(self.bodies, self.Nblobs)
+        slip = self.calc_slip(self.bodies, self.Nblobs, *args, **kwargs)
       else:
         slip = np.zeros((self.Nblobs, 3))
 

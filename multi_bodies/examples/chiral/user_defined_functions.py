@@ -613,7 +613,7 @@ def slip_shear_mode(body, *args, **kwargs):
   return slip 
 
 
-def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle_radius, p, output, radius_source=None, frame_body=None, *args, **kwargs):
+def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle_radius, p, radius_source=None, *args, **kwargs):
   '''
   This function plots the velocity field to a circle.
   The grid is defined in the body frame of reference of body "frame_body".
@@ -621,21 +621,14 @@ def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle
   '''
   # Create circle
   t = np.arange(p)
-  grid_coor_ref = np.zeros((p, 3))
-  grid_coor_ref[:,0] = circle_radius * np.cos(2 * np.pi * t / p)
-  grid_coor_ref[:,1] = circle_radius * np.sin(2 * np.pi * t / p)
-  
-
-  # Transform grid to the body frame of reference
-  if frame_body is not None:
-    grid_coor = utils.get_vectors_frame_body(grid_coor_ref, body=frame_body)
-  else:
-    grid_coor = grid_coor_ref
-    
+  grid_coor = np.zeros((p, 3))
+  grid_coor[:,0] = circle_radius * np.cos(2 * np.pi * t / p)
+  grid_coor[:,1] = circle_radius * np.sin(2 * np.pi * t / p)
+      
   # Set radius of blobs (= a) and grid nodes (= 0)
   if radius_source is None:
     radius_source = np.ones(r_vectors.size // 3) * blob_radius
-  radius_target = np.zeros(grid_coor.size // 3) 
+  radius_target = np.zeros(grid_coor.size // 3)
   
   # Compute velocity field 
   mobility_vector_prod_implementation = kwargs.get('mobility_vector_prod_implementation')
@@ -675,18 +668,6 @@ def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle
                                                                                     eta, 
                                                                                     *args, 
                                                                                     **kwargs)
-    
-  # Tranform velocity to the body frame of reference
-  if frame_body is not None:
-    grid_velocity = utils.get_vectors_frame_body(grid_velocity, body=frame_body, translate=False, transpose=True)
- 
-  # Write velocity field.
-  header = 'R=' + str(circle_radius) + ', p=' + str(p) + ', N=' + str(p) + ', centered body=' + str(frame_body) + ', 7 Columns: grid point (x,y,z), quadrature weight, velocity (vx,vy,vz)'
-  result = np.zeros((grid_coor.shape[0], 7))
-  result[:,0:3] = grid_coor_ref
-  result[:,3] = 2 * np.pi * circle_radius / p
-  grid_velocity = grid_velocity.reshape((grid_velocity.size // 3, 3)) 
-  result[:,4:] = grid_velocity
-  np.savetxt(output, result, header=header) 
-  return
+  
+  return grid_coor, grid_velocity
 multi_bodies_functions.plot_velocity_field_circle = plot_velocity_field_circle
