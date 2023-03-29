@@ -355,22 +355,31 @@ class QuaternionIntegrator(object):
                                                                      mobility_vector_prod_implementation='numba_no_wall')
           # Reshape
           grid_coor = grid_coor.reshape((grid_coor.size // 3, 3))
-          grid_velocity = grid_coor.reshape((grid_velocity.size // 3, 3))
-
-          # Compute modes
+          grid_velocity = grid_velocity.reshape((grid_velocity.size // 3, 3))
+          r_norm = np.linalg.norm(grid_coor, axis=1)
+          r_norm_2 = np.linalg.norm(grid_coor, axis=1)**2
+          
+          # Compute modes: 0
           r_mode = np.zeros_like(grid_coor)
+          r_mode[:,0] = -grid_coor[:,1]
+          r_mode[:,1] =  grid_coor[:,0]
+          mode_0 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size
+          # 1
+          r_mode[:,:] = 0
           r_mode[:,0] = grid_coor[:,0]
           r_mode[:,1] = -grid_coor[:,1]
-          mode_1 = np.einsum('ij,ij->', r_mode, grid_velocity)
+          mode_1 = np.einsum('ij,ij->', r_mode / r_norm_2[:,None], grid_velocity)  / r_norm_2.size
+          # 2
           r_mode[:,:] = 0
           r_mode[:,0] = grid_coor[:,1]
-          mode_2 = np.einsum('ij,ij->', r_mode, grid_velocity)
+          r_mode[:,1] = grid_coor[:,0]
+          mode_2 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size
 
           # Save bodies velocity
           mode = 'w' if step == 0 else 'a'
           name = self.output_name + '.shear_modes.dat'
           with open(name, mode) as f_handle:
-            f_handle.write(str(step * dt) + ' ' + str(mode_1) + ' ' + str(mode_2))
+            f_handle.write(str(step * dt) + ' ' + str(mode_0) + ' ' + str(mode_1) + ' ' + str(mode_2) + '\n')
       
       # Update location orientation to midpoint
       for k, b in enumerate(self.bodies):
