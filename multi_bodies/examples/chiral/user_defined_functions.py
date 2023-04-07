@@ -629,6 +629,7 @@ def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle
   grid_coor = np.zeros((p, 3))
   grid_coor[:,0] = circle_radius * np.cos(2 * np.pi * t / p)
   grid_coor[:,1] = circle_radius * np.sin(2 * np.pi * t / p)
+  grid_coor[:,2] = 1.7
       
   # Set radius of blobs (= a) and grid nodes (= 0)
   if radius_source is None:
@@ -663,7 +664,16 @@ def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle
                                                                                radius_target, 
                                                                                eta, 
                                                                                *args, 
-                                                                               **kwargs) 
+                                                                               **kwargs)
+  elif mobility_vector_prod_implementation == 'numba':
+    grid_velocity = mob.single_wall_mobility_trans_times_force_source_target_numba(r_vectors, 
+                                                                                   grid_coor, 
+                                                                                   lambda_blobs, 
+                                                                                   radius_source, 
+                                                                                   radius_target, 
+                                                                                   eta, 
+                                                                                   *args, 
+                                                                                   **kwargs)    
   else:
     grid_velocity = mob.single_wall_mobility_trans_times_force_source_target_pycuda(r_vectors, 
                                                                                     grid_coor, 

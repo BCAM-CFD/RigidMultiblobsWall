@@ -352,7 +352,7 @@ class QuaternionIntegrator(object):
                                                                      circle_radius,
                                                                      p,
                                                                      radius_source=None,
-                                                                     mobility_vector_prod_implementation='numba_no_wall')
+                                                                     mobility_vector_prod_implementation='numba')
           # Reshape
           grid_coor = grid_coor.reshape((grid_coor.size // 3, 3))
           grid_velocity = grid_velocity.reshape((grid_velocity.size // 3, 3))
@@ -1556,7 +1556,7 @@ class QuaternionIntegrator(object):
     if RHS is None:
       # Calculate slip on blobs
       if self.calc_slip is not None:
-        slip = self.calc_slip(self.bodies, self.Nblobs, *args, **kwargs)
+        slip = self.calc_slip(self.bodies, self.Nblobs, background_c=None, *args, **kwargs)
       else:
         slip = np.zeros((self.Nblobs, 3))
 
