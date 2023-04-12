@@ -344,12 +344,14 @@ class QuaternionIntegrator(object):
         # Plot flow on a shell
         if True:
           circle_radius = 16
+          circle_height = 1.7
           p = 32
           grid_coor, grid_velocity = self.plot_velocity_field_circle(r_vectors_blobs,
                                                                      lambda_blobs,
                                                                      self.a,
                                                                      self.eta,
                                                                      circle_radius,
+                                                                     circle_height, 
                                                                      p,
                                                                      radius_source=None,
                                                                      mobility_vector_prod_implementation='numba')
@@ -363,17 +365,17 @@ class QuaternionIntegrator(object):
           r_mode = np.zeros_like(grid_coor)
           r_mode[:,0] = -grid_coor[:,1]
           r_mode[:,1] =  grid_coor[:,0]
-          mode_0 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size
+          mode_0 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size / circle_height**2
           # 1
           r_mode[:,:] = 0
           r_mode[:,0] = grid_coor[:,0]
           r_mode[:,1] = -grid_coor[:,1]
-          mode_1 = np.einsum('ij,ij->', r_mode / r_norm_2[:,None], grid_velocity)  / r_norm_2.size
+          mode_1 = np.einsum('ij,ij->', r_mode / r_norm_2[:,None], grid_velocity)  / r_norm_2.size / circle_height**2
           # 2
           r_mode[:,:] = 0
           r_mode[:,0] = grid_coor[:,1]
           r_mode[:,1] = grid_coor[:,0]
-          mode_2 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size
+          mode_2 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size / circle_height**2
 
           # Save bodies velocity
           mode = 'w' if step == 0 else 'a'

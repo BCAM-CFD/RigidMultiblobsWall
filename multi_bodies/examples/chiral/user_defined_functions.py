@@ -618,7 +618,7 @@ def slip_shear_mode(body, *args, **kwargs):
   return slip 
 
 
-def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle_radius, p, radius_source=None, *args, **kwargs):
+def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle_radius, circle_height, p, radius_source=None, *args, **kwargs):
   '''
   This function plots the velocity field to a circle.
   The grid is defined in the body frame of reference of body "frame_body".
@@ -629,7 +629,7 @@ def plot_velocity_field_circle(r_vectors, lambda_blobs, blob_radius, eta, circle
   grid_coor = np.zeros((p, 3))
   grid_coor[:,0] = circle_radius * np.cos(2 * np.pi * t / p)
   grid_coor[:,1] = circle_radius * np.sin(2 * np.pi * t / p)
-  grid_coor[:,2] = 1.7
+  grid_coor[:,2] = circle_height
       
   # Set radius of blobs (= a) and grid nodes (= 0)
   if radius_source is None:
