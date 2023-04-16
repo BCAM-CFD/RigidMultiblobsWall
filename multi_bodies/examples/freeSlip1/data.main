@@ -33,7 +33,7 @@ slip_mode                                True
 
 
 # Load rigid bodies configuration, provide
-structure	virus4.vertex  virus.clones
+structure	virus22.vertex  virus.clones
 
 # Set output name
 output_name                              data/virusMob

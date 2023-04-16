@@ -32,7 +32,7 @@ debye_length_wall                        1.0
 slip_mode                                True
 
 # Load rigid bodies configuration, provide
-structure	virus12.vertex  virus.clones
+structure	virus26.vertex  virus.clones
 
 # Set output name
 output_name                              data/virusMob

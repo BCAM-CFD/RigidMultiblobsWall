@@ -314,8 +314,6 @@ def C_matrix_T_vector_prod(bodies, constraints, vector, Nconstraints, C_constrai
   result = np.reshape(result, (2*len(bodies), 3))
   return result
 
-
-#############################################################
 def calc_Pll_matrix(bodies, Nblobs):
   '''
   Calculate the geometric block-diagonal matrix P.
@@ -328,21 +326,10 @@ def calc_Pll_matrix(bodies, Nblobs):
     Pll[3*offset:3*(offset+b.Nblobs), 3*k:3*k+3] = Pll_body
     offset += b.Nblobs
   return Pll
-#############################################################
-def slip_xi_vector(bodies):
-  xi = np.empty((bodies))
-  offset = 0
-  for k, b in enumerate(bodies):
-       xi_v = b.Nblobs
-       slip_l = b.slip_xi_vector
-       xi[offset:(offset+Nblobs),k] = slip_l
-       offset += xi_v
-  return xi
 
-############################################################
 def calc_Pll_matrix_bodies(bodies):
   '''
-  Calculate the geometric matrix K for
+  Calculate the geometric matrix Pll for
   each body. List of shape (3*Nblobs, 6*Nbodies).
   '''
   Pll = []
@@ -350,11 +337,7 @@ def calc_Pll_matrix_bodies(bodies):
     Pll_body = b.calc_Pll_matrix()
     Pll.append(Pll_body)
   return Pll
-#vector=np.array([1,2,3])
-#unit_vector = vector / (vector**2).sum()**0.5
-#unit_vector = vector / np.linalg.norm(vector)
 
-###############################################################
 def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   '''
   Compute the matrix vector product Pll*vector where
@@ -451,7 +434,8 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies], Nblobs, K_bodies = K_bodies) 
   
   res[0:Ncomp_blobs] += np.reshape(Pll_times_lambda, (3*Nblobs ))
-  res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))  # Mobility_times_lambda + Pll_times_lambda - K_times_U
+  res[0:Ncomp_blobs] -= np.reshape(K_times_U , (3*Nblobs))  
+ 
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
 
@@ -461,19 +445,6 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   else:
     res[Ncomp_blobs : Ncomp_blobs+Ncomp_bodies] = np.reshape(-K_T_times_lambda, (Ncomp_bodies))
 
-  # Modify to account for prescribed kinematics
-  offset = 0
-  for k, b in enumerate(bodies):
-    if b.prescribed_kinematics is True:
-      res[3*offset : 3*(offset+b.Nblobs)] += (K_times_U[offset : (offset+b.Nblobs)]).flatten()
-      res[Ncomp_blobs + k*6: Ncomp_blobs + (k+1)*6] += vector[Ncomp_blobs + k*6: Ncomp_blobs + (k+1)*6]
-    offset += b.Nblobs
-
-  # Compute the "constraint velocity: B" part if any
-  if Nconstraints > 0:
-    C_times_U = C_matrix_vector_prod(bodies, constraints, v[Nblobs:Nblobs+2*Nbodies], Nconstraints, C_constraints = C_constraints)
-    res[Ncomp_blobs+Ncomp_bodies:Ncomp_tot] = np.reshape(C_times_U , (Ncomp_phi))
-    
   return res
 
 
