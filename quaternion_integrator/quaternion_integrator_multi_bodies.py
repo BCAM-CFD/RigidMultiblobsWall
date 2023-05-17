@@ -292,19 +292,9 @@ class QuaternionIntegrator(object):
       # Solve mobility problem
       sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, PC_partial=PC_partial, step = kwargs.get('step'), dt = dt)
 
-      # Plot velocity field 
-      if self.plot_velocity_field.size > 1: 
-        lambda_blobs = sol_precond[0:3*self.Nblobs]
-        output = self.output_prefix + '.step.' + str(kwargs.get('step'))  
-        pvf.plot_velocity_field(self.plot_velocity_field, r_vectors_blobs_n, lambda_blobs, self.a, self.eta, output, 0, 
-                                mobility_vector_prod_implementation='numba')
-      
+     
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))      
-
-      # Extract force on blobs and bodies velocities
-      self.blobs_lambda = sol_precond[0:3*self.Nblobs]
-      self.bodies_velocity = np.reshape(sol_precond[3*self.Nblobs:], (len(self.bodies), 6))
 
       step = kwargs.get('step')
       if (step % self.n_save) == 0:
@@ -312,76 +302,7 @@ class QuaternionIntegrator(object):
         mode = 'w' if step == 0 else 'a'
         name = self.output_name + '.bodies_velocities.dat'
         with open(name, mode) as f_handle:
-          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
-        
-        # Set radius of blobs 
-        radius_source = np.zeros(self.Nblobs)
-        offset = 0
-        for b in self.bodies:
-          num_blobs = b.Nblobs
-          radius_source[offset:(offset+num_blobs)] = b.blobs_radius
-          offset += num_blobs
-
-        # Extract blob forces 
-        lambda_blobs = sol_precond[0 : 3*self.Nblobs]
-
-        # Get blobs vectors
-        r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
-        
-        # Plot flow in rectangular in the body frame of reference of body zero 
-        if self.plot_velocity_field.size > 0:
-          pvf.plot_velocity_field(self.plot_velocity_field,
-                                  r_vectors_blobs,
-                                  lambda_blobs,
-                                  self.a,
-                                  self.eta,
-                                  self.output_name + '.step.' + str(step).zfill(8),
-                                  0,
-                                  radius_source=radius_source,
-                                  frame_body = self.bodies[0],
-                                  mobility_vector_prod_implementation='numba_no_wall')
-
-        # Plot flow on a shell
-        if True:
-          circle_radius = 16
-          circle_height = 1.7
-          p = 32
-          grid_coor, grid_velocity = self.plot_velocity_field_circle(r_vectors_blobs,
-                                                                     lambda_blobs,
-                                                                     self.a,
-                                                                     self.eta,
-                                                                     circle_radius,
-                                                                     circle_height, 
-                                                                     p,
-                                                                     radius_source=None,
-                                                                     mobility_vector_prod_implementation='numba')
-          # Reshape
-          grid_coor = grid_coor.reshape((grid_coor.size // 3, 3))
-          grid_velocity = grid_velocity.reshape((grid_velocity.size // 3, 3))
-          r_norm = np.linalg.norm(grid_coor, axis=1)
-          r_norm_2 = np.linalg.norm(grid_coor, axis=1)**2
-          
-          # Compute modes: 0
-          r_mode = np.zeros_like(grid_coor)
-          r_mode[:,0] = -grid_coor[:,1]
-          r_mode[:,1] =  grid_coor[:,0]
-          mode_0 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size / circle_height**2
-          # 1
-          r_mode[:,:] = 0
-          r_mode[:,0] = grid_coor[:,0]
-          r_mode[:,1] = -grid_coor[:,1]
-          mode_1 = np.einsum('ij,ij->', r_mode / r_norm_2[:,None], grid_velocity)  / r_norm_2.size / circle_height**2
-          # 2
-          r_mode[:,:] = 0
-          r_mode[:,0] = grid_coor[:,1]
-          r_mode[:,1] = grid_coor[:,0]
-          mode_2 = np.einsum('ij,ij->', r_mode / r_norm_2[:, None], grid_velocity) / r_norm_2.size / circle_height**2
-
-          # Save bodies velocity
-          mode = 'w' if step == 0 else 'a'
-          name = self.output_name + '.shear_modes.dat'
-          with open(name, mode) as f_handle:
-            f_handle.write(str(step * dt) + ' ' + str(mode_0) + ' ' + str(mode_1) + ' ' + str(mode_2) + '\n')
+          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))      
       
       # Update location orientation to midpoint
       for k, b in enumerate(self.bodies):
@@ -1631,10 +1552,10 @@ class QuaternionIntegrator(object):
 
       # Solve preconditioned linear system
       counter = gmres_counter(print_residual = self.print_residual)
-      # (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
-      # self.det_iterations_count += counter.niter
-      (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=400, restart=200, verbose=self.print_residual, convergence='presid')
-      self.det_iterations_count += len(resnorms)
+      (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=200, callback=counter)
+      self.det_iterations_count += counter.niter
+      # (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=400, restart=200, verbose=self.print_residual, convergence='presid')
+      # self.det_iterations_count += len(resnorms)
     else:
       sol_precond = np.zeros_like(RHS)
 

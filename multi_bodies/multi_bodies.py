@@ -1392,7 +1392,8 @@ if __name__ == '__main__':
   integrator.articulated = articulated
   integrator.nonlinear_solver_tolerance = read.nonlinear_solver_tolerance
   integrator.plot_velocity_field = read.plot_velocity_field
-  integrator.output_prefix = output_name
+  integrator.output_name = output_name
+  integrator.n_save = n_save
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:
