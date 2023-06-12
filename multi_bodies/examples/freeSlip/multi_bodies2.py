@@ -359,7 +359,6 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   return result
 
 
-
 def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, *args, **kwargs):
   '''
   RetC_matrix_vector_produrn the action of the linear operator of the articulated rigid bodies on vector v.
@@ -460,64 +459,6 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   
   return res
 
-def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, *args, **kwargs):
-  '''
-  The linear operator is
-  |  M+(xi^-1)Pll  -0.5*K-D*K ||lambda| = |  0 + noise_1|
-  |       -K^T              0 ||  U   | = | -F + noise_2|
-''' 
-  # Reserve memory for the solution and create some variables
-  L = kwargs.get('periodic_length')
-  Ncomp_blobs = r_vectors.size
-  Nblobs = r_vectors.size // 3
-  Nbodies = len(bodies)
-  Nconstraints = len(constraints)
-  Ncomp_bodies = 6 * Nbodies
-  Ncomp_phi = 3 * Nconstraints
-  Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
-  res = np.empty((Ncomp_tot))
-  v = np.reshape(vector, (vector.size//3, 3))
-  velocity= np.ones(r_vectors.size)
-  weights = np.ones(r_vectors.size) * (4*np.pi*1*1)/642
-  
-
-  for k, b in enumerate(bodies):
-    normals = b.normal_V()
-  
-  # Compute the "lambda" part
-  mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
-  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body)
-  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies],Nblobs, K_bodies = K_bodies)
-
-  Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights)
-  print(Dslip) 
-  
-  res[0:Ncomp_blobs] = mobility_times_lambda + np.reshape(Pll_times_lambda, (3*Nblobs )) - np.reshape(Dslip, (3*Nblobs )) - np.reshape(0.5*K_times_U , (3*Nblobs)) 
-
-
-  # Compute the "-force_torque" part
-  K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
-  # Add constraint forces if any
-  if Nconstraints > 0:
-    C_T_times_phi = C_matrix_T_vector_prod(bodies, constraints, vector[Ncomp_blobs + Ncomp_bodies:Ncomp_tot], Nconstraints, C_constraints = C_constraints)
-    res[Ncomp_blobs : Ncomp_blobs+Ncomp_bodies] = np.reshape(-K_T_times_lambda + C_T_times_phi, (Ncomp_bodies))
-  else:
-    res[Ncomp_blobs : Ncomp_blobs+Ncomp_bodies] = np.reshape(-K_T_times_lambda, (Ncomp_bodies))
-
-  # Modify to account for prescribed kinematics
-  offset = 0
-  for k, b in enumerate(bodies):
-    if b.prescribed_kinematics is True:
-      res[3*offset : 3*(offset+b.Nblobs)] += (K_times_U[offset : (offset+b.Nblobs)]).flatten()
-      res[Ncomp_blobs + k*6: Ncomp_blobs + (k+1)*6] += vector[Ncomp_blobs + k*6: Ncomp_blobs + (k+1)*6]
-    offset += b.Nblobs
-
-  # Compute the "constraint velocity: B" part if any
-  if Nconstraints > 0:
-    C_times_U = C_matrix_vector_prod(bodies, constraints, v[Nblobs:Nblobs+2*Nbodies], Nconstraints, C_constraints = C_constraints)
-    res[Ncomp_blobs+Ncomp_bodies:Ncomp_tot] = np.reshape(C_times_U , (Ncomp_phi))
-  
-  return res
 
 @utils.static_var('initialized', [])
 @utils.static_var('mobility_bodies', [])
@@ -1382,8 +1323,7 @@ if __name__ == '__main__':
   integrator.calc_K_matrix = calc_K_matrix
 
   if read.slip_mode =='True':
-    #integrator.linear_operator = linear_operator_projector
-    integrator.linear_operator = linear_operator_projector_second_layer
+    integrator.linear_operator = linear_operator_projector
   else:
     integrator.linear_operator = linear_operator_rigid
   integrator.build_block_diagonal_preconditioners_det_stoch = build_block_diagonal_preconditioners_det_stoch

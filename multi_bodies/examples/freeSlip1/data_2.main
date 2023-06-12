@@ -4,7 +4,7 @@ scheme                                   deterministic_forward_euler
 # Select implementation to compute M and M*f
 
 mobility_blobs_implementation            python_no_wall
-mobility_vector_prod_implementation      numba_no_wall
+mobility_vector_prod_implementation      numba_no_wall2
 domain                                   no_wall
 
 # Select implementation to compute the blobs-blob interactions

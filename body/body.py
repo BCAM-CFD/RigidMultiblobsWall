@@ -252,9 +252,11 @@ class Body(object):
     xi(Pll)
     '''
     P = np.zeros((3*self.Nblobs,3*self.Nblobs))
-    Area = (4*np.pi*1)/642
+    Area = (4*np.pi*1*1)/642
     for i in range(0,self.Nblobs):
       P_ii=(1/Area)*self.slip_l[i]*(np.eye(3)-(np.outer(self.normal_V()[i],self.normal_V()[i])))
       P[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii
       
     return P
+  
+  
