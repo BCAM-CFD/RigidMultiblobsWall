@@ -31,7 +31,6 @@ while found_functions is False:
     from quaternion_integrator.quaternion_integrator_rollers import QuaternionIntegratorRollers
     from body import body 
     from read_input import read_input
-    from read_input import read_vertex_file
     from read_input import read_clones_file
     from read_input import read_slip_file
     from read_input import read_velocity_file
@@ -480,7 +479,7 @@ def linear_operator_projector_second_layer(vector, bodies, constraints, r_vector
   velocity= np.ones(r_vectors.size)
   weights = np.ones(r_vectors.size) * (4*np.pi*1*1)/642
   
-
+  # Floren: this only works for a single body
   for k, b in enumerate(bodies):
     normals = b.normal_V()
   
@@ -491,12 +490,14 @@ def linear_operator_projector_second_layer(vector, bodies, constraints, r_vector
 
   Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights)
   print(Dslip) 
-  
+
+
   res[0:Ncomp_blobs] = mobility_times_lambda + np.reshape(Pll_times_lambda, (3*Nblobs )) - np.reshape(Dslip, (3*Nblobs )) - np.reshape(0.5*K_times_U , (3*Nblobs)) 
 
 
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
+
   # Add constraint forces if any
   if Nconstraints > 0:
     C_T_times_phi = C_matrix_T_vector_prod(bodies, constraints, vector[Ncomp_blobs + Ncomp_bodies:Ncomp_tot], Nconstraints, C_constraints = C_constraints)

@@ -242,7 +242,8 @@ class Body(object):
     '''
     rotation_matrix = self.orientation.rotation_matrix()
     normal = np.dot(self.normal, rotation_matrix.T)
-    normal += self.location
+    # Floren: adding location to the normals is wrong.
+    # normal += self.location
     return normal
   
   def calc_Pll_matrix(self):
