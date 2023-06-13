@@ -39,14 +39,11 @@ class Body(object):
     if reference_configuration.shape[1] == 4:   #### 
       self.blobs_radius = reference_configuration[:,3]
     if reference_configuration.shape[1] == 7:
-      #self.blobs_radius = reference_configuration[:,3]
-      self.blobs_radius = np.ones(self.Nblobs) * blob_radius
+      #self.blobs_radius = np.ones(self.Nblobs) * blob_radius
       self.normal = reference_configuration[:,3:6]   #normal
       self.slip_l = reference_configuration[:,6]   #slip
     else:
       self.blobs_radius = np.ones(self.Nblobs) * blob_radius
-    
-    
     
     # Body length
     self.body_length = None
@@ -245,28 +242,22 @@ class Body(object):
     '''
     rotation_matrix = self.orientation.rotation_matrix()
     normal = np.dot(self.normal, rotation_matrix.T)
-    
+    # Floren: adding location to the normals is wrong.
+    # normal += self.location
     return normal
-
   
-  def calc_Pll_matrix(self, location = None, orientation = None):
-    '''
+  def calc_Pll_matrix(self):
+    '''cd 
     Return matrix Pll with shape (3*Nblobs, 3)
-    normal = (n^t*n) I= Jmatrix. Pll = I-normal
+    normal = (n^t*n) I= matrix. Pll = I-normal
     xi(Pll)
     '''
-    
     P = np.zeros((3*self.Nblobs,3*self.Nblobs))
-    
-    print(np.shape(self.normal_V()))
-    vnormal_Vec = self.normal_V().transpose()
-    
+    Area = (4*np.pi*1*1)/642
     for i in range(0,self.Nblobs):
-      P_ii=self.slip_l[i]*(np.eye(3)-np.outer(self.normal_V()[i],self.normal_V()[i]))
+      P_ii=(1/Area)*self.slip_l[i]*(np.eye(3)-(np.outer(self.normal_V()[i],self.normal_V()[i])))
       P[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii
       
-    print(np.shape(P))
-
-    Pll_mult_xi = P #np.reshape(mult_xi,(3*self.Nblobs,3))
-        
-    return Pll_mult_xi
+    return P
+  
+  
