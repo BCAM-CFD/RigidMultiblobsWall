@@ -16,8 +16,8 @@ def torque_constnat(T0, omega_B, t, phi, R, dipole_0):
 
 def torque_dipole(T0, omega_B, t, phi, R, dipole_0):
   dipole = np.dot(R, dipole_0)
-  angle = w*t + phi
-  return T0 * np.cross(dipole, np.array([-np.sin(angle), np.cos(angle), 0]))
+  angle = omega_B*t + phi
+  return np.dot(R.T, T0 * np.cross(dipole, np.array([-np.sin(angle), np.cos(angle), 0])) )
 
 def skew_matrix(x):
   return np.array([0, -x[2], x[1],
@@ -61,40 +61,39 @@ def quaternion_from_R(R):
   projections = np.einsum('ij,j->i', u, direction)
   index = np.argsort(np.abs(projections))[-1]
 
-  if True:
-    print('norm2_1 = ', norm2_1)
-    print('norm2_2 = ', norm2_2)
-    print('norm2_3 = ', norm2_3)
-    print('norm2_4 = ', norm2_4)
-    print('direc   = ', direction)
-    print('proj    = ', projections)
-    print('index   = ', index)
-    print('u[i]    = ', u[index])
-    print('|u|     = ', np.linalg.norm(u, axis=1))
-    print('u       = \n', u)
+  # if True:
+  #   print('norm2_1 = ', norm2_1)
+  #   print('norm2_2 = ', norm2_2)
+  #   print('norm2_3 = ', norm2_3)
+  #   print('norm2_4 = ', norm2_4)
+  #   print('direc   = ', direction)
+  #   print('proj    = ', projections)
+  #   print('index   = ', index)
+  #   print('u[i]    = ', u[index])
+  #   print('|u|     = ', np.linalg.norm(u, axis=1))
+  #   print('u       = \n', u)
   
   return u[index]
   
 if __name__ == '__main__':
   # Set parameters
   start = time.time()
-  output_name = '/home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run3000/run3060/run3060.2.0.2'
+  output_name = '/home/fbalboa/simulations/RigidMultiblobsWall/chiral/data/run3000/run3060/run3060.4.0.0'
   Jxx = 2
   Jyy = 0.5
   Jzz = 1
   perturbation = 0
-  angular_momentum = np.array([0.01, 0.03, 1]) 
+  angular_momentum = np.array([0.01, 0.02, 0.03]) 
   phi = 0
-  T0 = 0
-  omega_z = 1
-  omega_B = 0
+  T0 = 10
+  omega_B = 1
   dipole_0 = np.array([0, 1, 0])
-  torque_type = 'constant'
-  dt = 2 * np.pi * 0.0025
+  torque_type = 'dipole'
+  dt = 2 * np.pi * 0.001
   tol = 1e-12
-  num_steps = 8000
+  num_steps = 20000
   n_save = 1
-  verbose = 1
+  verbose = 0
   
   # Set tensor of inertia and initial freq
   J = np.zeros((3,3))
@@ -107,6 +106,8 @@ if __name__ == '__main__':
   # Set torque function
   if torque_type == 'constant':
     torque_func = torque_constnat
+  elif torque_type == 'dipole':
+    torque_func = torque_dipole
 
   # Define body axes
   e_body = np.eye(3)
@@ -130,7 +131,8 @@ if __name__ == '__main__':
     name_axes = output_name + '.axes_body'
     name_e1_xyz = output_name + '.e1.xyz'
     name_e2_xyz = output_name + '.e2.xyz'
-    name_e3_xyz = output_name + '.e3.xyz'  
+    name_e3_xyz = output_name + '.e3.xyz'
+    name_B_xyz = output_name + '.B.xyz'    
     file_omega = open(name_omega, 'w')
     file_angular_momentum = open(name_angular_momentum, 'w')    
     file_quaternion = open(name_quaternion, 'w')
@@ -138,6 +140,7 @@ if __name__ == '__main__':
     file_e1_xyz = open(name_e1_xyz, 'w')
     file_e2_xyz = open(name_e2_xyz, 'w')
     file_e3_xyz = open(name_e3_xyz, 'w')
+    file_B_xyz = open(name_B_xyz, 'w')
 
   def residual_fk(x, J, rhs):
     x_norm = np.linalg.norm(x) if np.linalg.norm(x) > 0 else 1e-12
@@ -173,9 +176,16 @@ if __name__ == '__main__':
         print('q_norm     = ', q_norm)
         print('q_norm - 1 = ', q_norm - 1)  
         sys.exit()
+      angle = omega_B*t + phi
+      B = np.array([-np.sin(angle), np.cos(angle), 0])
+      file_B_xyz.write('1\n#\n')      
+      file_B_xyz.write('O 0 0 0 %s %s %s \n' % (B[0], B[1], B[2]))
 
+
+        
       
     # Compute RHS for nonlinear equation
+    t = step * dt
     torque_0 = torque_func(T0, omega_B, t, phi, R, dipole_0)
     rhs = dt * angular_momentum + 0.5 * dt**2 * torque_0
 
@@ -208,10 +218,10 @@ if __name__ == '__main__':
       print('\n\n')
       
     # Update momentum
+    t = (step+1) * dt    
     torque_1 = torque_func(T0, omega_B, t, phi, R, dipole_0)
     angular_momentum = np.dot(Fk.T, angular_momentum + 0.5 * dt * torque_0) + 0.5 * dt * torque_1
     
-
 
     
 
@@ -239,3 +249,7 @@ if __name__ == '__main__':
     if abs(q_norm - 1) > 1e-06:
       print('q_norm = ', q_norm)
       sys.exit()
+    angle = omega_B*t + phi
+    B = np.array([-np.sin(angle), np.cos(angle), 0])
+    file_B_xyz.write('1\n#\n')      
+    file_B_xyz.write('O 0 0 0 %s %s %s \n' % (B[0], B[1], B[2]))
