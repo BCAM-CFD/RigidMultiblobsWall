@@ -242,8 +242,6 @@ class Body(object):
     '''
     rotation_matrix = self.orientation.rotation_matrix()
     normal = np.dot(self.normal, rotation_matrix.T)
-    # Floren: adding location to the normals is wrong.
-    # normal += self.location
     return normal
   
   def calc_Pll_matrix(self):
@@ -259,5 +257,17 @@ class Body(object):
       P[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii
       
     return P
-  
+  def calc_Pll_matrix2(self):
+    '''cd 
+    Return matrix Pll with shape (3*Nblobs, 3)
+    normal = (n^t*n) I= matrix. Pll = I-normal
+    xi(Pll)
+    '''
+    P2 = np.zeros((3*self.Nblobs,3*self.Nblobs))
+    Area = (4*np.pi*1*1)/642
+    for i in range(0,self.Nblobs):
+      P_ii2=(1/Area)*(np.eye(3)-(np.outer(self.normal_V()[i],self.normal_V()[i])))
+      P2[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii2
+      
+    return P2
   

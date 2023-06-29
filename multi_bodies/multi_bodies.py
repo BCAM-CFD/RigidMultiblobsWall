@@ -462,8 +462,9 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
 def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, *args, **kwargs):
   '''
   The linear operator is
-  |  M+(xi^-1)Pll  -0.5*K-D*K ||lambda| = |  0 + noise_1|
-  |       -K^T              0 ||  U   | = | -F + noise_2|
+  |          M      -0.5*K-D*K   -0.5*I-D||lambda| = |  0 + noise_1|
+  |       -K^T              0      0     ||  U   | = | -F + noise_2|
+  |    (xi^-1)Pll           0      Pll   ||  Us  | = |  0 + noise_3|
 ''' 
   # Reserve memory for the solution and create some variables
   L = kwargs.get('periodic_length')
