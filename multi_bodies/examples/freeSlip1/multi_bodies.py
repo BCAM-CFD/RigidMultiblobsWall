@@ -523,17 +523,17 @@ The linear operator is
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies) # -K^T * lambda
 
   # Compute the "U" part
-  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 6*Nbodies],Nblobs, K_bodies = K_bodies) #K*U
+  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 2*Nbodies],Nblobs, K_bodies = K_bodies) #K*U
   Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights) #D*K*U
 
   # Compute the "u_s" part
-  I = np.dot(np.eye(Ncomp_blobs),(0.5*vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]))
+  I = (0.5*vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
   DslipUs = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]), weights) #D*us
   Pll_times_us = Pll_matrix_vector_prod2(bodies, vector[Ncomp_blobs+6*Nbodies:Ncomp_tot], Nblobs, Pll_body2 = Pll_body2) # Pll * us
   
-  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - 0.5*I
-  res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs))+np.reshape(Pll_times_us,(3*Nblobs))
-  print(vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
+  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
+  res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs))+np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
+  #print(vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
 
   # Add constraint forces if any
   if Nconstraints > 0:

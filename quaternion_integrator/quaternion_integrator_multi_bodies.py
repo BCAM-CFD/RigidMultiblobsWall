@@ -1398,6 +1398,7 @@ class QuaternionIntegrator(object):
           B[k] = - (c.links_deriv_updated[0:3] - c.links_deriv_updated[3:6])
       # Set right hand side
       RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten(), slip_vel.flatten(),B.flatten()]), (System_size))
+      print(RHS)
       # If prescribed velocity modify RHS
       offset = 0
       for k, b in enumerate(self.bodies):
@@ -1438,8 +1439,14 @@ class QuaternionIntegrator(object):
     # Set preconditioner 
     if PC_partial is None:
       PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, *args, **kwargs)
-    PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
-
+    # PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
+    PC = None
+    
+    x0 = np.zeros(RHS.size)
+    print("RHS = ", RHS.size)
+    print("x0  = ", x0.size)
+    print("A   = ", A.shape)
+    
     # Scale RHS to norm 1
     RHS_norm = np.linalg.norm(RHS)
     if RHS_norm > 0:
