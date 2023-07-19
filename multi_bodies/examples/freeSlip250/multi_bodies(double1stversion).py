@@ -186,13 +186,11 @@ def calc_K_matrix(bodies, Nblobs):
   Calculate the geometric block-diagonal matrix K.
   Shape (3*Nblobs, 6*Nbodies).
   '''
-  K = np.zeros((3*Nblobs, 6*len(bodies))) #For the double layer case
-  #K = np.zeros((3*Nblobs, 6*len(bodies))) #For the normal case single layer
+  K = np.zeros((3*Nblobs, 6*len(bodies)))
   offset = 0
   for k, b in enumerate(bodies):
     K_body = b.calc_K_matrix()
     K[3*offset:3*(offset+b.Nblobs), 6*k:6*k+6] = K_body
-    #K[3*offset:3*(offset+b.Nblobs), 6*k:6*k+6] = K_body #For the normal case single layer
     offset += b.Nblobs
   return K
 
@@ -229,7 +227,7 @@ def K_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
   ''' 
   # Prepare variables
   result = np.empty((Nblobs, 3))
-  v = vector.flatten()
+  v = np.reshape(vector, (len(bodies) * 6))
 
   # Loop over bodies
   offset = 0
@@ -238,7 +236,7 @@ def K_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
       K = b.calc_K_matrix()
     else:
       K = K_bodies[k] 
-    result[offset : offset+b.Nblobs] = np.reshape(np.dot(K, v[6*k : 6*(k+1)]), (b.Nblobs, 3)) #For the double layer case
+    result[offset : offset+b.Nblobs] = np.reshape(np.dot(K, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
     offset += b.Nblobs    
   return result
 
@@ -250,8 +248,8 @@ def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
   level of describtion of the body to the level of describtion of the blobs.
   ''' 
   # Prepare variables
-  result = np.empty((len(bodies), 6))#For the double layer case
-  v = np.reshape(vector, (Nblobs*3))
+  result = np.empty((len(bodies), 6))
+  v = np.reshape(vector, (Nblobs * 3))
 
   # Loop over bodies
   offset = 0
@@ -263,7 +261,7 @@ def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
     result[k : k+1] = np.dot(K.T, v[3*offset : 3*(offset+b.Nblobs)])
     offset += b.Nblobs    
 
-  result = np.reshape(result, (2*len(bodies), 3)) #For the double layer case
+  result = np.reshape(result, (2*len(bodies), 3))
   return result
 
 def C_matrix_vector_prod(bodies, constraints, vector, Nconstraints, C_constraints = None):
@@ -340,17 +338,6 @@ def calc_Pll_matrix_bodies(bodies):
     Pll.append(Pll_body)
   return Pll
 
-def calc_Pll_matrix_bodies2(bodies):
-  '''
-  Calculate the geometric matrix K for
-  each body. List of shape (3*Nblobs, 3*Nblobs).
-  '''
-  Pll2 = []
-  for k, b in enumerate(bodies):
-    Pll_body2 = b.calc_Pll_matrix2()
-    Pll2.append(Pll_body2)
-  return Pll2
-
 def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
   '''
   Compute the matrix vector product Pll*vector where
@@ -369,27 +356,6 @@ def Pll_matrix_vector_prod(bodies, vector, Nblobs, Pll_body = None):
       Pll = Pll_body[k] 
     result[offset : offset+b.Nblobs] = np.dot(Pll,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
     offset += b.Nblobs    
-  return result
-
-def Pll_matrix_vector_prod2(bodies, vector, Nblobs, Pll_body2 = None):
-  '''
-  Compute the matrix vector product Pll*vector where
-  Pll is the Projector operator matrix.
-  ''' 
-  # Prepare variables
-  result = np.empty((Nblobs, 3))
-  v = vector.flatten()
-
-  # Loop over bodies
-  offset = 0
-  for k, b in enumerate(bodies):
-    if Pll_body2 is None:
-      Pll2 = b.calc_Pll_matrix2()
-    else:
-      Pll2 = Pll_body2[k] 
-    result[offset : offset+b.Nblobs] = np.dot(Pll2,  v[3*offset : 3*(offset+b.Nblobs)]).reshape((b.Nblobs, 3))
-    offset += b.Nblobs 
-  
   return result
 
 
@@ -494,12 +460,11 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   
   return res
 
-def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, Pll_body2 = None, *args, **kwargs):
+def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, *args, **kwargs):
   '''
-The linear operator is
-  |          M      -0.5*K-D*K   -0.5*I-D||lambda| = |  0 + noise_1|
-  |       -K^T              0      0     ||  U   | = | -F + noise_2|
-  |    (xi^-1)Pll           0      Pll   ||  Us  | = |  0 + noise_3|
+  The linear operator is
+  |  M+(xi^-1)Pll  -0.5*K-D*K ||lambda| = |  0 + noise_1|
+  |       -K^T              0 ||  U   | = | -F + noise_2|
 ''' 
   # Reserve memory for the solution and create some variables
   L = kwargs.get('periodic_length')
@@ -509,32 +474,30 @@ The linear operator is
   Nconstraints = len(constraints)
   Ncomp_bodies = 6 * Nbodies
   Ncomp_phi = 3 * Nconstraints
-  Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi+Ncomp_blobs
+  Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
+  velocity= np.ones(r_vectors.size)
   weights = np.ones(r_vectors.size) * (4*np.pi*1*1)/642
+  
+
   for k, b in enumerate(bodies):
     normals = b.normal_V()
   
   # Compute the "lambda" part
-  mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) #M * lambda
-  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body) # (xi^-1 Pll) * lambda
-  K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies) # -K^T * lambda
+  mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) 
+  Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body)
+  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs+2*Nbodies],Nblobs, K_bodies = K_bodies)
 
-  # Compute the "U" part
-  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 2*Nbodies],Nblobs, K_bodies = K_bodies) #K*U
-  Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights) #D*K*U
-
-  # Compute the "u_s" part
-  I = (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
-  DslipUs = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]), weights) #D*us
-  Pll_times_us = Pll_matrix_vector_prod2(bodies, vector[Ncomp_blobs+6*Nbodies:Ncomp_tot], Nblobs, Pll_body2 = Pll_body2) # Pll * us
-
-
-  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
-  res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs)) + np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
+  Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights)
+  DslipP = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, Pll_times_lambda, weights)
   
+  #res[0:Ncomp_blobs] = mobility_times_lambda + np.reshape(Pll_times_lambda, (3*Nblobs )) - np.reshape(Dslip, (3*Nblobs )) - np.reshape(0.5*K_times_U , (3*Nblobs)) 
+  res[0:Ncomp_blobs] = mobility_times_lambda + np.reshape(Pll_times_lambda, (3*Nblobs )) + np.reshape(DslipP, (3*Nblobs )) - np.reshape(Dslip, (3*Nblobs )) - np.reshape(0.5*K_times_U , (3*Nblobs)) 
 
+
+  # Compute the "-force_torque" part
+  K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
   # Add constraint forces if any
   if Nconstraints > 0:
     C_T_times_phi = C_matrix_T_vector_prod(bodies, constraints, vector[Ncomp_blobs + Ncomp_bodies:Ncomp_tot], Nconstraints, C_constraints = C_constraints)

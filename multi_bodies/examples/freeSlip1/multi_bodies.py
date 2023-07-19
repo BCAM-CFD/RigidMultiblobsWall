@@ -54,6 +54,8 @@ while found_functions is False:
     if len(path_to_append) > 21:
       print('\nProjected functions not found. Edit path in multi_bodies.py')
       sys.exit()
+      
+print(vector)
 def calc_slip(bodies, Nblobs, *args, **kwargs):
   '''
   Function to calculate the slip in all the blobs.
@@ -512,8 +514,8 @@ The linear operator is
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi+Ncomp_blobs
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
-  vectn = np.ones(Ncomp_blobs)
   weights = np.ones(r_vectors.size) * (4*np.pi*1*1)/642
+  
   for k, b in enumerate(bodies):
     normals = b.normal_V()
   
@@ -523,17 +525,17 @@ The linear operator is
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies) # -K^T * lambda
 
   # Compute the "U" part
-  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 2*Nbodies],Nblobs, K_bodies = K_bodies) #K*U
+  K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 2*Nbodies],Nblobs, K_bodies = K_bodies) #K*U  vector[Ncomp_blobs: Ncomp_blobs+6*Nbodies]
   Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights) #D*K*U
 
   # Compute the "u_s" part
-  I = (0.5*vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
+  I = (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
   DslipUs = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]), weights) #D*us
   Pll_times_us = Pll_matrix_vector_prod2(bodies, vector[Ncomp_blobs+6*Nbodies:Ncomp_tot], Nblobs, Pll_body2 = Pll_body2) # Pll * us
+
+  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
+  res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs)) + np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
   
-  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
-  res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs))+np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
-  #print(vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
 
   # Add constraint forces if any
   if Nconstraints > 0:
@@ -552,8 +554,9 @@ The linear operator is
 
   # Compute the "constraint velocity: B" part if any
   if Nconstraints > 0:
-    C_times_U = C_matrix_vector_prod(bodies, constraints, v[Nblobs:Nblobs+6*Nbodies], Nconstraints, C_constraints = C_constraints)
+    C_times_U = C_matrix_vector_prod(bodies, constraints, v[Nblobs:Nblobs+2*Nbodies], Nconstraints, C_constraints = C_constraints)
     res[Ncomp_blobs+Ncomp_bodies:Ncomp_tot] = np.reshape(C_times_U , (Ncomp_phi))
+  
   
   return res
 

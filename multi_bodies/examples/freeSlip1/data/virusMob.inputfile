@@ -12,13 +12,14 @@ blob_blob_force_implementation           None
 
 # Set time step, number of steps and save frequency
 dt                                       0.1
+tolerance			         1e-06		
 n_steps                                  1
 n_save                                   1
 
 # Set fluid viscosity (eta), gravity (g) and blob radius
 eta                                      1
 g                                        1
-blob_radius                              0.06914158677358383
+blob_radius                              0.1382831
 
 # Set parameters for the blob-blob interation
 repulsion_strength                       0

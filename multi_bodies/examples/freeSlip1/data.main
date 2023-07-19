@@ -19,7 +19,7 @@ n_save                                   1
 # Set fluid viscosity (eta), gravity (g) and blob radius
 eta                                      1
 g                                        1
-blob_radius                              0.06914158677358383
+blob_radius                              0.1382831
 
 # Set parameters for the blob-blob interation
 repulsion_strength                       0
