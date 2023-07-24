@@ -15,6 +15,16 @@ except:
   except:
     import _pickle as cpickle
 
+try:
+  from mpi4py import MPI
+except ImportError:
+  print('It didn\'t find mpi4py!')
+
+# Add path for PySTKFMM
+sys.path.append('/workspace/scratch/users/fbalboa/sfw/FMM/STKFMM-lib-gnu/lib64/python/')
+PySTKFMM_found = False
+
+
 # Add path to HydroGrid and import module
 # sys.path.append('../../HydroGrid/src/')
 
@@ -40,6 +50,11 @@ while found_functions is False:
     from constraint.constraint import Constraint
     from articulated.articulated import Articulated
     import general_application_utils as utils
+    try:
+      import PySTKFMM
+      PySTKFMM_found = True
+    except ImportError:
+      pass
     try:
       import libCallHydroGrid as cc
       found_HydroGrid = True
@@ -147,6 +162,40 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     return mb.no_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba_no_wall':
     return mb.no_wall_mobility_trans_times_force_numba
+  elif implementation == 'stkfmm_no_wall':
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    pbc_string = kwargs.get('stkfmm_pbc')
+    max_pts = 512
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.RPY
+
+    # Get blobs radii
+    bodies = kwargs.get('bodies')
+    radius_blobs = []
+    for k, b in enumerate(bodies):
+      radius_blobs.append(b.blobs_radius)
+    radius_blobs = np.concatenate(radius_blobs, axis=0)    
+
+    # Setup FMM
+    rpy_fmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
+                                                                rpy_fmm=rpy_fmm, 
+                                                                L=kwargs.get('L'),
+                                                                wall=False,
+                                                                radius_blobs=radius_blobs,
+                                                                comm=kwargs.get('comm'))
+    return no_wall_mobility_trans_times_force_stkfmm_partial
+
   # Implementations with wall
   elif implementation == 'python':
     return mb.single_wall_fluid_mobility_product
@@ -1004,6 +1053,13 @@ def build_block_diagonal_preconditioner_articulated_single_blobs(bodies, articul
 
 
 if __name__ == '__main__':
+  # MPI
+  if PySTKFMM_found:
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+  else:
+    comm = None
+
   # Get command line arguments
   parser = argparse.ArgumentParser(description='Run a multi-body simulation and save trajectory.')
   parser.add_argument('--input-file', dest='input_file', type=str, default='data.main', help='name of the input file')
@@ -1214,8 +1270,14 @@ if __name__ == '__main__':
                                  g = g) 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
-  integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
-  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
+  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, 
+                                                  bodies=bodies,
+                                                  stkfmm_mult_order=read.stkfmm_mult_order, 
+                                                  stkfmm_pbc=read.stkfmm_pbc,
+                                                  stkfmm_max_points=read.stkfmm_max_points, 
+                                                  L=read.periodic_length,
+                                                  comm=comm) 
+  integrator.mobility_vector_prod = mobility_vector_prod
   integrator.force_torque_calculator = partial(multi_bodies_functions.force_torque_calculator_sort_by_bodies, 
                                                g = g, 
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
@@ -1249,6 +1311,8 @@ if __name__ == '__main__':
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation, bodies=bodies)  
   integrator.plot_velocity_field = read.plot_velocity_field
   integrator.output_name = read.output_name
+  integrator.C_matrix_T_vector_prod = C_matrix_T_vector_prod
+  integrator.n_save = n_save
   try:
     integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
   except:
