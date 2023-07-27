@@ -104,7 +104,6 @@ def calc_slip(bodies, Nblobs, *args, **kwargs):
   for b in bodies:
     slip_b = b.calc_slip()
     slip[offset:offset+b.Nblobs] += slip_b * np.cos(shear_omega * step * dt)
-    print(slip[offset:offset+b.Nblobs])
     offset += b.Nblobs
   return slip
 
