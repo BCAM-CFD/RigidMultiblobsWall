@@ -1,7 +1,7 @@
 '''
 Integrator for several rigid bodies.
 '''
-
+import sys
 import numpy as np
 import scipy.sparse.linalg as spla
 from functools import partial
@@ -13,10 +13,10 @@ import general_application_utils as utils
 
 try:
   from quaternion import Quaternion
-  import gmres 
+  # import gmres 
 except ImportError:
   from quaternion_integrator.quaternion import Quaternion
-  from quaternion_integrator import gmres 
+  # from quaternion_integrator import gmres 
 
 
 class QuaternionIntegrator(object):
@@ -382,6 +382,35 @@ class QuaternionIntegrator(object):
           name = self.output_name + '.shear_modes.dat'
           with open(name, mode) as f_handle:
             f_handle.write(str(step * dt) + ' ' + str(mode_0) + ' ' + str(mode_1) + ' ' + str(mode_2) + '\n')
+
+        if True:
+          # Save stress tensor
+          stress_tensor = np.zeros((len(self.bodies), 9))
+
+          # Extract blob forces 
+          lambda_blobs = sol_precond[0 : 3*self.Nblobs]
+          offset = 0
+          for k, b in enumerate(self.bodies):
+            r_k = b.get_r_vectors(location = np.zeros(3))
+            l_k = lambda_blobs[offset * 3 : (offset + b.Nblobs) * 3].reshape((b.Nblobs, 3))
+            stress_tensor[k] = np.einsum('ki,kj->ij', l_k, r_k).flatten()
+            offset += b.Nblobs
+          
+          # Save stress
+          mode = 'w' if step == 0 else 'a'
+          name = self.output_name + '.stress_tensor.dat'
+          with open(name, mode) as f_handle:
+            f_handle.write(str(len(self.bodies)) + '\n')
+            np.savetxt(f_handle, stress_tensor)          
+
+          # Save stress average
+          mode = 'w' if step == 0 else 'a'
+          name = self.output_name + '.stress_tensor_time.dat'
+          with open(name, mode) as f_handle:
+            result = np.zeros(10)
+            result[0] = step * dt
+            result[1:] = np.average(stress_tensor, axis=0)
+            np.savetxt(f_handle, result.reshape((1,10)))           
       
       # Update location orientation to midpoint
       for k, b in enumerate(self.bodies):
@@ -1631,10 +1660,10 @@ class QuaternionIntegrator(object):
 
       # Solve preconditioned linear system
       counter = gmres_counter(print_residual = self.print_residual)
-      # (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
-      # self.det_iterations_count += counter.niter
-      (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=400, restart=200, verbose=self.print_residual, convergence='presid')
-      self.det_iterations_count += len(resnorms)
+      (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
+      self.det_iterations_count += counter.niter
+      # (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=400, restart=200, verbose=self.print_residual, convergence='presid')
+      # self.det_iterations_count += len(resnorms)
     else:
       sol_precond = np.zeros_like(RHS)
 

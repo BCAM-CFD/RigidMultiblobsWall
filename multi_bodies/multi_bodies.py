@@ -68,6 +68,8 @@ while found_functions is False:
     if len(path_to_append) > 21:
       print('\nProjected functions not found. Edit path in multi_bodies.py')
       sys.exit()
+
+      
 def calc_slip(bodies, Nblobs, *args, **kwargs):
   '''
   Function to calculate the slip in all the blobs.
@@ -94,11 +96,15 @@ def calc_slip(bodies, Nblobs, *args, **kwargs):
       slip_blobs = mb.no_wall_mobility_trans_times_torque_pycuda(r_vectors, torque_blobs, eta, a) 
     slip = np.reshape(-slip_blobs, (Nblobs, 3) ) 
  
-  #2) Add prescribed slip 
+  #2) Add prescribed slip
+  shear_omega = kwargs.get('shear_omega')  
+  step = kwargs.get('step')
+  dt = kwargs.get('dt')
   offset = 0
   for b in bodies:
     slip_b = b.calc_slip()
-    slip[offset:offset+b.Nblobs] += slip_b
+    slip[offset:offset+b.Nblobs] += slip_b * np.cos(shear_omega * step * dt)
+    print(slip[offset:offset+b.Nblobs])
     offset += b.Nblobs
   return slip
 
@@ -1165,7 +1171,7 @@ if __name__ == '__main__':
         b.calc_body_length()
       else:
         b.body_length = bodies[-1].body_length
-      multi_bodies_functions.set_slip_by_ID(b, slip, shear_rate=read.shear_rate)
+      multi_bodies_functions.set_slip_by_ID(b, slip, shear_rate=read.shear_rate, shear_mode=read.shear_mode, dt=read.dt)
       # Add body mass
       if ID < len(read.mg_bodies):
         b.mg = read.mg_bodies[ID]
@@ -1346,7 +1352,8 @@ if __name__ == '__main__':
                                  implementation = read.mobility_vector_prod_implementation, 
                                  blob_radius = a, 
                                  eta = a, 
-                                 g = g) 
+                                 g = g,
+                                 shear_omega = read.shear_omega) 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation, eta_ratio=read.eta_ratio)
   integrator.mobility_vector_prod = mobility_vector_prod
@@ -1392,8 +1399,13 @@ if __name__ == '__main__':
   integrator.articulated = articulated
   integrator.nonlinear_solver_tolerance = read.nonlinear_solver_tolerance
   integrator.plot_velocity_field = read.plot_velocity_field
-  integrator.output_name = output_name
-  integrator.n_save = n_save
+  integrator.output_prefix = output_name
+  integrator.output_name = read.output_name
+  integrator.n_save = read.n_save  
+  try:
+    integrator.plot_velocity_field_circle = multi_bodies_functions.plot_velocity_field_circle
+  except:
+    pass 
 
   # Initialize HydroGrid library:
   if found_HydroGrid and read.call_HydroGrid:

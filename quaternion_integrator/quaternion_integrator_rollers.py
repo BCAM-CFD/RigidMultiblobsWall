@@ -13,10 +13,10 @@ from stochastic_forcing import stochastic_forcing as stochastic
 from mobility import mobility as mob
 import general_application_utils as utils
 try:
-  import gmres
+  # import gmres
   from quaternion import Quaternion
 except ImportError:
-  from quaternion_integrator import gmres
+  # from quaternion_integrator import gmres
   from quaternion_integrator.quaternion import Quaternion
 
 
