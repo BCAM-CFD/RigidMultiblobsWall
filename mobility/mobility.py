@@ -1365,8 +1365,112 @@ def mobility_radii_trans_times_force(r_vectors, force, eta, a, radius_blobs, fun
   '''
   return function(r_vectors, r_vectors, force, radius_blobs, radius_blobs, eta, *args, **kwargs)
 
+
 @njit(parallel=True, fastmath=True)
-def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=np.array([0., 0., 0.]), radius_blobs=None):
+def no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=np.array([0., 0., 0.])):
+  ''' 
+  Returns the blob-blob overlap correction for unbound fluids using the
+  RPY mobility. It subtract the uncorrected value for r<2*a and it adds
+  the corrected value.
+
+  This function uses numba.
+  '''
+  # Variables
+  N = r_vectors.size // 3
+  r_vectors = r_vectors.reshape(N, 3)
+  force = force.reshape(N, 3)
+  u = np.zeros((N, 3))
+  fourOverThree = 4.0 / 3.0
+  inva = 1.0 / a
+  norm_fact_f = 1.0 / (8.0 * np.pi * eta * a)
+
+  Lx = L[0]
+  Ly = L[1]
+  Lz = L[2]
+  
+  rx_vec = np.copy(r_vectors[:,0])
+  ry_vec = np.copy(r_vectors[:,1])
+  rz_vec = np.copy(r_vectors[:,2])
+  fx_vec = np.copy(force[:,0])
+  fy_vec = np.copy(force[:,1])
+  fz_vec = np.copy(force[:,2])
+  
+  # Loop over image boxes and then over particles
+  for i in prange(N):
+    rxi = rx_vec[i]
+    ryi = ry_vec[i]
+    rzi = rz_vec[i]
+    ux = 0
+    uy = 0
+    uz = 0
+    for k in range(offsets[i+1] - offsets[i]):
+      j = list_of_neighbors[offsets[i] + k]
+      if i == j:
+        continue
+      # Compute vector between particles i and j
+      rx = rxi - rx_vec[j]
+      ry = ryi - ry_vec[j]
+      rz = rzi - rz_vec[j]
+
+      # PBC
+      if Lx > 0:
+        rx = rx - int(rx / Lx + 0.5 * (int(rx>0) - int(rx<0))) * Lx
+      if Ly > 0:
+        ry = ry - int(ry / Ly + 0.5 * (int(ry>0) - int(ry<0))) * Ly
+      if Lz > 0:
+        rz = rz - int(rz / Lz + 0.5 * (int(rz>0) - int(rz<0))) * Lz
+      
+      # Normalize distance with hydrodynamic radius
+      rx = rx * inva 
+      ry = ry * inva
+      rz = rz * inva
+      r2 = rx*rx + ry*ry + rz*rz
+      r = np.sqrt(r2)
+        
+      # TODO: We should not divide by zero 
+      invr = 1.0 / r
+      invr2 = invr * invr
+        
+      if r > 2:
+        Mxx = 0
+        Mxy = 0
+        Mxz = 0
+        Myy = 0
+        Myz = 0
+        Mzz = 0
+      else:
+        c1 = fourOverThree * (1.0 - 0.28125 * r) # 9/32 = 0.28125
+        c2 = fourOverThree * 0.09375 * invr      # 3/32 = 0.09375
+        Mxx = c1 + c2 * rx*rx 
+        Mxy =      c2 * rx*ry 
+        Mxz =      c2 * rx*rz 
+        Myy = c1 + c2 * ry*ry 
+        Myz =      c2 * ry*rz 
+        Mzz = c1 + c2 * rz*rz 
+        c1 = 1.0 + 2.0 / (3.0 * r2)
+        c2 = (1.0 - 2.0 * invr2) * invr2
+        Mxx -= (c1 + c2*rx*rx) * invr
+        Mxy -= (     c2*rx*ry) * invr
+        Mxz -= (     c2*rx*rz) * invr
+        Myy -= (c1 + c2*ry*ry) * invr
+        Myz -= (     c2*ry*rz) * invr
+        Mzz -= (c1 + c2*rz*rz) * invr                     
+      Myx = Mxy
+      Mzx = Mxz
+      Mzy = Myz
+	  
+      # 2. Compute product M_ij * F_j           
+      ux += (Mxx * fx_vec[j] + Mxy * fy_vec[j] + Mxz * fz_vec[j]) 
+      uy += (Myx * fx_vec[j] + Myy * fy_vec[j] + Myz * fz_vec[j]) 
+      uz += (Mzx * fx_vec[j] + Mzy * fy_vec[j] + Mzz * fz_vec[j]) 
+    u[i,0] = ux * norm_fact_f
+    u[i,1] = uy * norm_fact_f
+    u[i,2] = uz * norm_fact_f          
+  return u.flatten()
+
+
+@njit(parallel=True, fastmath=True)
+def no_wall_mobility_trans_times_force_overlap_correction_numba_2(r_vectors, force, eta, a, list_of_neighbors, offsets, L=np.array([0., 0., 0.]), radius_blobs=None):
   ''' 
   Returns the blob-blob overlap correction for unbound fluids using the
   RPY mobility. It subtract the uncorrected value for r<2*a and it adds
@@ -1572,12 +1676,6 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
       boxsize = np.array([Lx_cKDTree, Ly_cKDTree, Lz_cKDTree])      
     else:
       boxsize = None
-    # print('boxsize = ', boxsize)
-    # print('S       = ', r_vectors.shape)
-    # print('X       = ', np.max(r_vectors[:,0]))
-    # print('Y       = ', np.max(r_vectors[:,1]))
-    # print('Z       = ', np.max(r_vectors[:,2]))
-    # print('\n\n\n\n')    
     tree = scsp.cKDTree(r_vectors, boxsize = boxsize)
     pairs = tree.query_ball_tree(tree, d_max)
     offsets = np.zeros(len(pairs)+1, dtype=int)
@@ -1610,7 +1708,8 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
   # 4. Double Laplacian 
   #    it is zero with PBC 
   # 5. Add blob-blob overlap correction 
-  v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=L, radius_blobs=radius_blobs) 
+  # v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=L, radius_blobs=radius_blobs) 
+  v_overlap = no_wall_mobility_trans_times_force_overlap_correction_numba(r_vectors, force, eta, a, list_of_neighbors, offsets, L=L) 
   vel += v_overlap.reshape((N, 3)) 
   
   if wall:

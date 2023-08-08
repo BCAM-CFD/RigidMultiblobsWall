@@ -205,6 +205,41 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     return mb.single_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba':
     return mb.single_wall_mobility_trans_times_force_numba
+  elif implementation == 'stkfmm_single_wall':
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    pbc_string = kwargs.get('stkfmm_pbc')
+    max_pts = kwargs.get('stkfmm_max_points')
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.RPY
+
+    # Get blobs radii
+    bodies = kwargs.get('bodies')
+    radius_blobs = []
+    for k, b in enumerate(bodies):
+      radius_blobs.append(b.blobs_radius)
+    radius_blobs = np.concatenate(radius_blobs, axis=0)    
+
+    # Setup FMM
+    rpy_fmm = PySTKFMM.StkWallFMM(mult_order, max_pts, pbc, kernel)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
+                                                                rpy_fmm=rpy_fmm, 
+                                                                L=kwargs.get('L'),
+                                                                wall=True,
+                                                                radius_blobs=radius_blobs,
+                                                                comm=kwargs.get('comm'))
+    return no_wall_mobility_trans_times_force_stkfmm_partial
+
+
   # Implementations free surface
   elif implementation == 'pycuda_free_surface':
     return mb.free_surface_mobility_trans_times_force_pycuda
