@@ -101,19 +101,19 @@ if __name__ == '__main__':
 
   # Compute velocities
   if wall:
-    u_numba = mob.single_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    u_numba = mob.single_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, periodic_length=L)
     u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
     timer('numba')
-    u_numba = mob.single_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    u_numba = mob.single_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, periodic_length=L)
     timer('numba')
     timer('stkfmm')
     u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
     timer('stkfmm')
   else:
-    u_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    u_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, periodic_length=L)
     u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)
     timer('numba')
-    u_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a)
+    u_numba = mob.no_wall_mobility_trans_times_force_numba(r_vectors, force, eta, a, periodic_length=L)
     timer('numba')
     timer('stkfmm')
     u_stkfmm = mobility_trans_times_force_stkfmm_partial(r_vectors, force, eta, a, rpy_fmm=rpy_fmm, L=L)

@@ -1624,6 +1624,14 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
     if overlap is True:
       force = B_damp.dot(force.flatten())
 
+  if True:
+    sel = r_vectors[:,0] < 1e-13
+    r_vectors[sel,0] = 0
+    sel = r_vectors[:,1] < 1e-13
+    r_vectors[sel,1] = 0
+    sel = r_vectors[:,2] < 1e-13
+    r_vectors[sel,2] = 0
+
   # Set tree if necessary
   build_tree = True
   if len(mobility_trans_times_force_stkfmm.list_of_neighbors) > 0:
