@@ -1601,10 +1601,17 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
       for i in range(3):
         if(L[i] > 0):
           r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+          # Careful with float precision
+          sel = r[:,i] >= L[i]
+          r[sel,i] = L[i] - 1e-13
         else:
           ri_min =  np.min(r[:,i])
           if ri_min < 0:
             r[:,i] -= ri_min
+
+        # Careful with float precision
+        sel = r[:,i] < 0
+        r[sel,i] = 0
     return r
 
   # Prepare coordinates
@@ -1623,14 +1630,6 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
 
     if overlap is True:
       force = B_damp.dot(force.flatten())
-
-  if True:
-    sel = r_vectors[:,0] < 1e-13
-    r_vectors[sel,0] = 0
-    sel = r_vectors[:,1] < 1e-13
-    r_vectors[sel,1] = 0
-    sel = r_vectors[:,2] < 1e-13
-    r_vectors[sel,2] = 0
 
   # Set tree if necessary
   build_tree = True

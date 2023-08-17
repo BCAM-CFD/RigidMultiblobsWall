@@ -21,7 +21,7 @@ except ImportError:
   print('It didn\'t find mpi4py!')
 
 # Add path for PySTKFMM
-sys.path.append('/workspace/scratch/users/fbalboa/sfw/FMM/STKFMM-lib-gnu/lib64/python/')
+sys.path.append('/workspace/scratch/users/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
 PySTKFMM_found = False
 
 

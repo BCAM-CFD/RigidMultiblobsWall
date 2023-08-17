@@ -219,10 +219,17 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
       for i in range(3):
         if(L[i] > 0):
           r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+          # Careful with float precision
+          sel = r[:,i] >= L[i]
+          r[sel,i] = L[i] - 1e-13
         else:
           ri_min =  np.min(r[:,i])
           if ri_min < 0:
             r[:,i] -= ri_min
+
+        # Careful with float precision
+        sel = r[:,i] < 0
+        r[sel,i] = 0
     return r
     
   # Get parameters from arguments
