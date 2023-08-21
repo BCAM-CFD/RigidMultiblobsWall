@@ -258,9 +258,12 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
         if L[i] > 0:
           boxsize[i] = L[i]
         else:
-          boxsize[i] = (np.max(r_vectors[:,i]) - np.min(r_vectors[:,i])) + d_max * 10
+          boxsize[i] = (2 * np.max(r_vectors[:,i]) - np.min(r_vectors[:,i])) + d_max * 10
     else:
       boxsize = None   
+
+    print('r_vectors = \n', r_vectors)
+    print('boxsize   = \n', boxsize)
 
     # Build tree
     tree = scsp.cKDTree(r_vectors, boxsize=boxsize)
