@@ -262,9 +262,6 @@ def calc_blob_blob_forces_tree_numba(r_vectors, *args, **kwargs):
     else:
       boxsize = None   
 
-    print('r_vectors = \n', r_vectors)
-    print('boxsize   = \n', boxsize)
-
     # Build tree
     tree = scsp.cKDTree(r_vectors, boxsize=boxsize)
     pairs = tree.query_ball_tree(tree, d_max)
