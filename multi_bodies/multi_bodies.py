@@ -141,6 +141,9 @@ def set_mobility_blobs(implementation):
   # Implementation free surface
   elif implementation == 'C++_free_surface':
     return  mb.boosted_free_surface_mobility
+  # Implementation diagonal mobility (free draining)
+  elif implementation == 'diagonal':
+    return  mb.diagonal_tensor
 
 
 def set_mobility_vector_prod(implementation, *args, **kwargs):
@@ -263,6 +266,8 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
       radius_blobs.append(b.blobs_radius)
     radius_blobs = np.concatenate(radius_blobs, axis=0)    
     return partial(mb.mobility_radii_trans_times_force, radius_blobs=radius_blobs, function=function)
+  elif implementation == 'diagonal':
+    return mb.diagonal_product
 
 
 def calc_K_matrix(bodies, Nblobs):

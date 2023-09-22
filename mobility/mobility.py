@@ -1725,3 +1725,27 @@ def mobility_trans_times_force_stkfmm(r, force, eta, a, rpy_fmm=None, L=np.array
       vel = B_damp.dot(vel.flatten())
   
   return vel.flatten()
+
+
+def diagonal_tensor(r_vectors, eta, a, *args, **kwargs):
+  ''' 
+  Calculate free rotne prager tensor for particles at locations given by
+  r_vectors of radius a.
+  '''
+
+  # Build mobility matrix of size 3N \times 3N
+  M = np.eye(r_vectors.size) / (6 * np.pi * eta * a)
+  return M
+
+
+def diagonal_product(r_vectors, vector, eta, a, *args, **kwargs):
+  '''
+  WARNING: pseudo-PBC are not implemented for this function.
+
+  Product (Mobility * vector). Mobility for particles in an unbounded domain.
+  This uses the standard Rotne-Prager-Yamakawa expression.
+  '''
+  mobility = 1.0 / (6 * np.pi * eta * a)
+  return mobility * vector
+
+
