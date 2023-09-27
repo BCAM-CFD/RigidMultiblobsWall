@@ -1,0 +1,42 @@
+# Select integrator 
+scheme                                   stochastic_Slip_Trapz
+
+# Select implementation to compute M and M*f
+mobility_blobs_implementation            C++_no_wall
+mobility_vector_prod_implementation      radii_numba_no_wall
+domain                                   no_wall
+
+# Select implementation to compute the blobs-blob interactions
+blob_blob_force_implementation           C++
+body_body_force_torque_implementation    python
+
+# Set time step, number of steps and save frequency
+dt                                       1e-05
+n_steps                                  100
+n_save                                   1
+
+# Set fluid viscosity (eta), gravity (g) and blob radius
+eta                                      1e-03
+g                                        0
+blob_radius                              0.131
+kT                                       0.0041419464
+
+# Potential between big sphere and spikes
+omega_one_roller                         1.2  1   1
+
+# Set parameters for the blob-blob interation
+repulsion_strength                       0.0
+debye_length                             0.01
+
+# Set interaction with the wall
+repulsion_strength_wall                  0
+debye_length_wall                        1.0
+
+# Load rigid bodies configuration, provide
+# *.vertex and *.clones files
+structure ../../Structures/shell_N_162_Rg_0_9497_Rh_1.vertex  ../../Structures/shell.clones
+structure ../../Structures/spikes.vertex  ../../Structures/spikes.clones
+
+# Set output name
+save_clones                              one_file
+output_name                              data/run

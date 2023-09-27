@@ -90,6 +90,7 @@ class QuaternionIntegrator(object):
       
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+      print('velocity = ', velocities)
 
       # Update location orientation 
       for k, b in enumerate(self.bodies):
@@ -1386,6 +1387,7 @@ class QuaternionIntegrator(object):
         slip = np.zeros((self.Nblobs, 3))
       # Calculate force-torque on bodies
       force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+      print('force_torque = ', force_torque)
       # NEW VECTOR FOR u_s term in double layer
       slip_vel = np.zeros((self.Nblobs, 3))      
       # Add noise to the force/torque
