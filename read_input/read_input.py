@@ -99,6 +99,14 @@ class ReadInput(object):
     self.domType = str(self.options.get('domType') or 'RPB')
     self.slip_mode = str(self.options.get('slip_mode') or 'False')
 
+    # Some extra inputs for dipole interactions
+    self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
+    self.mu = np.fromstring(self.options.get('mu') or '1 0 0', sep=' ')
+    self.B0 = float(self.options.get('B0') or 0)
+    self.omega = float(self.options.get('omega') or 0)
+    self.quaternion_B = np.fromstring(self.options.get('quaternion_B') or '1 0 0 0', sep=' ')
+    self.vacuum_permeability = float(self.options.get('vacuum_permeability') or 1.25663706143592e+06)
+
     # Create list with [vertex_file, clones_file] for each structure
     self.num_free_bodies = number_of_structures
     self.structures = []

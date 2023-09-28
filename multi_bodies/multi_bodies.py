@@ -1378,7 +1378,13 @@ if __name__ == '__main__':
                                                repulsion_strength = read.repulsion_strength, 
                                                debye_length = read.debye_length, 
                                                periodic_length = read.periodic_length,
-                                               omega_one_roller = read.omega_one_roller) 
+                                               omega_one_roller = read.omega_one_roller,
+                                               mu = read.mu,
+                                               B0 = read.B0,
+                                               omega = read.omega,
+                                               quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                                               vacuum_permeability = read.vacuum_permeability)
+  
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
 
