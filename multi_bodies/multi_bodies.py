@@ -31,6 +31,7 @@ while found_functions is False:
     from quaternion_integrator.quaternion_integrator_rollers import QuaternionIntegratorRollers
     from body import body 
     from read_input import read_input
+    from read_input import read_vertex_file    
     from read_input import read_clones_file
     from read_input import read_slip_file
     from read_input import read_velocity_file
