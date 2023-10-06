@@ -6,5 +6,5 @@ shell 0
 loc 0.5
 lp 0.5
 ellips False
-slip_length 5
+slip_length 2
 angle_range 0

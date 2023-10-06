@@ -90,6 +90,7 @@ class QuaternionIntegrator(object):
       
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+      print('velocity = ', velocities)
 
       # Update location orientation 
       for k, b in enumerate(self.bodies):
@@ -1446,20 +1447,23 @@ class QuaternionIntegrator(object):
     where v_i and w_i are the linear and angular velocities of body i.
     '''
     Nconstraints = len(self.constraints) 
-    System_size = self.Nblobs * 3 + len(self.bodies) * 6 + Nconstraints * 3
+    System_size = 6*self.Nblobs + len(self.bodies)*6 + Nconstraints*3
 
     # Get blobs coordinates
     r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
 
-    # If RHS = None set RHS = [slip, -force_torque, B ]
+    # If RHS = None set RHS = [slip, -force_torque, u, B ]
     if RHS is None:
       # Calculate slip on blobs
       if self.calc_slip is not None:
         slip = self.calc_slip(self.bodies, self.Nblobs)
       else:
         slip = np.zeros((self.Nblobs, 3))
+        
       # Calculate force-torque on bodies
-      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, step = kwargs.get('step'), dt = kwargs.get('dt')) 
+      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+      slip_vel = np.zeros((self.Nblobs, 3))      
+
       # Add noise to the force/torque
       if noise_FT is not None:
         force_torque += noise_FT
@@ -1469,7 +1473,8 @@ class QuaternionIntegrator(object):
         for k, c in enumerate(self.constraints):
           B[k] = - (c.links_deriv_updated[0:3] - c.links_deriv_updated[3:6])
       # Set right hand side
-      RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten(), B.flatten()]), (System_size))
+      RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten(), slip_vel.flatten(),B.flatten()]), (System_size))
+      
       # If prescribed velocity modify RHS
       offset = 0
       for k, b in enumerate(self.bodies):
@@ -1510,8 +1515,14 @@ class QuaternionIntegrator(object):
     # Set preconditioner 
     if PC_partial is None:
       PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, *args, **kwargs)
-    PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
-
+    # PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
+    PC = None
+    
+    x0 = np.zeros(RHS.size)
+    #print("RHS = ", RHS.size)
+    #print("x0  = ", x0.size)
+    #print("A   = ", A.shape)
+    
     # Scale RHS to norm 1
     RHS_norm = np.linalg.norm(RHS)
     if RHS_norm > 0:
