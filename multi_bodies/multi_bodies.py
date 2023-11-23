@@ -1353,6 +1353,7 @@ if __name__ == '__main__':
   integrator.output_name = read.output_name
   integrator.C_matrix_T_vector_prod = C_matrix_T_vector_prod
   integrator.n_save = n_save
+  integrator.output_name = read.output_name  
   try:
     integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
   except:

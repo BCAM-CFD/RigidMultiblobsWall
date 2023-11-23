@@ -91,6 +91,15 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
+      # Save velocities
+      step = kwargs.get('step')
+      if (step % self.n_save) == 0 and step >= 0:
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.velocities.dat'
+        with open(name, mode) as f_handle:
+          f_handle.write(str(len(self.bodies)) + '\n')
+          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
+
       # Update location orientation 
       for k, b in enumerate(self.bodies):
         b.location_new = b.location + velocities[6*k:6*k+3] * dt
@@ -122,7 +131,7 @@ class QuaternionIntegrator(object):
 
       # Solve mobility problem
       velocities, mobility_bodies = self.solve_mobility_problem_dense_algebra()
-
+      
       # Update location orientation 
       for k, b in enumerate(self.bodies):
         b.location_new = b.location + velocities[6*k:6*k+3] * dt
@@ -157,6 +166,15 @@ class QuaternionIntegrator(object):
 
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+
+      # Save velocities
+      step = kwargs.get('step')
+      if (step % self.n_save) == 0 and step >= 0:
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.velocities.dat'
+        with open(name, mode) as f_handle:
+          f_handle.write(str(len(self.bodies)) + '\n')
+          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))      
 
       # Update location and orientation
       if self.first_step == False:
@@ -905,8 +923,18 @@ class QuaternionIntegrator(object):
                                                 x0 = self.first_guess, 
                                                 save_first_guess = True,
                                                 PC_partial = PC_partial)
+            
       # Extract velocities
       velocities_1 = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+
+      # Save velocities
+      step = kwargs.get('step')
+      if (step % self.n_save) == 0 and step >= 0:
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.velocities.dat'
+        with open(name, mode) as f_handle:
+          f_handle.write(str(len(self.bodies)) + '\n')
+          np.savetxt(f_handle, velocities_1.reshape((len(self.bodies), 6)))      
 
       # Solve mobility problem
       slip_precond_rfd = self.solve_mobility_problem(RHS = np.concatenate([-1.0*W_slip, np.zeros(len(self.bodies) * 6)]), PC_partial = PC_partial)
