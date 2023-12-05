@@ -753,6 +753,13 @@ class Lub_Solver(object):
           f_handle.write(str(step * self.dt) + '  ')
           np.savetxt(f_handle, vel_p.reshape((1, 6)), delimiter=' ')
 
+    if False:
+      if (step % self.n_save) == 0 and step >= 0:
+        mode = 'w' if step == 0 else 'a'
+        with open(self.output_name + '.velocity.dat', mode) as f_handle:
+          f_handle.write(str(step * self.dt) + '  ')
+          np.savetxt(f_handle, vel_p.reshape((1, 6)), delimiter=' ')
+      
     for k, b in enumerate(self.bodies):
       b.location = b.location_old + vel_p[6*k:6*k+3] * self.dt
       quaternion_dt = Quaternion.from_rotation((vel_p[6*k+3:6*k+6]) * self.dt)
