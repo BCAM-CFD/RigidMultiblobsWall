@@ -397,11 +397,11 @@ class QuaternionIntegrator(object):
             offset += b.Nblobs
           
           # Save stress
-          mode = 'w' if step == 0 else 'a'
-          name = self.output_name + '.stress_tensor.dat'
-          with open(name, mode) as f_handle:
-            f_handle.write(str(len(self.bodies)) + '\n')
-            np.savetxt(f_handle, stress_tensor)          
+          # mode = 'w' if step == 0 else 'a'
+          # name = self.output_name + '.stress_tensor.dat'
+          # with open(name, mode) as f_handle:
+          #   f_handle.write(str(len(self.bodies)) + '\n')
+          #   np.savetxt(f_handle, stress_tensor)          
 
           # Save stress average
           mode = 'w' if step == 0 else 'a'

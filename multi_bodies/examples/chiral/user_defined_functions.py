@@ -611,15 +611,18 @@ def slip_shear_mode(body, *args, **kwargs):
     slip[:,0] -= shear_rate * r_configuration[:,1]
     slip[:,1] -= shear_rate * r_configuration[:,0]    
   elif shear_mode == 3:
+    # First shear mode
     slip[:,0] -= shear_rate * r_configuration[:,0] * r_configuration[:,2]
     slip[:,1] += shear_rate * r_configuration[:,1] * r_configuration[:,2]
   elif shear_mode == 4:
+    # Second shear mode
     slip[:,0] -= shear_rate * r_configuration[:,1] * r_configuration[:,2]
     slip[:,1] -= shear_rate * r_configuration[:,0] * r_configuration[:,2]
   elif shear_mode == 5:
     slip[:,0] += shear_rate * r_configuration[:,1] 
     slip[:,1] -= shear_rate * r_configuration[:,0] 
   elif shear_mode == 6:
+    # Rotational mode
     slip[:,0] += shear_rate * r_configuration[:,1] * r_configuration[:,2]
     slip[:,1] -= shear_rate * r_configuration[:,0] * r_configuration[:,2]
    

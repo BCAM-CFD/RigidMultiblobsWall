@@ -159,6 +159,8 @@ if __name__ == '__main__':
     LSolv.kT = read.kT
     LSolv.tolerance = read.solver_tolerance
     LSolv.print_residual = args.print_residual
+    LSolv.n_save = read.n_save
+    LSolv.output_name = read.output_name
     
     multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation)
     multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)   
