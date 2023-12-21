@@ -1286,7 +1286,8 @@ if __name__ == '__main__':
     integrator.calc_one_blob_forces = partial(multi_bodies_functions.calc_one_blob_forces,
                                               g = g,
                                               repulsion_strength_wall = read.repulsion_strength_wall, 
-                                              debye_length_wall = read.debye_length_wall)
+                                              debye_length_wall = read.debye_length_wall,
+                                              tilt_angle = read.theta)
     integrator.calc_blob_blob_forces = partial(multi_bodies_functions.calc_blob_blob_forces,
                                                g = g,
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
