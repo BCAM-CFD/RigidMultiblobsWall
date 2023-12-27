@@ -8,7 +8,7 @@ from multi_bodies_functions import *
 
 
 # Override blob_external_force
-def blob_external_forces_new(r_vectors, *args, **kwargs):
+def blob_external_force_new(r_vectors, *args, **kwargs):
   '''
   This function compute the external force acting on a
   single blob. It returns an array with shape (3).
