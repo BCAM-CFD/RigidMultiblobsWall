@@ -1,14 +1,14 @@
 '''
 We defined here the tilt gravity force
 '''
-
+import numpy as np
 import multi_bodies_functions
 from multi_bodies_functions import *
 
 
 
-# Override blob_external_force
-def blob_external_force_new(r_vectors, *args, **kwargs):
+# Override blob_external_forces
+def blob_external_forces_new(r_vectors, *args, **kwargs):
   '''
   This function compute the external force acting on a
   single blob. It returns an array with shape (3).
@@ -47,7 +47,7 @@ def blob_external_force_new(r_vectors, *args, **kwargs):
   f[sr_mask,2] += (repulsion_strength_wall / debye_length_wall)
 
   return f
-multi_bodies_functions.blob_external_force = blob_external_force_new
+multi_bodies_functions.blob_external_forces = blob_external_forces_new
 
 
 

@@ -1282,12 +1282,11 @@ if __name__ == '__main__':
     integrator.first_guess = np.zeros(Nblobs*3 + num_bodies*6 + len(constraints)*3)
   else:
     integrator = QuaternionIntegratorRollers(bodies, Nblobs, scheme, tolerance = read.solver_tolerance, domain = read.domain, 
-                                             mobility_vector_prod_implementation = read.mobility_vector_prod_implementation) 
+                                             mobility_vector_prod_implementation = read.mobility_vector_prod_implementation)
     integrator.calc_one_blob_forces = partial(multi_bodies_functions.calc_one_blob_forces,
                                               g = g,
                                               repulsion_strength_wall = read.repulsion_strength_wall, 
-                                              debye_length_wall = read.debye_length_wall,
-                                              tilt_angle = read.theta)
+                                              debye_length_wall = read.debye_length_wall)
     integrator.calc_blob_blob_forces = partial(multi_bodies_functions.calc_blob_blob_forces,
                                                g = g,
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
@@ -1326,7 +1325,8 @@ if __name__ == '__main__':
                                                repulsion_strength = read.repulsion_strength, 
                                                debye_length = read.debye_length, 
                                                periodic_length = read.periodic_length,
-                                               omega_one_roller = read.omega_one_roller) 
+                                               omega_one_roller = read.omega_one_roller,
+                                               tilt_angle = read.theta) 
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
 
