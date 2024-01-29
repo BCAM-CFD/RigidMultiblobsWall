@@ -1496,8 +1496,12 @@ class QuaternionIntegrator(object):
       for k, b in enumerate(self.bodies):
         if b.prescribed_kinematics is True:
           # Add K*U to Right Hand side 
-          KU = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
-          RHS[3*offset : 3*(offset+b.Nblobs)] += KU.flatten()
+          # KU = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
+          weights = np.ones(r_vectors_blobs.size) * (4*np.pi*1*1) / self.Nblobs
+          normals = self.bodies[0].normal_V()          
+          K_times_U = np.dot(b.calc_K_matrix(), np.array([0, 0, 1, 0, 0, 0]))
+          Dslip = mob.no_wall_double_layer_source_target_numba(r_vectors_blobs, r_vectors_blobs, normals, K_times_U, weights) #D*K*U xxx
+          RHS[3*offset : 3*(offset+b.Nblobs)] += 0.5 * K_times_U.flatten() + Dslip
           # Set F to zero
           RHS[3*self.Nblobs+k*6 : 3*self.Nblobs+(k+1)*6] = 0.0
         offset += b.Nblobs
@@ -1558,6 +1562,12 @@ class QuaternionIntegrator(object):
       sol_precond = sol_precond * RHS_norm
     else:
       sol_precond[:] = 0.0
+
+    print('Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)]) 
+    name = self.output_name + '.bodies_force.dat'
+    with open(name, 'w') as f_handle:
+      np.savetxt(f_handle, sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)].reshape((1, 6)))
+      
 
     # If prescribed velocity we know the velocity
     for k, b in enumerate(self.bodies):
