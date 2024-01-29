@@ -536,7 +536,6 @@ The linear operator is
   res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
   res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs)) + np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
   
-
   # We never have articulated constraints here
   res[Ncomp_blobs : Ncomp_blobs+Ncomp_bodies] = np.reshape(-K_T_times_lambda, (Ncomp_bodies))
 
@@ -1423,6 +1422,7 @@ if __name__ == '__main__':
   if read.slip_mode:
     #integrator.linear_operator = linear_operator_projector
     integrator.linear_operator = linear_operator_projector_second_layer
+    integrator.first_guess = np.zeros(Nblobs*6 + num_bodies*6 + len(constraints)*3)    
   else:
     integrator.linear_operator = linear_operator_rigid
   integrator.build_block_diagonal_preconditioners_det_stoch = build_block_diagonal_preconditioners_det_stoch

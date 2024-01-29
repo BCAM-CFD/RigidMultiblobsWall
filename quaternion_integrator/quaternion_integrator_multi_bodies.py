@@ -1454,6 +1454,7 @@ class QuaternionIntegrator(object):
     velocities = (v_1, w_1, v_2, w_2, ...)
     where v_i and w_i are the linear and angular velocities of body i.
     '''
+    
     Nconstraints = len(self.constraints) 
     System_size = 3*self.Nblobs + len(self.bodies)*6 + Nconstraints*3
     if self.slip_mode:
@@ -1533,8 +1534,8 @@ class QuaternionIntegrator(object):
     else:
       if PC_partial is None:
         PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, *args, **kwargs)
-      PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')  
-    
+      PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
+
     # Scale RHS to norm 1
     RHS_norm = np.linalg.norm(RHS)
     if RHS_norm > 0:
