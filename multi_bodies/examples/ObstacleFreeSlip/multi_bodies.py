@@ -513,7 +513,7 @@ The linear operator is
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi+Ncomp_blobs
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
-  weights = np.ones(r_vectors.size) * (4*np.pi*1*1)/642
+  weights = np.ones(r_vectors.size) * (4*np.pi*1*1) / Nblobs
   
   for k, b in enumerate(bodies):
     normals = b.normal_V()
