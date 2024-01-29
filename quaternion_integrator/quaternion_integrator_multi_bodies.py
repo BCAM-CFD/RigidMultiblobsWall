@@ -90,7 +90,15 @@ class QuaternionIntegrator(object):
       
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
-      print('velocity = ', velocities)
+
+      if True:
+        # Save bodies velocity
+        print('velocity = ', velocities)
+        step = kwargs.get('step')
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.bodies_velocities.dat'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
 
       # Update location orientation 
       for k, b in enumerate(self.bodies):
@@ -1447,7 +1455,10 @@ class QuaternionIntegrator(object):
     where v_i and w_i are the linear and angular velocities of body i.
     '''
     Nconstraints = len(self.constraints) 
-    System_size = 6*self.Nblobs + len(self.bodies)*6 + Nconstraints*3
+    System_size = 3*self.Nblobs + len(self.bodies)*6 + Nconstraints*3
+    if self.slip_mode:
+      System_size += 3*self.Nblobs
+      
 
     # Get blobs coordinates
     r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
@@ -1472,8 +1483,12 @@ class QuaternionIntegrator(object):
       if Nconstraints>0:
         for k, c in enumerate(self.constraints):
           B[k] = - (c.links_deriv_updated[0:3] - c.links_deriv_updated[3:6])
+
       # Set right hand side
-      RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten(), slip_vel.flatten(),B.flatten()]), (System_size))
+      if self.slip_mode:
+        RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten(), slip_vel.flatten(), B.flatten()]), (System_size))
+      else:
+        RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten(), B.flatten()]), (System_size))
       
       # If prescribed velocity modify RHS
       offset = 0
@@ -1512,16 +1527,13 @@ class QuaternionIntegrator(object):
                                       periodic_length=self.periodic_length)
     A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
 
-    # Set preconditioner 
-    if PC_partial is None:
-      PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, *args, **kwargs)
-    # PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
-    PC = None
-    
-    x0 = np.zeros(RHS.size)
-    #print("RHS = ", RHS.size)
-    #print("x0  = ", x0.size)
-    #print("A   = ", A.shape)
+    # Set preconditioner
+    if self.slip_mode:
+      PC = None
+    else:
+      if PC_partial is None:
+        PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, *args, **kwargs)
+      PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')  
     
     # Scale RHS to norm 1
     RHS_norm = np.linalg.norm(RHS)

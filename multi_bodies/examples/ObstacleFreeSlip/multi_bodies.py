@@ -421,6 +421,7 @@ def linear_operator_rigid(vector, bodies, constraints, r_vectors, eta, a, K_bodi
 
   # Compute the "-force_torque" part
   K_T_times_lambda = K_matrix_T_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, K_bodies = K_bodies)
+
   # Add constraint forces if any
   if Nconstraints > 0:
     C_T_times_phi = C_matrix_T_vector_prod(bodies, constraints, vector[Ncomp_blobs + Ncomp_bodies:Ncomp_tot], Nconstraints, C_constraints = C_constraints)
@@ -1416,8 +1417,10 @@ if __name__ == '__main__':
                                                omega_one_roller = read.omega_one_roller) 
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
+  read.slip_mode = True if read.slip_mode == 'True' else False
+  integrator.slip_mode = read.slip_mode
 
-  if read.slip_mode =='True':
+  if read.slip_mode:
     #integrator.linear_operator = linear_operator_projector
     integrator.linear_operator = linear_operator_projector_second_layer
   else:

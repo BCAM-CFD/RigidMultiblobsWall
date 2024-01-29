@@ -15,7 +15,7 @@ def flow_resolved(body, *args, **kwargs):
   '''
   It adds the constant background flow.
   '''
-  flow = np.zeros((b.Nblobs, 3))
-  flow[:,2] = 1.0
+  flow = np.zeros((body.Nblobs, 3))
+  flow[:,2] = 0.0
   return  flow
 
