@@ -1459,7 +1459,6 @@ class QuaternionIntegrator(object):
     System_size = 3*self.Nblobs + len(self.bodies)*6 + Nconstraints*3
     if self.slip_mode:
       System_size += 3*self.Nblobs
-      
 
     # Get blobs coordinates
     r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
@@ -1496,11 +1495,10 @@ class QuaternionIntegrator(object):
       for k, b in enumerate(self.bodies):
         if b.prescribed_kinematics is True:
           # Add K*U to Right Hand side 
-          # KU = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
           weights = np.ones(r_vectors_blobs.size) * (4*np.pi*1*1) / self.Nblobs
           normals = self.bodies[0].normal_V()          
-          K_times_U = np.dot(b.calc_K_matrix(), np.array([0, 0, 1, 0, 0, 0]))
-          Dslip = mob.no_wall_double_layer_source_target_numba(r_vectors_blobs, r_vectors_blobs, normals, K_times_U, weights) #D*K*U xxx
+          K_times_U = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
+          Dslip = mob.no_wall_double_layer_source_target_numba(r_vectors_blobs, r_vectors_blobs, normals, K_times_U, weights) #D*K*U 
           RHS[3*offset : 3*(offset+b.Nblobs)] += 0.5 * K_times_U.flatten() + Dslip
           # Set F to zero
           RHS[3*self.Nblobs+k*6 : 3*self.Nblobs+(k+1)*6] = 0.0
@@ -1533,13 +1531,10 @@ class QuaternionIntegrator(object):
     A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
 
     # Set preconditioner
-    if self.slip_mode:
-      PC = None
-    else:
-      if PC_partial is None:
-        PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, *args, **kwargs)
-      PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
-
+    if PC_partial is None:
+      PC_partial = self.build_block_diagonal_preconditioner(self.bodies, self.articulated, r_vectors_blobs, self.Nblobs, self.eta, self.a, slip_mode=self.slip_mode, *args, **kwargs)
+    PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
+    
     # Scale RHS to norm 1
     RHS_norm = np.linalg.norm(RHS)
     if RHS_norm > 0:
@@ -1547,7 +1542,7 @@ class QuaternionIntegrator(object):
 
       # Solve preconditioned linear system
       counter = gmres_counter(print_residual = self.print_residual)
-      (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=300, restart=300, callback=counter)
+      (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=600, restart=600, callback=counter)
       self.det_iterations_count += counter.niter
       # (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, verbose=self.print_residual, convergence='presid')
       # self.det_iterations_count += len(resnorms)
@@ -1563,11 +1558,16 @@ class QuaternionIntegrator(object):
     else:
       sol_precond[:] = 0.0
 
-    print('Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)]) 
     name = self.output_name + '.bodies_force.dat'
-    with open(name, 'w') as f_handle:
-      np.savetxt(f_handle, sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)].reshape((1, 6)))
-      
+    step = kwargs.get('step')
+    mode = 'w' if step == 0 else 'a'
+    with open(name, mode) as f_handle:
+      for k, b in enumerate(self.bodies):
+        print('body = ', k, ', Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)])
+        if b.prescribed_kinematics is True:
+          np.savetxt(f_handle, sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)].reshape((1, 6)))
+        else:
+          np.savetxt(f_handle, force_torque[6*k : 6*(k+1)].reshape((1, 6)))
 
     # If prescribed velocity we know the velocity
     for k, b in enumerate(self.bodies):

@@ -532,7 +532,6 @@ The linear operator is
   DslipUs = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]), weights) #D*us
   Pll_times_us = Pll_matrix_vector_prod2(bodies, vector[Ncomp_blobs+6*Nbodies:Ncomp_tot], Nblobs, Pll_body2 = Pll_body2) # Pll * us
 
-
   res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
   res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs)) + np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
   
@@ -847,6 +846,8 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
   K_bodies = []
   C_art_bodies = []
   res_art_bodies = []
+  slip_mode = kwargs.get('slip_mode')
+
   if(kwargs.get('step') % kwargs.get('update_PC') == 0) or len(build_block_diagonal_preconditioner.mobility_bodies) == 0:
     # loop over bodies
     for k, b in enumerate(bodies):
@@ -854,9 +855,10 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
         mobility_inv_blobs.append(build_block_diagonal_preconditioner.mobility_inv_blobs[k])
         mobility_bodies.append(build_block_diagonal_preconditioner.mobility_bodies[k])
         K_bodies.append(build_block_diagonal_preconditioner.K_bodies[k])
+        slip_l.append(build_block_diagonal_preconditioner.slip_l[k]) 
       else:
-        # 1. compute blobs mobility and invert it
-        M = b.calc_mobility_blobs(eta, a)
+        # 1. compute blobs mobility and invert it 
+        M = b.calc_mobility_blobs(eta, a) + (b.calc_Pll_matrix() if slip_mode else 0)       
         # 2. compute cholesy factorization, M = L^t * L
         L, lower = scipy.linalg.cho_factor(M)
         L = np.triu(L)   
@@ -867,7 +869,7 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
         K_bodies.append(K)
         # 5. compute body mobility
         mobility_bodies.append(np.linalg.pinv(np.dot(K.T, scipy.linalg.cho_solve((L,lower), K, check_finite=False))))
-    
+        
     # Loop over articulated bodies
     for ka, art in enumerate(articulated):     
       # Compute C matrix for each articulated body
@@ -906,13 +908,14 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
     res_art_bodies = build_block_diagonal_preconditioner.res_art_bodies
     mobility_inv_blobs = build_block_diagonal_preconditioner.mobility_inv_blobs 
 
-  def block_diagonal_preconditioner(vector, bodies = None, articulated = None, mobility_bodies = None, mobility_inv_blobs = None, K_bodies = None, Nblobs = None):
+  def block_diagonal_preconditioner(vector, bodies = None, articulated = None, mobility_bodies = None, mobility_inv_blobs = None, K_bodies = None, Nblobs = None, slip_mode = None):
     '''
     Apply the block diagonal preconditioner.
     '''
     result = np.zeros(vector.shape)
     Ncomp = len(vector)
     offset = 0
+    offset_slip = 3 * Nblobs + 6 * len(bodies)
     # First compute unconstrained body velocities
     for k, b in enumerate(bodies):
       if b.prescribed_kinematics is False:
@@ -931,6 +934,11 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
         result[3*offset : 3*(offset + b.Nblobs)] = Lambda
         result[3*Nblobs + 6*k : 3*Nblobs + 6*(k+1)] = U_unconst
 
+        if slip_mode:
+          # 5. Solve slip_length * lambda + u_s = RHS
+          result[offset_slip + 3*offset : offset_slip + 3*(offset + b.Nblobs)] = -Pll_matrix_vector_prod([b], Lambda, b.Nblobs, Pll_body = None).flatten() + \
+            vector[offset_slip + 3*offset : offset_slip + 3*(offset + b.Nblobs)]
+
       if b.prescribed_kinematics is True:
         # 1. solve M*Lambda = (slip + K*y)
         slip_KU = vector[3*offset : 3*(offset + b.Nblobs)]
@@ -942,6 +950,11 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
         # 3. set result
         result[3*offset : 3*(offset + b.Nblobs)] = Lambda
         result[3*Nblobs + 6*k : 3*Nblobs + 6*(k+1)] = F
+
+        if slip_mode:
+          # 5. Solve slip_length * lambda + u_s = RHS
+          result[offset_slip + 3*offset : offset_slip + 3*(offset + b.Nblobs)] = -Pll_matrix_vector_prod([b], Lambda, b.Nblobs, Pll_body = None).flatten() + \
+            vector[offset_slip + 3*offset : offset_slip + 3*(offset + b.Nblobs)]        
       offset += b.Nblobs
 
     # Compute constraint forces and body velocities for each articulated body separately
@@ -983,7 +996,8 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
                                                   mobility_bodies = mobility_bodies, 
                                                   mobility_inv_blobs = mobility_inv_blobs, 
                                                   K_bodies = K_bodies,
-                                                  Nblobs = Nblobs)
+                                                  Nblobs = Nblobs,
+                                                  slip_mode = slip_mode)
   return block_diagonal_preconditioner_partial
 
 
@@ -1268,7 +1282,8 @@ if __name__ == '__main__':
       # If structure is an obstacle
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
-        b.prescribed_velocity = np.zeros(6)
+        b.prescribed_velocity = np.array([0, 0, 1, 0, 0, 0])
+
       # Append bodies to total bodies list
       bodies.append(b)
 

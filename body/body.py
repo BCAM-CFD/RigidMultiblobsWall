@@ -40,7 +40,7 @@ class Body(object):
       self.blobs_radius = reference_configuration[:,3]
     if reference_configuration.shape[1] == 7:
       #self.blobs_radius = np.ones(self.Nblobs) * blob_radius
-      self.normal = reference_configuration[:,3:6]   #normal
+      self.normal = reference_configuration[:,3:6] / np.linalg.norm(reference_configuration[:,3:6], axis=1)[:, None]
       self.slip_l = reference_configuration[:,6]   #slip
     else:
       self.blobs_radius = np.ones(self.Nblobs) * blob_radius
@@ -251,9 +251,10 @@ class Body(object):
     xi(Pll)
     '''
     P = np.zeros((3*self.Nblobs,3*self.Nblobs))
-    Area = (4*np.pi*1*1)/642
+    Area_inverse = self.Nblobs / (4 * np.pi)
+    normal = self.normal_V()
     for i in range(0,self.Nblobs):
-      P_ii=(1/Area)*self.slip_l[i]*(np.eye(3)-(np.outer(self.normal_V()[i],self.normal_V()[i])))
+      P_ii = Area_inverse * self.slip_l[i] * (np.eye(3) - np.outer(normal[i], normal[i]))
       P[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii
       
     return P
@@ -265,9 +266,9 @@ class Body(object):
     xi(Pll)
     '''
     P2 = np.zeros((3*self.Nblobs,3*self.Nblobs))
-    Area = (4*np.pi*1*1)/642
+    normal = self.normal_V()
     for i in range(0,self.Nblobs):
-      P_ii2=(np.eye(3)-(np.outer(self.normal_V()[i],self.normal_V()[i])))
+      P_ii2 = np.eye(3) - np.outer(normal[i], normal[i])
       P2[3*i:3*(i+1), 3*i:3*(i+1)] = P_ii2
       
     return P2
