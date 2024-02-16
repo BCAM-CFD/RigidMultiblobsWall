@@ -186,13 +186,11 @@ def calc_K_matrix(bodies, Nblobs):
   Calculate the geometric block-diagonal matrix K.
   Shape (3*Nblobs, 6*Nbodies).
   '''
-  K = np.zeros((3*Nblobs, 6*len(bodies))) #For the double layer case
-  #K = np.zeros((3*Nblobs, 6*len(bodies))) #For the normal case single layer
+  K = np.zeros((3*Nblobs, 6*len(bodies)))
   offset = 0
   for k, b in enumerate(bodies):
     K_body = b.calc_K_matrix()
     K[3*offset:3*(offset+b.Nblobs), 6*k:6*k+6] = K_body
-    #K[3*offset:3*(offset+b.Nblobs), 6*k:6*k+6] = K_body #For the normal case single layer
     offset += b.Nblobs
   return K
 
@@ -238,7 +236,7 @@ def K_matrix_vector_prod(bodies, vector, Nblobs, K_bodies = None):
       K = b.calc_K_matrix()
     else:
       K = K_bodies[k] 
-    result[offset : offset+b.Nblobs] = np.reshape(np.dot(K, v[6*k : 6*(k+1)]), (b.Nblobs, 3)) #For the double layer case
+    result[offset : offset+b.Nblobs] = np.reshape(np.dot(K, v[6*k : 6*(k+1)]), (b.Nblobs, 3))
     offset += b.Nblobs    
   return result
 
@@ -250,8 +248,8 @@ def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
   level of describtion of the body to the level of describtion of the blobs.
   ''' 
   # Prepare variables
-  result = np.empty((len(bodies), 6))#For the double layer case
-  v = np.reshape(vector, (Nblobs*3))
+  result = np.empty((len(bodies), 6))
+  v = vector.flatten()
 
   # Loop over bodies
   offset = 0
@@ -263,7 +261,7 @@ def K_matrix_T_vector_prod(bodies, vector, Nblobs, K_bodies = None):
     result[k : k+1] = np.dot(K.T, v[3*offset : 3*(offset+b.Nblobs)])
     offset += b.Nblobs    
 
-  result = np.reshape(result, (2*len(bodies), 3)) #For the double layer case
+  result = np.reshape(result, (2*len(bodies), 3))
   return result
 
 def C_matrix_vector_prod(bodies, constraints, vector, Nconstraints, C_constraints = None):
