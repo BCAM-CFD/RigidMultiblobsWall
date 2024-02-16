@@ -227,7 +227,7 @@ class QuaternionIntegrator(object):
                                                             step = kwargs.get('step'))
       
       # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, PC_partial=PC_partial, step = kwargs.get('step'), dt = dt)
+      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, PC_partial=PC_partial, step = kwargs.get('step'), dt = dt)
 
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))      
@@ -245,7 +245,8 @@ class QuaternionIntegrator(object):
       # Solve mobility problem at the corrector step  
       sol_precond = self.solve_mobility_problem(x0 = self.first_guess, 
                                                 save_first_guess = True,
-                                                PC_partial = PC_partial,
+                                                update_PC = self.update_PC,
+                                                PC_partial=PC_partial, 
                                                 step = kwargs.get('step') + 0.5,
                                                 dt = dt)
 
@@ -1472,7 +1473,7 @@ class QuaternionIntegrator(object):
         slip = np.zeros((self.Nblobs, 3))
         
       # Calculate force-torque on bodies
-      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, step = kwargs.get('step'), dt = kwargs.get('dt'))
       slip_vel = np.zeros((self.Nblobs, 3))      
 
       # Add noise to the force/torque

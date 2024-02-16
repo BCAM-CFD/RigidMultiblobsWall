@@ -102,8 +102,9 @@ class ReadInput(object):
     # Some extra inputs for dipole interactions
     self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
     self.mu = np.fromstring(self.options.get('mu') or '1 0 0', sep=' ')
-    self.B0 = float(self.options.get('B0') or 0)
-    self.omega = float(self.options.get('omega') or 0)
+    self.B0 = np.fromstring(self.options.get('B0') or '0 0 0', sep=' ')
+    self.omega = np.fromstring(self.options.get('omega') or '0 0 0', sep=' ')
+    self.phi = np.fromstring(self.options.get('phi') or '0 0 0', sep=' ')    
     self.quaternion_B = np.fromstring(self.options.get('quaternion_B') or '1 0 0 0', sep=' ')
     self.vacuum_permeability = float(self.options.get('vacuum_permeability') or 1.25663706143592e+06)
 
