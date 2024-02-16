@@ -1564,7 +1564,7 @@ class QuaternionIntegrator(object):
     mode = 'w' if step == 0 else 'a'
     with open(name, mode) as f_handle:
       for k, b in enumerate(self.bodies):
-        print('body = ', k, ', Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)])
+        # print('body = ', k, ', Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)])
         if b.prescribed_kinematics is True:
           np.savetxt(f_handle, sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)].reshape((1, 6)))
         else:

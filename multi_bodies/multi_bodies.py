@@ -856,7 +856,7 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
         slip_l.append(build_block_diagonal_preconditioner.slip_l[k]) 
       else:
         # 1. compute blobs mobility and invert it 
-        M = b.calc_mobility_blobs(eta, a) + (b.calc_Pll_matrix() if slip_mode else 0)       
+        M = b.calc_mobility_blobs(eta, a) + (b.calc_Pll_matrix() if slip_mode else 0)
         # 2. compute cholesy factorization, M = L^t * L
         L, lower = scipy.linalg.cho_factor(M)
         L = np.triu(L)   
@@ -1231,7 +1231,6 @@ if __name__ == '__main__':
   multi_bodies_functions.calc_body_body_forces_torques = multi_bodies_functions.set_body_body_forces_torques(read.body_body_force_torque_implementation)
 
   # Copy input file to output
-  # subprocess.call(["cp", input_file, output_name + '.inputfile'])
   copyfile(input_file,output_name + '.inputfile')
 
   # Set random generator state
@@ -1426,7 +1425,13 @@ if __name__ == '__main__':
                                                repulsion_strength = read.repulsion_strength, 
                                                debye_length = read.debye_length, 
                                                periodic_length = read.periodic_length,
-                                               omega_one_roller = read.omega_one_roller) 
+                                               omega_one_roller = read.omega_one_roller,
+                                               mu = read.mu,
+                                               B0 = read.B0,
+                                               omega = read.omega,
+                                               phi = read.phi,
+                                               quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                                               vacuum_permeability = read.vacuum_permeability)
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
   read.slip_mode = True if read.slip_mode == 'True' else False
