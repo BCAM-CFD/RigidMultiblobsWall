@@ -104,7 +104,7 @@ def calc_body_body_forces_torques_numba(bodies, r_vectors, *args, **kwargs):
 
   # Collect dipole forces-torques
   force_torque_bodies[:,0:3] = force
-  force_torque_bodies[:,3:6] = torque   
+  force_torque_bodies[:,3:6] = torque
   return force_torque_bodies.reshape((2*len(bodies),3))
 
 

@@ -1477,7 +1477,7 @@ class QuaternionIntegrator(object):
         slip = np.zeros((self.Nblobs, 3))
         
       # Calculate force-torque on bodies
-      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, step = kwargs.get('step'), dt = kwargs.get('dt'))
+      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = kwargs.get('dt'))
       slip_vel = np.zeros((self.Nblobs, 3))      
 
       # Add noise to the force/torque
