@@ -1464,6 +1464,7 @@ if __name__ == '__main__':
   multi_bodies_functions.calc_blob_blob_forces = multi_bodies_functions.set_blob_blob_forces(read.blob_blob_force_implementation, bodies=bodies)  
   integrator.plot_velocity_field = read.plot_velocity_field
   integrator.output_name = read.output_name
+  integrator.save_force_torque = read.save_force_torque  
   try:
     integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
   except:

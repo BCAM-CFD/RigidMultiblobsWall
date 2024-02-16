@@ -98,6 +98,7 @@ class ReadInput(object):
     self.zmax = float(self.options.get('zmax') or 1e7)
     self.domType = str(self.options.get('domType') or 'RPB')
     self.slip_mode = str(self.options.get('slip_mode') or 'False')
+    self.save_force_torque = True if self.options.get('save_force_torque') == 'True' else False
 
     # Some extra inputs for dipole interactions
     self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')

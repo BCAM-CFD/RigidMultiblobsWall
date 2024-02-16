@@ -937,7 +937,7 @@ class QuaternionIntegrator(object):
 
     The computational cost of this scheme is 3 rigid solves
     + 1 lanczos call + 2 blob mobility product + 2 products with the geometri matrix K.
-
+5
     The linear and angular velocities are sorted like
     velocities = (v_1, w_1, v_2, w_2, ...)
     where v_i and w_i are the linear and angular velocities of body i.
@@ -988,7 +988,9 @@ class QuaternionIntegrator(object):
       sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
                                                 x0 = self.first_guess, 
                                                 save_first_guess = True,
-                                                PC_partial = PC_partial)
+                                                PC_partial = PC_partial,
+                                                step = kwargs.get('step'),
+                                                dt = dt)
       # Extract velocities
       velocities_1 = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
@@ -1029,7 +1031,9 @@ class QuaternionIntegrator(object):
                                                     noise_FT = rand_force_cor, 
                                                     x0 = self.first_guess, 
                                                     save_first_guess = True,
-                                                    PC_partial = PC_partial)
+                                                    PC_partial = PC_partial,
+                                                    step = kwargs.get('step'),
+                                                    dt = dt)
 
       # Extract velocities
       velocities_2 = np.reshape(sol_precond_cor[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -1559,16 +1563,17 @@ class QuaternionIntegrator(object):
     else:
       sol_precond[:] = 0.0
 
-    name = self.output_name + '.bodies_force.dat'
-    step = kwargs.get('step')
-    mode = 'w' if step == 0 else 'a'
-    with open(name, mode) as f_handle:
-      for k, b in enumerate(self.bodies):
-        # print('body = ', k, ', Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)])
-        if b.prescribed_kinematics is True:
-          np.savetxt(f_handle, sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)].reshape((1, 6)))
-        else:
-          np.savetxt(f_handle, force_torque[6*k : 6*(k+1)].reshape((1, 6)))
+    if self.save_force_torque:
+      name = self.output_name + '.bodies_force.dat'
+      step = kwargs.get('step')
+      mode = 'w' if step == 0 else 'a'
+      with open(name, mode) as f_handle:
+        for k, b in enumerate(self.bodies):
+          # print('body = ', k, ', Force = ', sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)])
+          if b.prescribed_kinematics is True:
+            np.savetxt(f_handle, sol_precond[3*self.Nblobs + 6*k : 3*self.Nblobs + 6*(k+1)].reshape((1, 6)))
+          else:
+            np.savetxt(f_handle, force_torque[6*k : 6*(k+1)].reshape((1, 6)))
 
     # If prescribed velocity we know the velocity
     for k, b in enumerate(self.bodies):
