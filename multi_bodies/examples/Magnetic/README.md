@@ -19,3 +19,6 @@ B = R(quaternion_B) * B1
 The utility code `characteristic_times.py` can be used to compute the characteristic times of the problem.
 
 
+## Input files
+Look `inputfile_deterministic.dat` and `inputfile_stochastic.dat` for examples of deterministic and stochastic input files.
+
