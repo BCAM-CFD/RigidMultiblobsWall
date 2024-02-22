@@ -1,0 +1,58 @@
+# Length, time and mass are given in units of microns, seconds and miligrams.
+
+# Select scheme to integrate Brownian equations
+scheme                                   stochastic_Slip_Trapz
+
+# Select implementation to compute M and M*f
+# We recommend to use the C++ implementation which is faster,
+# see documentation
+mobility_blobs_implementation            python_no_wall
+mobility_vector_prod_implementation      numba_no_wall
+domain                                   no_wall
+
+# Select implementation to compute the blobs-blob interactions
+blob_blob_force_implementation           tree_numba
+body_body_force_torque_implementation    numba
+
+# Set time step, number of steps and save frequency
+dt                                       5e-03
+n_steps                                  1000
+n_save                                   1
+initial_step                             0
+
+# Solver params
+solver_tolerance                         1.0e-06
+update_PC                                1
+
+# Set fluid viscosity (eta), gravity*blob_mass (g) and blob radius
+eta                                      1e-03
+g                                        0
+blob_radius                              0.243553056072
+
+# Stochastic parameters
+# 300 Kelvin * k_B = 0.0041419464 in this units
+kT                                       0.0041419464
+
+# Set interaction with the wall
+repulsion_strength_wall                  0
+debye_length_wall                        1
+
+# Define implementation to compute the blobs-blob force and pass its arguments
+repulsion_strength                       0.1
+debye_length                             0.121776528036
+
+# Magnetic interactions
+vacuum_permeability                      1.25663706143592e+06
+quaternion_B                             1 0 0 0
+B0                                       1e+03 1e+03 0
+omega                                    6.28318530717959  6.28318530717959   0
+phi                                      0 -1.5707963267949 0 
+mu                                       0 0 1e-3
+
+# Structures
+structure ../../Structures/shell_N_42_Rg_0_8913_Rh_1.vertex   Structures/colloids.clones
+
+# Set output name
+output_name                              /home/fbalboa/simulations/RigidMultiblobsWall/FreeSlip/data/run0/run6/run6.0.0.0
+save_clones                              one_file
+
