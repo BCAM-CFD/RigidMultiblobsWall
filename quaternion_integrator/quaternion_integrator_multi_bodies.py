@@ -365,6 +365,15 @@ class QuaternionIntegrator(object):
                                                                                                         periodic_length=self.periodic_length,
                                                                                                         update_PC = self.update_PC,
                                                                                                         step = kwargs.get('step'))
+      PC_partial = self.build_block_diagonal_preconditioner(self.bodies,
+                                                            self.articulated,
+                                                            r_vectors_blobs,
+                                                            self.Nblobs,
+                                                            self.eta,
+                                                            self.a,
+                                                            slip_mode=self.slip_mode,
+                                                            update_PC = self.update_PC,
+                                                            step = kwargs.get('step'))
 
       # Add noise contribution sqrt(2kT/dt)*N^{1/2}*W
       velocities_noise, it_lanczos = stochastic.stochastic_forcing_lanczos(factor = np.sqrt(2*self.kT / dt),
@@ -376,7 +385,13 @@ class QuaternionIntegrator(object):
       self.stoch_iterations_count += it_lanczos
 
       # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(noise = velocities_noise, x0 = self.first_guess, save_first_guess = True, PC_partial = PC_partial)
+      sol_precond = self.solve_mobility_problem(noise = velocities_noise,
+                                                x0 = self.first_guess,
+                                                save_first_guess = True,
+                                                PC_partial = PC_partial,
+                                                update_PC = self.update_PC,
+                                                step = kwargs.get('step'),
+                                                dt = dt)
 
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -390,9 +405,14 @@ class QuaternionIntegrator(object):
         force_rfd[k*6 : k*6+3] /= b.body_length
         
       # Add thermal drift contribution with N at x = x - random_displacement
-      System_size = self.Nblobs * 3 + len(self.bodies) * 6
-      sol_precond = self.solve_mobility_problem(RHS = np.reshape(np.concatenate([np.zeros(3*self.Nblobs), -force_rfd]), (System_size)), PC_partial = PC_partial)
-
+      # RHS = np.reshape(np.concatenate([np.zeros(3*self.Nblobs), -force_rfd], (System_size))
+      System_size = 3*self.Nblobs + len(self.bodies)*6 
+      if self.slip_mode:
+        System_size += 3*self.Nblobs
+      RHS = np.zeros_like(sol_precond)
+      RHS[3*self.Nblobs : 3*self.Nblobs + force_rfd.size] = -force_rfd
+      sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial) 
+      
       # Update configuration for rfd 
       for k, b in enumerate(self.bodies):
         b.location = b.location_old + rfd_noise[k*6 : k*6+3] * (self.rf_delta * 0.5 * b.body_length)
@@ -403,13 +423,16 @@ class QuaternionIntegrator(object):
       # Set linear operators 
       r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
       linear_operator_partial = partial(self.linear_operator, 
-                                        bodies=self.bodies, 
+                                        bodies=self.bodies,
+                                        constraints=self.constraints, 
                                         r_vectors=r_vectors_blobs, 
                                         eta=self.eta, 
-                                        a=self.a, 
-                                        periodic_length=self.periodic_length)
+                                        a=self.a,
+                                        periodic_length=self.periodic_length)      
       A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
-      RHS = np.reshape(np.concatenate([np.zeros(3*self.Nblobs), -force_rfd]), (System_size)) - A * sol_precond
+      RHS = np.zeros_like(sol_precond)
+      RHS[3*self.Nblobs : 3*self.Nblobs + force_rfd.size] = -force_rfd
+      RHS = RHS - A * sol_precond
 
       # Add thermal drift contribution with N at x = x + random_displacement
       sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial)
