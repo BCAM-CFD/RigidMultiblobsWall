@@ -337,10 +337,13 @@ class QuaternionIntegrator(object):
       # Set linear operators 
       r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
       linear_operator_partial = partial(self.linear_operator, 
-                                        bodies=self.bodies, 
+                                        bodies=self.bodies,
+                                        constraints = self.constraints,
                                         r_vectors=r_vectors_blobs, 
                                         eta=self.eta, 
-                                        a=self.a, 
+                                        a=self.a,
+                                        K_bodies = None,
+                                        C_constraints = None,
                                         periodic_length=self.periodic_length)
       A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
       RHS = np.reshape(np.concatenate([np.zeros(3*self.Nblobs), -force_rfd]), (System_size)) - A * sol_precond

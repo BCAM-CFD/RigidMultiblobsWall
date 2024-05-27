@@ -1,0 +1,39 @@
+# Select integrator 
+scheme                                   stochastic_first_order_RFD
+
+# Select implementation to compute M and M*f
+mobility_blobs_implementation            diagonal
+mobility_vector_prod_implementation      diagonal
+
+# Select implementation to compute the blobs-blob interactions
+blob_blob_force_implementation           tree_numba
+
+# Set time step, number of steps and save frequency
+dt                                       0.1
+n_steps                                  100000
+n_save                                   100
+
+# Set fluid viscosity (eta), gravity (g) and blob radius
+eta                                      1.0 
+g                                        0
+blob_radius                              0.25
+
+# Set parameters for the blob-blob interation
+repulsion_strength                       0.1
+debye_length                             0.025
+
+# Set interaction with the wall
+repulsion_strength_wall                  0.1
+debye_length_wall                        0.025
+
+# Load rigid bodies configuration, provide
+# *.vertex and *.clones files
+structure ../../Structures/boomerang_N_15.vertex ../../Structures/boomerang_N_15.clones
+structure ../../Structures/shell_N_12_Rg_1_Rh_1_2625.vertex ../../Structures/shell_N_12_Rg_1.clones
+
+# Set output name
+save_clones				                       one_file
+output_name                              /home/fbalboa/simulations/RigidMultiblobsWall/sedimentation/data/run0/run3/run3.0.0.0
+
+
+
