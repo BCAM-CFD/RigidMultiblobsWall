@@ -524,7 +524,7 @@ The linear operator is
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi+Ncomp_blobs
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
-  weights = np.ones(r_vectors.size) * (4*np.pi*1*1) / Nblobs
+  weights = np.ones(r_vectors.size // 3) * (4*np.pi*1*1) / Nblobs
     
   # Compute the "lambda" part
   mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) #M * lambda
