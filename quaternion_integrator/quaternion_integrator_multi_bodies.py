@@ -1487,6 +1487,7 @@ class QuaternionIntegrator(object):
     System_size = 3*self.Nblobs + len(self.bodies)*6 + Nconstraints*3
     if self.slip_mode:
       System_size += 3*self.Nblobs
+      normals = self.get_blobs_normals(self.bodies, self.Nblobs)
 
     # Get blobs coordinates
     r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
@@ -1524,9 +1525,8 @@ class QuaternionIntegrator(object):
         if b.prescribed_kinematics is True:
           # Add K*U to Right Hand side 
           weights = np.ones(r_vectors_blobs.size) * (4*np.pi*1*1) / self.Nblobs
-          normals = self.bodies[0].normal_V()          
           K_times_U = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
-          Dslip = mob.no_wall_double_layer_source_target_numba(r_vectors_blobs, r_vectors_blobs, normals, K_times_U, weights) #D*K*U 
+          Dslip = mob.no_wall_double_layer_source_target_numba(r_vectors_blobs, r_vectors_blobs, self.bodies[0].normal_V(), K_times_U, weights) #D*K*U 
           RHS[3*offset : 3*(offset+b.Nblobs)] += 0.5 * K_times_U.flatten() + Dslip
           # Set F to zero
           RHS[3*self.Nblobs+k*6 : 3*self.Nblobs+(k+1)*6] = 0.0
@@ -1550,7 +1550,8 @@ class QuaternionIntegrator(object):
     linear_operator_partial = partial(self.linear_operator, 
                                       bodies = self.bodies, 
                                       constraints = self.constraints, 
-                                      r_vectors = r_vectors_blobs, 
+                                      r_vectors = r_vectors_blobs,
+                                      normals = normals,
                                       eta = self.eta, 
                                       a = self.a, 
                                       K_bodies = K,

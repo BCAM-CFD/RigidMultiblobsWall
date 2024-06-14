@@ -102,6 +102,19 @@ def get_blobs_r_vectors(bodies, Nblobs):
   return r_vectors
 
 
+def get_blobs_normals(bodies, Nblobs):
+  '''
+  Return coordinates of all the blobs with shape (Nblobs, 3).
+  '''
+  normals = np.empty((Nblobs, 3))
+  offset = 0
+  for b in bodies:
+    num_blobs = b.Nblobs
+    normals[offset:(offset+num_blobs)] = b.get_r_vectors()
+    offset += num_blobs
+  return normals
+
+
 def set_mobility_blobs(implementation):
   '''
   Set the function to compute the dense mobility
@@ -493,7 +506,7 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   
   return res
 
-def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, Pll_body2 = None, *args, **kwargs):
+def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, normals, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, Pll_body2 = None, *args, **kwargs):
   '''
 The linear operator is
   |          M      -0.5*K-D*K   -0.5*I-D||lambda| = |  0 + noise_1|
@@ -512,10 +525,7 @@ The linear operator is
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
   weights = np.ones(r_vectors.size) * (4*np.pi*1*1) / Nblobs
-  
-  for k, b in enumerate(bodies):
-    normals = b.normal_V()
-  
+    
   # Compute the "lambda" part
   mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) #M * lambda
   Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body) # (xi^-1 Pll) * lambda
@@ -1438,9 +1448,9 @@ if __name__ == '__main__':
   integrator.slip_mode = read.slip_mode
 
   if read.slip_mode:
-    #integrator.linear_operator = linear_operator_projector
     integrator.linear_operator = linear_operator_projector_second_layer
-    integrator.first_guess = np.zeros(Nblobs*6 + num_bodies*6 + len(constraints)*3)    
+    integrator.first_guess = np.zeros(Nblobs*6 + num_bodies*6 + len(constraints)*3)
+    integrator.get_blobs_normals = get_blobs_normals
   else:
     integrator.linear_operator = linear_operator_rigid
   integrator.build_block_diagonal_preconditioners_det_stoch = build_block_diagonal_preconditioners_det_stoch
