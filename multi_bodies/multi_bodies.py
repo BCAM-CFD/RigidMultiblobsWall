@@ -1167,6 +1167,11 @@ if __name__ == '__main__':
         b.calc_body_length()
       else:
         b.body_length = bodies[-1].body_length
+      # Add body mass
+      if ID < len(read.mg_bodies):
+        b.mg = read.mg_bodies[ID]
+      else:
+        b.mg = 0.0        
       # Compute the blobs offset for lambda in the whole system array
       b.blobs_offset = blobs_offset
       blobs_offset += b.Nblobs

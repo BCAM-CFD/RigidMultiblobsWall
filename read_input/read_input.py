@@ -102,6 +102,9 @@ class ReadInput(object):
     self.stkfmm_max_points = int(self.options.get('stkfmm_max_points') or 512)
     self.stkfmm_pbc = str(self.options.get('stkfmm_pbc') or 'None')
 
+    # Add body mass
+    self.mg_bodies = np.fromstring(self.options.get('mg_bodies') or 'None', sep=' ')
+
     # Create list with [vertex_file, clones_file] for each structure
     self.num_free_bodies = number_of_structures
     self.structures = []
