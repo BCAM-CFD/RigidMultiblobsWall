@@ -16,7 +16,7 @@ def bodies_external_force_torque_new(bodies, r_vectors, *args, **kwargs):
   '''
   force_torque = np.zeros((2*len(bodies), 3))
   for k, b in enumerate(bodies):
-    force_torque[k,2] = b.mg
+    force_torque[2*k,2] = -b.mg
     
   return force_torque
 multi_bodies_functions.bodies_external_force_torque = bodies_external_force_torque_new
