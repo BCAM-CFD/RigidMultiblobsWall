@@ -33,22 +33,23 @@ def energy(r, xi, yi, zi, i):
     zij = zi - z[j]
     rij = np.sqrt(xij*xij + yij*yij + zij*zij)
     U = U + 1.0 / rij**6
+   
   return U
 
 if __name__ == '__main__':
   print('# Start')
   # Set parameters
   Nu = 12
-  Nv = 20
+  Nv = 10
   N = Nu * Nv
   A = 1.0
   B = 1.0
   C = 1.0
-  t = 3.9
-  m = 3.9
+  t = 5
+  m = 5
   noise = 0.1 / N
   kT = 1.0
-  n_steps = 1000000
+  n_steps = 100000
   n_save = 100
   dt_min = 1e-01
 
@@ -78,6 +79,8 @@ if __name__ == '__main__':
       f_handle.write(str(N) + '\n' + '# \n')
       np.savetxt(f_handle, result)
 
+    kT_eff = kT / np.sqrt(step + 1)
+    
     # Update configuration with Monte Carlo
     for i in range(N):
       U = energy(r, r[i,0], r[i,1], r[i,2], i)
@@ -85,7 +88,6 @@ if __name__ == '__main__':
       x, y, z = cartesian_superellipsoid(uv_test, A, B, C, m, t)
       U_test = energy(r, x, y, z, i)
 
-      kT_eff = kT / np.sqrt(step + 1)
       if np.exp((U_test - U) / kT_eff) < np.random.rand(1)[0]:
         uv[i] = uv_test
         r[i,0] = x
