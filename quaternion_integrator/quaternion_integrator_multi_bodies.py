@@ -93,7 +93,7 @@ class QuaternionIntegrator(object):
 
       if True:
         # Save bodies velocity
-        print('velocity = ', velocities)
+        #print('velocity = ', velocities)
         step = kwargs.get('step')
         mode = 'w' if step == 0 else 'a'
         name = self.output_name + '.bodies_velocities.dat'
@@ -409,6 +409,7 @@ class QuaternionIntegrator(object):
       System_size = 3*self.Nblobs + len(self.bodies)*6 
       if self.slip_mode:
         System_size += 3*self.Nblobs
+        normals = self.get_blobs_normals(self.bodies, self.Nblobs)
       RHS = np.zeros_like(sol_precond)
       RHS[3*self.Nblobs : 3*self.Nblobs + force_rfd.size] = -force_rfd
       sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial) 
@@ -425,7 +426,8 @@ class QuaternionIntegrator(object):
       linear_operator_partial = partial(self.linear_operator, 
                                         bodies=self.bodies,
                                         constraints=self.constraints, 
-                                        r_vectors=r_vectors_blobs, 
+                                        r_vectors=r_vectors_blobs,
+					normals = normals,
                                         eta=self.eta, 
                                         a=self.a,
                                         periodic_length=self.periodic_length)      
