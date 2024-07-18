@@ -110,7 +110,7 @@ def get_blobs_normals(bodies, Nblobs):
   offset = 0
   for b in bodies:
     num_blobs = b.Nblobs
-    normals[offset:(offset+num_blobs)] = b.get_r_vectors()
+    normals[offset:(offset+num_blobs)] = b.normal_V()
     offset += num_blobs
   return normals
 
