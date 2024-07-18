@@ -216,21 +216,21 @@ class QuaternionIntegrator(object):
       r_vectors_blobs_n = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
         
       # Build preconditioner
-      PC_partial = self.build_block_diagonal_preconditioner(self.bodies,
-                                                            self.articulated,
-                                                            r_vectors_blobs_n,
-                                                            self.Nblobs,
-                                                            self.eta,
-                                                            self.a,
-                                                            periodic_length=self.periodic_length,
-                                                            update_PC = self.update_PC,
-                                                            step = kwargs.get('step'))
+      # PC_partial = self.build_block_diagonal_preconditioner(self.bodies,
+      #                                                       self.articulated,
+      #                                                       r_vectors_blobs_n,
+      #                                                       self.Nblobs,
+      #                                                       self.eta,
+      #                                                       self.a,
+      #                                                       periodic_length=self.periodic_length,
+      #                                                       update_PC = self.update_PC,
+      #                                                       step = kwargs.get('step'))
       
       # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, PC_partial=PC_partial, step = kwargs.get('step'), dt = dt)
+      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, PC_partial=None, step = kwargs.get('step'), dt = dt)
 
       # Extract velocities
-      velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))      
+      velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
       # Update location orientation to midpoint
       for k, b in enumerate(self.bodies):
@@ -246,7 +246,7 @@ class QuaternionIntegrator(object):
       sol_precond = self.solve_mobility_problem(x0 = self.first_guess, 
                                                 save_first_guess = True,
                                                 update_PC = self.update_PC,
-                                                PC_partial=PC_partial, 
+                                                PC_partial=None, 
                                                 step = kwargs.get('step') + 0.5,
                                                 dt = dt)
 
