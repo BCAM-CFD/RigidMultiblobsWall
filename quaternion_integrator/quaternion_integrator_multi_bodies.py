@@ -1490,6 +1490,8 @@ class QuaternionIntegrator(object):
     if self.slip_mode:
       System_size += 3*self.Nblobs
       normals = self.get_blobs_normals(self.bodies, self.Nblobs)
+    else:
+      normals = None
 
     # Get blobs coordinates
     r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
