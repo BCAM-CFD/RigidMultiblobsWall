@@ -1875,11 +1875,10 @@ def fluid_velocity_overlap_correction_numba(r_source, r_target, force, eta, a, l
 
 
 @utils.static_var('r_vectors_old', [])
-def double_layer_stkfmm(r, normals, field, weights, PVel, L=np.zeros(3), *args, **kwargs):
+def double_layer_stkfmm(r, r_unused, normals, field, weights, PVel, L=np.zeros(3), *args, **kwargs):
   '''
   Stokes double layer.
   '''
-  
   def project_to_periodic_image(r, L):
     '''
     Project a vector r to the minimal image representation
@@ -1908,7 +1907,6 @@ def double_layer_stkfmm(r, normals, field, weights, PVel, L=np.zeros(3), *args, 
   build_tree = True
   if len(double_layer_stkfmm.r_vectors_old) > 0:
     if np.array_equal(double_layer_stkfmm.r_vectors_old, r_vectors):
-      double_layer_stkfmm.r_vectors_old = np.copy(r_vectors)
       build_tree = False
   if build_tree:
     # Build tree in STKFMM
@@ -1954,6 +1952,9 @@ def double_layer_stkfmm(r, normals, field, weights, PVel, L=np.zeros(3), *args, 
     PVel.set_box(np.array([x_min, y_min, z_min]), L_box)
     PVel.set_points(np.zeros(0), r_vectors, r_vectors)
     PVel.setup_tree(PySTKFMM.KERNEL.PVel)
+
+    # Save vectors for next evaluation
+    double_layer_stkfmm.r_vectors_old = np.copy(r_vectors)
     
   # Set double layer
   trg_value = np.zeros((N, 4))

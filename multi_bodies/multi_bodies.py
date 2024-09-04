@@ -20,9 +20,16 @@ try:
 except ImportError:
   print('It didn\'t find mpi4py!')
 
-# Add path for PySTKFMM
+# CHANGE 2: Add path for PySTKFMM
 sys.path.append('/home/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
-PySTKFMM_found = False 
+PySTKFMM_found = False
+
+# CHANGE 3: Load STKFMM
+try:
+  import PySTKFMM
+  PySTKFMM_found = True
+except ImportError:
+  print('STKFMM library not found')
 
 # Add path to HydroGrid and import module
 # sys.path.append('../../HydroGrid/src/')
@@ -68,6 +75,8 @@ while found_functions is False:
     if len(path_to_append) > 21:
       print('\nProjected functions not found. Edit path in multi_bodies.py')
       sys.exit()
+
+      
 def calc_slip(bodies, Nblobs, *args, **kwargs):
   '''
   Function to calculate the slip in all the blobs.
@@ -191,20 +200,12 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     # u, lapu kernel (4->6)
     kernel = PySTKFMM.KERNEL.RPY
 
-    # Get blobs radii
-    bodies = kwargs.get('bodies')
-    radius_blobs = []
-    for k, b in enumerate(bodies):
-      radius_blobs.append(b.blobs_radius)
-    radius_blobs = np.concatenate(radius_blobs, axis=0)    
-
     # Setup FMM
     rpy_fmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
     no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
                                                                 rpy_fmm=rpy_fmm, 
                                                                 L=kwargs.get('L'),
                                                                 wall=False,
-                                                                radius_blobs=radius_blobs,
                                                                 comm=kwargs.get('comm'))
     return no_wall_mobility_trans_times_force_stkfmm_partial
   
@@ -234,20 +235,12 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     # u, lapu kernel (4->6)
     kernel = PySTKFMM.KERNEL.RPY
 
-    # Get blobs radii
-    bodies = kwargs.get('bodies')
-    radius_blobs = []
-    for k, b in enumerate(bodies):
-      radius_blobs.append(b.blobs_radius)
-    radius_blobs = np.concatenate(radius_blobs, axis=0)    
-
     # Setup FMM
     rpy_fmm = PySTKFMM.StkWallFMM(mult_order, max_pts, pbc, kernel)
     no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
                                                                 rpy_fmm=rpy_fmm, 
                                                                 L=kwargs.get('L'),
                                                                 wall=True,
-                                                                radius_blobs=radius_blobs,
                                                                 comm=kwargs.get('comm'))
     return no_wall_mobility_trans_times_force_stkfmm_partial
   
@@ -274,6 +267,35 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
       radius_blobs.append(b.blobs_radius)
     radius_blobs = np.concatenate(radius_blobs, axis=0)    
     return partial(mb.mobility_radii_trans_times_force, radius_blobs=radius_blobs, function=function)
+
+
+def set_double_layer_kernels(mult_order, pbc_string, max_pts, L=np.zeros(3), *args, **kwargs):
+  print('pbc_string = ', pbc_string)
+
+  if pbc_string == 'None':
+    pbc = PySTKFMM.PAXIS.NONE
+  elif pbc_string == 'PX':
+    pbc = PySTKFMM.PAXIS.PX
+  elif pbc_string == 'PXY':
+    pbc = PySTKFMM.PAXIS.PXY
+  elif pbc_string == 'PXYZ':
+    pbc = PySTKFMM.PAXIS.PXYZ
+  else:
+    print('Error while setting pbc for stkfmm!')
+
+  comm = kwargs.get('comm')
+  comm.Barrier()
+
+  # u, lapu kernel (4->6)
+  kernel = PySTKFMM.KERNEL.PVel
+
+  # Setup FMM
+  PVel = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
+  no_wall_double_layer_stkfmm_partial = partial(mb.double_layer_stkfmm,
+                                                PVel=PVel, 
+                                                L=L,
+                                                comm=kwargs.get('comm'))
+  return no_wall_double_layer_stkfmm_partial
 
 
 def calc_K_matrix(bodies, Nblobs):
@@ -588,6 +610,7 @@ def linear_operator_projector(vector, bodies, constraints, r_vectors, eta, a, K_
   
   return res
 
+
 def linear_operator_projector_second_layer(vector, bodies, constraints, r_vectors, normals, eta, a, K_bodies = None, C_constraints = None, Pll_body=None, Pll_body2 = None, *args, **kwargs):
   '''
 The linear operator is
@@ -607,7 +630,10 @@ The linear operator is
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
   weights = np.ones(r_vectors.size // 3) * (4*np.pi*1*1) / Nblobs
-    
+
+  # Get double layer operator 
+  no_wall_double_layer = kwargs.get('no_wall_double_layer')
+  
   # Compute the "lambda" part
   mobility_times_lambda = mobility_vector_prod(r_vectors, vector[0:Ncomp_blobs], eta, a, *args, **kwargs) #M * lambda
   Pll_times_lambda = Pll_matrix_vector_prod(bodies, vector[0:Ncomp_blobs], Nblobs, Pll_body = Pll_body) # (xi^-1 Pll) * lambda
@@ -615,14 +641,14 @@ The linear operator is
 
   # Compute the "U" part
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 2*Nbodies],Nblobs, K_bodies = K_bodies) #K*U  vector[Ncomp_blobs: Ncomp_blobs+6*Nbodies]
-  Dslip = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, K_times_U, weights) #D*K*U
+  Dslip = no_wall_double_layer(r_vectors, r_vectors, normals, K_times_U, weights) #D*K*U
 
   # Compute the "u_s" part
   I = (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
-  DslipUs = mb.no_wall_double_layer_source_target_numba(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]), weights) #D*us
+  DslipUs = no_wall_double_layer(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]).reshape(K_times_U.shape), weights) #D*us
   Pll_times_us = Pll_matrix_vector_prod2(bodies, vector[Ncomp_blobs+6*Nbodies:Ncomp_tot], Nblobs, Pll_body2 = Pll_body2) # Pll * us
 
-  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip - DslipUs - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
+  res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip.flatten() - DslipUs.flatten() - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
   res[Ncomp_blobs+6*Nbodies:Ncomp_tot] = np.reshape(Pll_times_lambda,(3*Nblobs)) + np.reshape(Pll_times_us,(3*Nblobs)) # xi*Pll*lambda + Pll*u_s
   
   # We never have articulated constraints here
@@ -1542,8 +1568,19 @@ if __name__ == '__main__':
   read.slip_mode = True if read.slip_mode == 'True' else False
   integrator.slip_mode = read.slip_mode
 
-  if read.slip_mode:
-    integrator.linear_operator = linear_operator_projector_second_layer
+  if read.slip_mode: 
+    if read.mobility_vector_prod_implementation.find('stkfmm') >= 0:
+      # Create STFMM object
+      print('stkfmm_mult_order = ', read.stkfmm_mult_order)
+      print('stkfmm_pbc        = ', read.stkfmm_pbc)
+      print('stkfmm_max_points = ', read.stkfmm_max_points)
+      print('L                 = ', read.periodic_length)           
+      no_wall_double_layer_stkfmm_partial = set_double_layer_kernels(read.stkfmm_mult_order, read.stkfmm_pbc, read.stkfmm_max_points, L=read.periodic_length, comm=comm)     
+      integrator.linear_operator = partial(linear_operator_projector_second_layer, 
+                                           no_wall_double_layer = no_wall_double_layer_stkfmm_partial)
+    else:
+      integrator.linear_operator = partial(linear_operator_projector_second_layer, 
+                                           no_wall_double_layer = mb.no_wall_double_layer_source_target_numba)
     integrator.first_guess = np.zeros(Nblobs*6 + num_bodies*6 + len(constraints)*3)
     integrator.get_blobs_normals = get_blobs_normals
   else:
