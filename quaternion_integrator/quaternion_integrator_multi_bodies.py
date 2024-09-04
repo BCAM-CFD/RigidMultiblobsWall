@@ -423,14 +423,23 @@ class QuaternionIntegrator(object):
       # Modify RHS for drift solve
       # Set linear operators 
       r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
-      linear_operator_partial = partial(self.linear_operator, 
-                                        bodies=self.bodies,
-                                        constraints=self.constraints, 
-                                        r_vectors=r_vectors_blobs,
-					normals = normals,
-                                        eta=self.eta, 
-                                        a=self.a,
-                                        periodic_length=self.periodic_length)      
+      if self.slip_mode:
+        linear_operator_partial = partial(self.linear_operator, 
+                                          bodies=self.bodies,
+                                          constraints=self.constraints, 
+                                          r_vectors=r_vectors_blobs,
+					  normals = normals,
+                                          eta=self.eta, 
+                                          a=self.a,
+                                          periodic_length=self.periodic_length)
+      else:
+        linear_operator_partial = partial(self.linear_operator, 
+                                          bodies=self.bodies,
+                                          constraints=self.constraints, 
+                                          r_vectors=r_vectors_blobs,
+                                          eta=self.eta, 
+                                          a=self.a,
+                                          periodic_length=self.periodic_length)      
       A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
       RHS = np.zeros_like(sol_precond)
       RHS[3*self.Nblobs : 3*self.Nblobs + force_rfd.size] = -force_rfd
@@ -1506,7 +1515,7 @@ class QuaternionIntegrator(object):
         
       # Calculate force-torque on bodies
       force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = kwargs.get('dt'))
-      slip_vel = np.zeros((self.Nblobs, 3))      
+      slip_vel = np.zeros((self.Nblobs, 3))
 
       # Add noise to the force/torque
       if noise_FT is not None:
