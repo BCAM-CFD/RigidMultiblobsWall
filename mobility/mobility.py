@@ -1942,12 +1942,6 @@ def double_layer_stkfmm(r, r_unused, normals, field, weights, PVel, L=np.zeros(3
     else:
       L_box = np.max([Lx_pvfmm, Ly_pvfmm, 2 * Lz_pvfmm])
     
-    # Set box size for pvfmm
-    if L[0] > 0 or L[1] > 0 or L[2] > 0:
-      L_box = np.max(L)
-    else:
-      L_box = np.max([Lx_pvfmm, Ly_pvfmm, 2 * Lz_pvfmm])
-
     # Buid FMM tree
     PVel.set_box(np.array([x_min, y_min, z_min]), L_box)
     PVel.set_points(np.zeros(0), r_vectors, r_vectors)
