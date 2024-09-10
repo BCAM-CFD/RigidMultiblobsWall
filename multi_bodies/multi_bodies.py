@@ -270,7 +270,11 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
 
 
 def set_double_layer_kernels(mult_order, pbc_string, max_pts, L=np.zeros(3), *args, **kwargs):
-  print('pbc_string = ', pbc_string)
+
+  print('stkfmm_mult_order = ', mult_order)
+  print('stkfmm_pbc        = ', pbc_string)
+  print('stkfmm_max_points = ', max_pts)
+  print('L                 = ', L)
 
   if pbc_string == 'None':
     pbc = PySTKFMM.PAXIS.NONE
@@ -1568,13 +1572,8 @@ if __name__ == '__main__':
   read.slip_mode = True if read.slip_mode == 'True' else False
   integrator.slip_mode = read.slip_mode
 
-  if read.slip_mode: 
+  if read.slip_mode:
     if read.mobility_vector_prod_implementation.find('stkfmm') >= 0:
-      # Create STFMM object
-      print('stkfmm_mult_order = ', read.stkfmm_mult_order)
-      print('stkfmm_pbc        = ', read.stkfmm_pbc)
-      print('stkfmm_max_points = ', read.stkfmm_max_points)
-      print('L                 = ', read.periodic_length)           
       no_wall_double_layer_stkfmm_partial = set_double_layer_kernels(read.stkfmm_mult_order, read.stkfmm_pbc, read.stkfmm_max_points, L=read.periodic_length, comm=comm)     
       integrator.linear_operator = partial(linear_operator_projector_second_layer, 
                                            no_wall_double_layer = no_wall_double_layer_stkfmm_partial)
