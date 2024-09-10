@@ -331,7 +331,6 @@ class QuaternionIntegrator(object):
     return
 
 
-
   def stochastic_first_order_RFD(self, dt, *args, **kwargs): 
     ''' 
     Take a time step of length dt using a stochastic
@@ -423,7 +422,7 @@ class QuaternionIntegrator(object):
       # Modify RHS for drift solve
       # Set linear operators 
       r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
-      if self.slip_mode:
+      if self.slip_mode:        
         linear_operator_partial = partial(self.linear_operator, 
                                           bodies=self.bodies,
                                           constraints=self.constraints, 
@@ -469,6 +468,196 @@ class QuaternionIntegrator(object):
 
     return
 
+
+  def stochastic_first_order_slip_RFD(self, dt, *args, **kwargs): 
+    ''' 
+    Take a time step of length dt using a stochastic
+    first order Randon Finite Difference (RFD) scheme.
+
+    The linear and angular velocities are sorted like
+    velocities = (v_1, w_1, v_2, w_2, ...)
+    where v_i and w_i are the linear and angular velocities of body i.
+    ''' 
+    while True: 
+      # Call preprocess
+      preprocess_result = self.preprocess(self.bodies)
+      
+      # Save initial configuration
+      for k, b in enumerate(self.bodies):
+        np.copyto(b.location_old, b.location)
+        b.orientation_old = copy.copy(b.orientation)
+
+      # Get system size
+      System_size = 3*self.Nblobs + len(self.bodies)*6 
+      if self.slip_mode:
+        System_size += 3*self.Nblobs
+        normals = self.get_blobs_normals(self.bodies, self.Nblobs)
+
+      # Generate random vector
+      rfd_noise = np.random.normal(0.0, 1.0, len(self.bodies) * 6)     
+
+      # Get blobs vectors
+      r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
+
+      # Build preconditioners
+      PC_partial, mobility_pc_partial, P_inv_mult = self.build_block_diagonal_preconditioners_det_stoch(self.bodies, 
+                                                                                                        r_vectors_blobs, 
+                                                                                                        self.Nblobs, 
+                                                                                                        self.eta, 
+                                                                                                        self.a,
+                                                                                                        periodic_length=self.periodic_length,
+                                                                                                        update_PC = self.update_PC,
+                                                                                                        step = kwargs.get('step'))
+      PC_partial = self.build_block_diagonal_preconditioner(self.bodies,
+                                                            self.articulated,
+                                                            r_vectors_blobs,
+                                                            self.Nblobs,
+                                                            self.eta,
+                                                            self.a,
+                                                            slip_mode=self.slip_mode,
+                                                            update_PC = self.update_PC,
+                                                            step = kwargs.get('step'))
+
+      if True:
+        # Calculate K matrix
+        K = self.calc_K_matrix_bodies(self.bodies, self.Nblobs)
+
+        # Calculate C matrix if any constraint
+        if len(self.constraints) > 0:
+          C = self.calc_C_matrix_constraints(self.constraints)
+        else:
+          C = None
+
+          # Set linear operators 
+          linear_operator_partial = partial(self.linear_operator, 
+                                            bodies = self.bodies, 
+                                            constraints = self.constraints, 
+                                            r_vectors = r_vectors_blobs,
+                                            normals = normals,
+                                            eta = self.eta, 
+                                            a = self.a, 
+                                            K_bodies = K,
+                                            C_constraints = C,
+                                            periodic_length=self.periodic_length)
+          A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
+
+        # Set preconditioner
+        if PC_partial is None:
+          PC_partial = self.build_block_diagonal_preconditioner(self.bodies,
+                                                                self.articulated,
+                                                                r_vectors_blobs,
+                                                                self.Nblobs,
+                                                                self.eta,
+                                                                self.a,
+                                                                slip_mode=self.slip_mode,
+                                                                *args, **kwargs)
+        PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
+    
+        velocities_noise_bodies, it_lanczos = stochastic.stochastic_forcing_lanczos(factor = np.sqrt(2*self.kT / dt),
+                                                                                    tolerance = self.tolerance, 
+                                                                                    dim = System_size, 
+                                                                                    mobility_mult = A,
+                                                                                    L_mult = None,
+                                                                                    print_residual = self.print_residual)
+        self.stoch_iterations_count += it_lanczos
+        velocities_noise_bodies = velocities_noise_bodies[self.Nblobs * 3 : self.Nblobs * 3 + len(self.bodies) * 6]
+        velocities_noise = np.zeros(self.Nblobs * 3)
+
+      else:
+        # Add noise contribution sqrt(2kT/dt)*N^{1/2}*W
+        velocities_noise, it_lanczos = stochastic.stochastic_forcing_lanczos(factor = np.sqrt(2*self.kT / dt),
+                                                                             tolerance = self.tolerance, 
+                                                                             dim = self.Nblobs * 3, 
+                                                                             mobility_mult = mobility_pc_partial,
+                                                                             L_mult = P_inv_mult,
+                                                                             print_residual = self.print_residual)
+        self.stoch_iterations_count += it_lanczos
+        velocities_noise_bodies = np.zeros(len(self.bodies) * 6)
+
+      # Solve mobility problem
+      sol_precond = self.solve_mobility_problem(noise = velocities_noise,
+                                                x0 = self.first_guess,
+                                                save_first_guess = True,
+                                                PC_partial = PC_partial,
+                                                update_PC = self.update_PC,
+                                                step = kwargs.get('step'),
+                                                dt = dt)
+
+      # Extract velocities
+      velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+
+      # Add random velocities
+      velocities += velocities_noise_bodies
+
+      # Update configuration for rfd 
+      force_rfd = np.copy(rfd_noise) 
+      for k, b in enumerate(self.bodies):
+        b.location = b.location_old + rfd_noise[k*6 : k*6+3] * (-self.rf_delta * 0.5 * b.body_length)
+        quaternion_dt = Quaternion.from_rotation(rfd_noise[(k*6+3):(k*6+6)] * (-self.rf_delta * 0.5))
+        b.orientation = quaternion_dt * b.orientation_old
+        force_rfd[k*6 : k*6+3] /= b.body_length
+        
+      # Add thermal drift contribution with N at x = x - random_displacement
+      # RHS = np.reshape(np.concatenate([np.zeros(3*self.Nblobs), -force_rfd], (System_size))
+      RHS = np.zeros_like(sol_precond)
+      RHS[3*self.Nblobs : 3*self.Nblobs + force_rfd.size] = -force_rfd
+      sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial) 
+      
+      # Update configuration for rfd 
+      for k, b in enumerate(self.bodies):
+        b.location = b.location_old + rfd_noise[k*6 : k*6+3] * (self.rf_delta * 0.5 * b.body_length)
+        quaternion_dt = Quaternion.from_rotation(rfd_noise[(k*6+3):(k*6+6)] * (self.rf_delta * 0.5))
+        b.orientation = quaternion_dt * b.orientation_old
+
+      # Modify RHS for drift solve
+      # Set linear operators 
+      r_vectors_blobs = self.get_blobs_r_vectors(self.bodies, self.Nblobs)
+      if self.slip_mode:
+        linear_operator_partial = partial(self.linear_operator, 
+                                          bodies=self.bodies,
+                                          constraints=self.constraints, 
+                                          r_vectors=r_vectors_blobs,
+					  normals = normals,
+                                          eta=self.eta, 
+                                          a=self.a,
+                                          periodic_length=self.periodic_length)
+      else:
+        linear_operator_partial = partial(self.linear_operator, 
+                                          bodies=self.bodies,
+                                          constraints=self.constraints, 
+                                          r_vectors=r_vectors_blobs,
+                                          eta=self.eta, 
+                                          a=self.a,
+                                          periodic_length=self.periodic_length)      
+      A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
+      RHS = np.zeros_like(sol_precond)
+      RHS[3*self.Nblobs : 3*self.Nblobs + force_rfd.size] = -force_rfd
+      RHS = RHS - A * sol_precond
+
+      # Add thermal drift contribution with N at x = x + random_displacement
+      sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial)
+
+      # Extract velocities
+      velocities_drift = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
+
+      # Add all velocity contributions
+      velocities += (self.kT / self.rf_delta) * velocities_drift
+      
+      # Update location orientation 
+      for k, b in enumerate(self.bodies):
+        b.location_new = b.location_old + velocities[6*k:6*k+3] * dt
+        quaternion_dt = Quaternion.from_rotation((velocities[6*k+3:6*k+6]) * dt)
+        b.orientation_new = quaternion_dt * b.orientation_old
+
+      # Call postprocess
+      postprocess_result = self.postprocess(self.bodies)
+
+      # Check positions, if valid return 
+      if self.check_positions(new = 'new', old = 'old', update_in_success = True, update_in_failure = True, domain = self.domain) is True:
+        return
+
+    return
+  
 
   def stochastic_adams_bashforth(self, dt, *args, **kwargs): 
     ''' 
@@ -1548,7 +1737,6 @@ class QuaternionIntegrator(object):
     # Add noise to the slip
     if noise is not None:
       RHS[0:r_vectors_blobs.size] -= noise
-
 
     # Calculate K matrix
     K = self.calc_K_matrix_bodies(self.bodies, self.Nblobs)
