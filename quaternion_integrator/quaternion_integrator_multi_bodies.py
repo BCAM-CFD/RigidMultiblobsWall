@@ -492,6 +492,8 @@ class QuaternionIntegrator(object):
       if self.slip_mode:
         System_size += 3*self.Nblobs
         normals = self.get_blobs_normals(self.bodies, self.Nblobs)
+      else:
+        normals = None
 
       # Generate random vector
       rfd_noise = np.random.normal(0.0, 1.0, len(self.bodies) * 6)     
@@ -528,18 +530,18 @@ class QuaternionIntegrator(object):
         else:
           C = None
 
-          # Set linear operators 
-          linear_operator_partial = partial(self.linear_operator, 
-                                            bodies = self.bodies, 
-                                            constraints = self.constraints, 
-                                            r_vectors = r_vectors_blobs,
-                                            normals = normals,
-                                            eta = self.eta, 
-                                            a = self.a, 
-                                            K_bodies = K,
-                                            C_constraints = C,
-                                            periodic_length=self.periodic_length)
-          A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
+        # Set linear operators 
+        linear_operator_partial = partial(self.linear_operator, 
+                                          bodies = self.bodies, 
+                                          constraints = self.constraints, 
+                                          r_vectors = r_vectors_blobs,
+                                          normals = normals,
+                                          eta = self.eta, 
+                                          a = self.a, 
+                                          K_bodies = K,
+                                          C_constraints = C,
+                                          periodic_length=self.periodic_length)
+        A = spla.LinearOperator((System_size, System_size), matvec = linear_operator_partial, dtype='float64')
 
         # Set preconditioner
         if PC_partial is None:
@@ -552,28 +554,28 @@ class QuaternionIntegrator(object):
                                                                 slip_mode=self.slip_mode,
                                                                 *args, **kwargs)
         PC = spla.LinearOperator((System_size, System_size), matvec = PC_partial, dtype='float64')
-    
+
+        counter = gmres_counter(print_residual = self.print_residual)
+        def apply_N(RHS, A, PC):
+          if self.slip_mode:
+            b = np.concatenate([np.zeros(self.Nblobs * 3), -RHS, np.zeros(self.Nblobs * 3)])
+          else:
+            np.concatenate([np.zeros(self.Nblobs * 3), -RHS])
+          sol_precond, info_precond = utils.gmres(A, b, tol=self.tolerance, M=PC, maxiter=600, restart=600)
+          return sol_precond[self.Nblobs * 3 : self.Nblobs * 3 + len(self.bodies) * 6]
+        apply_N_partial = partial(apply_N, A=A, PC=PC)
+        apply_N_parial_LO = spla.LinearOperator((len(self.bodies) * 6, len(self.bodies) * 6), matvec=apply_N_partial, dtype='float64')
+        
         velocities_noise_bodies, it_lanczos = stochastic.stochastic_forcing_lanczos(factor = np.sqrt(2*self.kT / dt),
                                                                                     tolerance = self.tolerance, 
-                                                                                    dim = System_size, 
-                                                                                    mobility_mult = A,
+                                                                                    dim = len(self.bodies) * 6, 
+                                                                                    mobility_mult = apply_N_parial_LO,
                                                                                     L_mult = None,
                                                                                     print_residual = self.print_residual)
+
         self.stoch_iterations_count += it_lanczos
-        velocities_noise_bodies = velocities_noise_bodies[self.Nblobs * 3 : self.Nblobs * 3 + len(self.bodies) * 6]
         velocities_noise = np.zeros(self.Nblobs * 3)
-
-      else:
-        # Add noise contribution sqrt(2kT/dt)*N^{1/2}*W
-        velocities_noise, it_lanczos = stochastic.stochastic_forcing_lanczos(factor = np.sqrt(2*self.kT / dt),
-                                                                             tolerance = self.tolerance, 
-                                                                             dim = self.Nblobs * 3, 
-                                                                             mobility_mult = mobility_pc_partial,
-                                                                             L_mult = P_inv_mult,
-                                                                             print_residual = self.print_residual)
-        self.stoch_iterations_count += it_lanczos
-        velocities_noise_bodies = np.zeros(len(self.bodies) * 6)
-
+        
       # Solve mobility problem
       sol_precond = self.solve_mobility_problem(noise = velocities_noise,
                                                 x0 = self.first_guess,
