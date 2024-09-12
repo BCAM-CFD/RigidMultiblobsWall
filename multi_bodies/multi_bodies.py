@@ -162,6 +162,8 @@ def set_mobility_blobs(implementation):
   # Implementation free surface
   elif implementation == 'C++_free_surface':
     return  mb.boosted_free_surface_mobility
+  if implementation == 'python_diagonal_no_wall':
+    return mb.python_diagonal_no_wall
 
 
 def set_mobility_vector_prod(implementation, *args, **kwargs):
@@ -208,6 +210,8 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
                                                                 wall=False,
                                                                 comm=kwargs.get('comm'))
     return no_wall_mobility_trans_times_force_stkfmm_partial
+  elif implementation == 'diagonal_no_wall':
+    return mb.diagonal_no_wall
   
   # Implementations with wall
   elif implementation == 'python':

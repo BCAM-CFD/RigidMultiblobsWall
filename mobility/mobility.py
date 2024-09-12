@@ -1970,3 +1970,13 @@ def double_layer_stkfmm(r, r_unused, normals, field, weights, PVel, L=np.zeros(3
   return u
 
 
+def python_diagonal_no_wall(r_vectors, eta, a, *args, **kwargs):
+  # Extract variables
+  return np.diag(np.ones(r_vectors.size) / (6 * np.pi * eta * a))
+
+
+def diagonal_no_wall(r_vectors, force, eta, a, *args, **kwargs): 
+  return force / (6 * np.pi * eta * a)
+
+
+
