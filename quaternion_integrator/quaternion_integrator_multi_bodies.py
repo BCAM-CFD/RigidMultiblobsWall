@@ -232,6 +232,45 @@ class QuaternionIntegrator(object):
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
+      # Save stress and velocity
+      step = kwargs.get('step')
+      if (step % self.n_save) == 0 and step >= 0:
+        # Save velocity
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.bodies_velocity.dat'
+        with open(name, mode) as f_handle:
+          f_handle.write(str(len(self.bodies)) + '\n')
+          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
+
+        # Save stress tensor
+        stress_tensor = np.zeros((len(self.bodies), 9))
+
+        # Extract blob forces 
+        lambda_blobs = sol_precond[0 : 3*self.Nblobs]
+        offset = 0
+        for k, b in enumerate(self.bodies):
+          r_k = b.get_r_vectors(location = np.zeros(3))
+          l_k = lambda_blobs[offset * 3 : (offset + b.Nblobs) * 3].reshape((b.Nblobs, 3))
+          stress_tensor[k] = np.einsum('ki,kj->ij', l_k, r_k).flatten()
+          offset += b.Nblobs
+          
+        # Save stress
+        if False:
+          mode = 'w' if step == 0 else 'a'
+          name = self.output_name + '.stress_tensor.dat'
+          with open(name, mode) as f_handle:
+            f_handle.write(str(len(self.bodies)) + '\n')
+            np.savetxt(f_handle, stress_tensor)          
+
+        # Save stress average
+        mode = 'w' if step == 0 else 'a'
+        name = self.output_name + '.stress_tensor_time.dat'
+        with open(name, mode) as f_handle:
+          result = np.zeros(10)
+          result[0] = step * dt
+          result[1:] = np.average(stress_tensor, axis=0)
+          np.savetxt(f_handle, result.reshape((1,10)))           
+
       # Update location orientation to midpoint
       for k, b in enumerate(self.bodies):
         b.location = b.location_old + velocities[6*k:6*k+3] * dt * 0.5

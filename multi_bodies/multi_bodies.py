@@ -1408,7 +1408,7 @@ if __name__ == '__main__':
       # Compute the blobs offset for lambda in the whole system array
       b.blobs_offset = blobs_offset
       blobs_offset += b.Nblobs
-      multi_bodies_functions.set_slip_by_ID(b, slip)
+      multi_bodies_functions.set_slip_by_ID(b, slip, gamma_dot=read.gamma_dot, Lz=read.periodic_length[2])
       # If structure is an obstacle
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
@@ -1611,6 +1611,7 @@ if __name__ == '__main__':
   integrator.output_name = read.output_name
   integrator.save_force_torque = read.save_force_torque
   integrator.dipole_dipole = read.dipole_dipole
+  integrator.n_save = read.n_save  
   try:
     integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
   except:

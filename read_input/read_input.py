@@ -112,7 +112,10 @@ class ReadInput(object):
     # Info for STKFMM
     self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)
     self.stkfmm_max_points = int(self.options.get('stkfmm_max_points') or 512)
-    self.stkfmm_pbc = str(self.options.get('stkfmm_pbc') or 'None') 
+    self.stkfmm_pbc = str(self.options.get('stkfmm_pbc') or 'None')
+
+    # Extra variables
+    self.gamma_dot = float(self.options.get('gamma_dot') or 0)
 
     # Create list with [vertex_file, clones_file] for each structure
     self.num_free_bodies = number_of_structures
