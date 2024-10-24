@@ -1585,6 +1585,7 @@ if __name__ == '__main__':
     else:
       integrator.linear_operator = partial(linear_operator_projector_second_layer, 
                                            no_wall_double_layer = mb.no_wall_double_layer_source_target_numba)
+      integrator.no_wall_double_layer = mb.no_wall_double_layer_source_target_numba
     integrator.first_guess = np.zeros(Nblobs*6 + num_bodies*6 + len(constraints)*3)
     integrator.get_blobs_normals = get_blobs_normals
   else:
