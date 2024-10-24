@@ -21,7 +21,7 @@ except ImportError:
   print('It didn\'t find mpi4py!')
 
 # CHANGE 2: Add path for PySTKFMM
-sys.path.append('/home/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
+sys.path.append('/workspace/scratch/users/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
 PySTKFMM_found = False
 
 # CHANGE 3: Load STKFMM
@@ -1581,6 +1581,7 @@ if __name__ == '__main__':
       no_wall_double_layer_stkfmm_partial = set_double_layer_kernels(read.stkfmm_mult_order, read.stkfmm_pbc, read.stkfmm_max_points, L=read.periodic_length, comm=comm)     
       integrator.linear_operator = partial(linear_operator_projector_second_layer, 
                                            no_wall_double_layer = no_wall_double_layer_stkfmm_partial)
+      integrator.no_wall_double_layer = no_wall_double_layer_stkfmm_partial
     else:
       integrator.linear_operator = partial(linear_operator_projector_second_layer, 
                                            no_wall_double_layer = mb.no_wall_double_layer_source_target_numba)
