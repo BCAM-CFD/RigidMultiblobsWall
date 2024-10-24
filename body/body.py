@@ -245,7 +245,7 @@ class Body(object):
     return normal
   
   def calc_Pll_matrix(self):
-    '''cd 
+    '''
     Return matrix Pll with shape (3*Nblobs, 3)
     normal = (n^t*n) I= matrix. Pll = I-normal
     xi(Pll)
@@ -260,7 +260,7 @@ class Body(object):
     return P
   
   def calc_Pll_matrix2(self):
-    '''cd 
+    '''
     Return matrix Pll with shape (3*Nblobs, 3)
     normal = (n^t*n) I= matrix. Pll = I-normal
     xi(Pll)
