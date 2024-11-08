@@ -1745,7 +1745,11 @@ class QuaternionIntegrator(object):
 
       # If free slip apply double layer
       if self.slip_mode:
-        weights = np.ones(r_vectors_blobs.size // 3) * (4*np.pi*1*1) / self.Nblobs
+        weights = np.zeros(self.Nblobs)
+        offset = 0
+        for k, b in enumerate(self.bodies):
+          weights[offset : offset + b.Nblobs] = (4*np.pi*1*1) / b.Nblobs
+          offset += b.Nblobs
         Dslip = self.no_wall_double_layer(r_vectors_blobs, r_vectors_blobs, normals, slip, weights).reshape((self.Nblobs, 3))
         slip = 0.5 * slip + Dslip
         
