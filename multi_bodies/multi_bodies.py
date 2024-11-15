@@ -637,7 +637,7 @@ The linear operator is
   Ncomp_tot = Ncomp_blobs + Ncomp_bodies + Ncomp_phi+Ncomp_blobs
   res = np.empty((Ncomp_tot))
   v = np.reshape(vector, (vector.size//3, 3))
-  weights = np.zeros(vector.size//3, 3)
+  weights = np.zeros(vector.size // 3)
   offset = 0
   for k, b in enumerate(bodies):
     weights[offset : offset + b.Nblobs] = (4*np.pi*1*1) / b.Nblobs
