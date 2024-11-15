@@ -1777,7 +1777,7 @@ class QuaternionIntegrator(object):
       for k, b in enumerate(self.bodies):
         if b.prescribed_kinematics is True:
           # Add K*U to Right Hand side 
-          weights = np.ones(r_vectors_blobs.size) * (4*np.pi*1*1) / self.Nblobs
+          weights = np.ones(r_vectors_blobs.size) * (4*np.pi*1*1) / b.Nblobs
           K_times_U = np.dot(b.calc_K_matrix(), b.calc_prescribed_velocity())
           Dslip = mob.no_wall_double_layer_source_target_numba(r_vectors_blobs, r_vectors_blobs, self.bodies[0].normal_V(), K_times_U, weights) #D*K*U 
           RHS[3*offset : 3*(offset+b.Nblobs)] += 0.5 * K_times_U.flatten() + Dslip
