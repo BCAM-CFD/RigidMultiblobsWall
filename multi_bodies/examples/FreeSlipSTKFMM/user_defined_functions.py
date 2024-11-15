@@ -75,6 +75,8 @@ def flow_resolved_coord(r, *args, **kwargs):
   '''
   Adds the background flow.
   '''
+  # print('flow_resolved_coord')
+
   # Get slip options, offset start, offset end and speed
   gamma_dot = kwargs.get('gamma_dot')
   Lz = kwargs.get('Lz')
