@@ -1359,7 +1359,7 @@ if __name__ == '__main__':
   integrator.output_name = read.output_name
   integrator.C_matrix_T_vector_prod = C_matrix_T_vector_prod
   integrator.n_save = n_save
-  integrator.output_name = read.output_name  
+  integrator.output_name = read.output_name 
   try:
     integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
   except:
@@ -1380,16 +1380,21 @@ if __name__ == '__main__':
                                0, 
                                get_blobs_r_vectors(bodies, Nblobs))
 
-
   # Loop over time steps
   start_time = time.time()
   if read.save_clones == 'one_file':
     output_files = []
+    output_files_velocities = []
     buffering = max(1, min(body_types) * n_steps // n_save // 200)
     ID_loop = read.structures_ID + read.articulated_ID
     for i, ID in enumerate(ID_loop):
       name = output_name + '.' + ID + '.config'
       output_files.append(open(name, 'w', buffering=buffering))
+
+      name = output_name + '.' + ID + '_velocities.dat'
+      output_files_velocities.append(open(name, 'w', buffering=buffering))
+  integrator.body_types = body_types      
+  integrator.output_files_velocities = output_files_velocities
 
   for step in range(read.initial_step, n_steps):
     # Save data if...

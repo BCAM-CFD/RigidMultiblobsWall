@@ -94,11 +94,11 @@ class QuaternionIntegrator(object):
       # Save velocities
       step = kwargs.get('step')
       if (step % self.n_save) == 0 and step >= 0:
-        mode = 'w' if step == 0 else 'a'
-        name = self.output_name + '.velocities.dat'
-        with open(name, mode) as f_handle:
-          f_handle.write(str(len(self.bodies)) + '\n')
-          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
+        body_offset = 0
+        for i, f_ID in enumerate(self.output_files_velocities):
+          f_ID.write(str(self.body_types[i]) + '\n')
+          np.savetxt(f_ID, velocities.reshape((len(self.bodies), 6))[body_offset : body_offset + self.body_types[i]])
+          body_offset += self.body_types[i]
 
       # Update location orientation 
       for k, b in enumerate(self.bodies):
@@ -170,12 +170,12 @@ class QuaternionIntegrator(object):
       # Save velocities
       step = kwargs.get('step')
       if (step % self.n_save) == 0 and step >= 0:
-        mode = 'w' if step == 0 else 'a'
-        name = self.output_name + '.velocities.dat'
-        with open(name, mode) as f_handle:
-          f_handle.write(str(len(self.bodies)) + '\n')
-          np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))      
-
+        body_offset = 0
+        for i, f_ID in enumerate(self.output_files_velocities):
+          f_ID.write(str(self.body_types[i]) + '\n')
+          np.savetxt(f_ID, velocities.reshape((len(self.bodies), 6))[body_offset : body_offset + self.body_types[i]])
+          body_offset += self.body_types[i]
+        
       # Update location and orientation
       if self.first_step == False:
         # Use Adams-Bashforth
@@ -933,11 +933,11 @@ class QuaternionIntegrator(object):
       # Save velocities
       step = kwargs.get('step')
       if (step % self.n_save) == 0 and step >= 0:
-        mode = 'w' if step == 0 else 'a'
-        name = self.output_name + '.velocities.dat'
-        with open(name, mode) as f_handle:
-          f_handle.write(str(len(self.bodies)) + '\n')
-          np.savetxt(f_handle, velocities_1.reshape((len(self.bodies), 6)))      
+        body_offset = 0
+        for i, f_ID in enumerate(self.output_files_velocities):
+          f_ID.write(str(self.body_types[i]) + '\n')
+          np.savetxt(f_ID, velocities.reshape((len(self.bodies), 6))[body_offset : body_offset + self.body_types[i]])
+          body_offset += self.body_types[i]
 
       # Solve mobility problem
       slip_precond_rfd = self.solve_mobility_problem(RHS = np.concatenate([-1.0*W_slip, np.zeros(len(self.bodies) * 6)]), PC_partial = PC_partial)
