@@ -936,7 +936,7 @@ class QuaternionIntegrator(object):
         body_offset = 0
         for i, f_ID in enumerate(self.output_files_velocities):
           f_ID.write(str(self.body_types[i]) + '\n')
-          np.savetxt(f_ID, velocities.reshape((len(self.bodies), 6))[body_offset : body_offset + self.body_types[i]])
+          np.savetxt(f_ID, velocities_1.reshape((len(self.bodies), 6))[body_offset : body_offset + self.body_types[i]])
           body_offset += self.body_types[i]
 
       # Solve mobility problem
