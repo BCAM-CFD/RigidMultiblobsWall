@@ -57,7 +57,7 @@ def set_slip_by_ID_new(body, slip, *args, **kwargs):
   '''
   body.function_slip = partial(flow_resolved, *args, **kwargs)
   return
-multi_bodies_functions.set_slip_by_ID = set_slip_by_ID_new
+# multi_bodies_functions.set_slip_by_ID = set_slip_by_ID_new
 
 
 def flow_resolved(body, *args, **kwargs):

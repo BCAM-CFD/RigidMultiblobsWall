@@ -1750,7 +1750,7 @@ class QuaternionIntegrator(object):
         for k, b in enumerate(self.bodies):
           weights[offset : offset + b.Nblobs] = (4*np.pi*1*1) / b.Nblobs
           offset += b.Nblobs
-        Dslip = self.no_wall_double_layer(r_vectors_blobs, r_vectors_blobs, normals, slip, weights).reshape((self.Nblobs, 3))
+        Dslip = self.no_wall_double_layer(r_vectors_blobs, r_vectors_blobs, normals, slip, weights, self.a).reshape((self.Nblobs, 3))
         slip = 0.5 * slip + Dslip
         
       # Calculate force-torque on bodies

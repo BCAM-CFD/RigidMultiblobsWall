@@ -21,7 +21,7 @@ except ImportError:
   print('It didn\'t find mpi4py!')
 
 # CHANGE 2: Add path for PySTKFMM
-sys.path.append('/workspace/scratch/users/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
+sys.path.append('/home/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
 PySTKFMM_found = False
 
 # CHANGE 3: Load STKFMM
@@ -653,11 +653,11 @@ The linear operator is
 
   # Compute the "U" part
   K_times_U = K_matrix_vector_prod(bodies, v[Nblobs : Nblobs + 2*Nbodies],Nblobs, K_bodies = K_bodies) #K*U  vector[Ncomp_blobs: Ncomp_blobs+6*Nbodies]
-  Dslip = no_wall_double_layer(r_vectors, r_vectors, normals, K_times_U, weights) #D*K*U
+  Dslip = no_wall_double_layer(r_vectors, r_vectors, normals, K_times_U, weights, a) #D*K*U
 
   # Compute the "u_s" part
   I = (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot])
-  DslipUs = no_wall_double_layer(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]).reshape(K_times_U.shape), weights) #D*us
+  DslipUs = no_wall_double_layer(r_vectors, r_vectors, normals, (vector[Ncomp_blobs+6*Nbodies:Ncomp_tot]).reshape(K_times_U.shape), weights, a) #D*us
   Pll_times_us = Pll_matrix_vector_prod2(bodies, vector[Ncomp_blobs+6*Nbodies:Ncomp_tot], Nblobs, Pll_body2 = Pll_body2) # Pll * us
 
   res[0:Ncomp_blobs] = mobility_times_lambda - 0.5*(np.reshape(K_times_U,(3*Nblobs))) - Dslip.flatten() - DslipUs.flatten() - 0.5*I  #M*lambda - 0.5K*U - DK*U - D*u_s - 0.5I*u_s
