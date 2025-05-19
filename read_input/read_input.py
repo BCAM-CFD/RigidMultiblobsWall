@@ -101,6 +101,12 @@ class ReadInput(object):
     self.background_Laplace = np.hstack([tmp_Laplace, np.zeros(9 - tmp_Laplace.size)]).flatten()
     self.diffusion_coefficient = float(self.options.get('diffusion_coefficient') or 1.0)
 
+    # Parameters for SAOS
+    self.flow_magnitude = float(self.options.get('flow_magnitude') or 0)
+    self.omega_0 = float(self.options.get('omega_0') or 1)
+    self.omega_f = float(self.options.get('omega_f') or 10)
+    self.delta = float(self.options.get('delta') or 1)
+
     # Create list with [vertex_file, clones_file] for each structure
     self.num_free_bodies = number_of_structures
     self.structures = []

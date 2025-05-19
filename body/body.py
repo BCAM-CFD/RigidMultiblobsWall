@@ -140,11 +140,11 @@ class Body(object):
     return True
 
 
-  def calc_slip(self):
+  def calc_slip(self, t):
     '''
     Return the slip on the blobs.
     '''
-    return self.function_slip(self)
+    return self.function_slip(self, t)
 
 
   def calc_prescribed_velocity(self):

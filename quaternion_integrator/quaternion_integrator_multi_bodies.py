@@ -153,7 +153,7 @@ class QuaternionIntegrator(object):
       preprocess_result = self.preprocess(self.bodies)
 
       # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, step = kwargs.get('step'))
+      sol_precond = self.solve_mobility_problem(x0 = self.first_guess, save_first_guess = True, update_PC = self.update_PC, step = kwargs.get('step'), dt = dt)
 
       # Extract velocities
       velocities = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -1457,8 +1457,8 @@ class QuaternionIntegrator(object):
     # If RHS = None set RHS = [slip, -force_torque, B ]
     if RHS is None:
       # Calculate slip on blobs
-      if self.calc_slip is not None:
-        slip = self.calc_slip(self.bodies, self.Nblobs)
+      if self.calc_slip is not None: 
+        slip = self.calc_slip(self.bodies, self.Nblobs, t = kwargs.get('step') * kwargs.get('dt'))
       else:
         slip = np.zeros((self.Nblobs, 3))
       # Calculate force-torque on bodies
