@@ -1066,12 +1066,6 @@ class QuaternionIntegrator(object):
         with open(name, mode) as f_handle:
           np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
 
-        # Save stress    
-        name = self.output_name + '.stress_wang2019e_deterministic.dat'
-        mode = 'w' if kwargs.get('step') == 0 else 'a'
-        with open(name, mode) as f_handle:
-          np.savetxt(f_handle, stress_wang2019.reshape((1, 9)))
-
 
       # Solve mobility problem
       sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
