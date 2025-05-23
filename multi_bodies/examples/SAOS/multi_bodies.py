@@ -16,6 +16,23 @@ except:
   except:
     import _pickle as cpickle
 
+try:
+  from mpi4py import MPI
+except ImportError:
+  print('It didn\'t find mpi4py!')
+
+# CHANGE 2: Add path for PySTKFMM
+sys.path.append('/workspace/scratch/users/fbalboa/sfw/FMM2/STKFMM-lib-gnu/lib64/python/')
+PySTKFMM_found = False
+
+# CHANGE 3: Load STKFMM
+try:
+  import PySTKFMM
+  PySTKFMM_found = True
+except ImportError:
+  print('STKFMM library not found')
+
+
 # Add path to HydroGrid and import module
 # sys.path.append('../../HydroGrid/src/')
 
@@ -231,17 +248,10 @@ def set_mobility_blobs(implementation):
     return  mb.boosted_free_surface_mobility
 
 
+# CHANGE 4: Replace this function in multi_bodies.py
 def set_mobility_vector_prod(implementation, *args, **kwargs):
   '''
-  Set the function to compute the matrix-vector
-  product (M*F) with the mobility defined at the blob 
-  level to the right implementation.
-  
-  The implementations in numba, pycuda and C++ are much faster than the
-  python implementation. 
-  Depending on the computer the fastest implementation will be the C++ or the pycuda codes.
-  To use the pycuda implementation is necessary to have installed pycuda and a GPU with CUDA capabilities. 
-  To use the C++ implementation the user has to compile the file mobility/mobility.cpp.  
+  New function with STKFMM call.
   ''' 
   # Implementations without wall
   if implementation == 'python_no_wall':
@@ -250,6 +260,35 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     return mb.no_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba_no_wall':
     return mb.no_wall_mobility_trans_times_force_numba
+  elif implementation == 'stkfmm_no_wall':
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    pbc_string = kwargs.get('stkfmm_pbc')
+    max_pts = kwargs.get('stkfmm_max_points')
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+    else:
+      print('Error while setting pbc for stkfmm!')
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.RPY
+
+    # Setup FMM
+    rpy_fmm = PySTKFMM.Stk3DFMM(mult_order, max_pts, pbc, kernel)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
+                                                                rpy_fmm=rpy_fmm, 
+                                                                L=kwargs.get('L'),
+                                                                wall=False,
+                                                                comm=kwargs.get('comm'))
+    return no_wall_mobility_trans_times_force_stkfmm_partial
+
+  
   # Implementations with wall
   elif implementation == 'python':
     return mb.single_wall_fluid_mobility_product
@@ -259,11 +298,35 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
     return mb.single_wall_mobility_trans_times_force_pycuda
   elif implementation == 'numba':
     return mb.single_wall_mobility_trans_times_force_numba
+  elif implementation == 'stkfmm_single_wall':
+    # STKFMM parameters
+    mult_order = kwargs.get('stkfmm_mult_order')
+    pbc_string = kwargs.get('stkfmm_pbc')
+    max_pts = kwargs.get('stkfmm_max_points')
+    if pbc_string == 'None':
+      pbc = PySTKFMM.PAXIS.NONE
+    elif pbc_string == 'PX':
+      pbc = PySTKFMM.PAXIS.PX
+    elif pbc_string == 'PXY':
+      pbc = PySTKFMM.PAXIS.PXY
+    elif pbc_string == 'PXYZ':
+      pbc = PySTKFMM.PAXIS.PXYZ
+
+    # u, lapu kernel (4->6)
+    kernel = PySTKFMM.KERNEL.RPY
+
+    # Setup FMM
+    rpy_fmm = PySTKFMM.StkWallFMM(mult_order, max_pts, pbc, kernel)
+    no_wall_mobility_trans_times_force_stkfmm_partial = partial(mb.mobility_trans_times_force_stkfmm, 
+                                                                rpy_fmm=rpy_fmm, 
+                                                                L=kwargs.get('L'),
+                                                                wall=True,
+                                                                comm=kwargs.get('comm'))
+    return no_wall_mobility_trans_times_force_stkfmm_partial
+  
   # Implementations free surface
   elif implementation == 'pycuda_free_surface':
     return mb.free_surface_mobility_trans_times_force_pycuda
-  elif implementation == 'numba_free_surface':
-    return mb.free_surface_mobility_trans_times_force_numba
   # Implementations different radii
   elif implementation.find('radii') > -1:
     # Get right function
@@ -277,8 +340,6 @@ def set_mobility_vector_prod(implementation, *args, **kwargs):
       function = mb.mobility_vector_product_source_target_one_wall
     elif implementation == 'radii_no_wall':
       function = mb.mobility_vector_product_source_target_unbounded
-    if implementation == 'radii_numba_free_surface':
-      function = mb.free_surface_mobility_trans_times_force_source_target_numba
     # Get blobs radii
     bodies = kwargs.get('bodies')
     radius_blobs = []
@@ -1111,6 +1172,14 @@ def build_block_diagonal_preconditioner_articulated_single_blobs(bodies, articul
 
 
 if __name__ == '__main__':
+  # CHANGE 6: Add these lines at the very top of __main__ in multi_bodies.py
+  # MPI
+  if PySTKFMM_found:
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+  else:
+    comm = None
+
   # Get command line arguments
   parser = argparse.ArgumentParser(description='Run a multi-body simulation and save trajectory.')
   parser.add_argument('--input-file', dest='input_file', type=str, default='data.main', help='name of the input file')
@@ -1204,7 +1273,13 @@ if __name__ == '__main__':
       # Compute the blobs offset for lambda in the whole system array
       b.blobs_offset = blobs_offset
       blobs_offset += b.Nblobs
-      multi_bodies_functions.set_slip_by_ID(b, slip, flow_magnitude=read.flow_magnitude, omega_0=read.omega_0, omega_f=read.omega_f, delta=read.delta, t_f=read.n_steps * read.dt)
+      multi_bodies_functions.set_slip_by_ID(b, 
+                                            slip, 
+                                            flow_magnitude=read.flow_magnitude, 
+                                            omega_0= 2 * np.pi / (read.n_steps * read.dt), 
+                                            omega_f=read.omega_f, 
+                                            delta=read.delta, 
+                                            t_f=read.n_steps * read.dt)
       # If structure is an obstacle
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
@@ -1353,8 +1428,16 @@ if __name__ == '__main__':
                                  domain = read.domain) 
   integrator.get_blobs_r_vectors = get_blobs_r_vectors 
   integrator.mobility_blobs = set_mobility_blobs(read.mobility_blobs_implementation)
-  integrator.mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
-  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, bodies=bodies)
+
+  # CHANGE 7: Inside the main replace the call to set_mobility_vector_prod with these lines
+  mobility_vector_prod = set_mobility_vector_prod(read.mobility_vector_prod_implementation, 
+                                                  stkfmm_mult_order=read.stkfmm_mult_order, 
+                                                  stkfmm_pbc=read.stkfmm_pbc,
+                                                  stkfmm_max_points=read.stkfmm_max_points,
+                                                  L=read.periodic_length,
+                                                  comm=comm)
+  integrator.mobility_vector_prod = mobility_vector_prod
+
   integrator.force_torque_calculator = partial(multi_bodies_functions.force_torque_calculator_sort_by_bodies, 
                                                g = g, 
                                                repulsion_strength_wall = read.repulsion_strength_wall, 
