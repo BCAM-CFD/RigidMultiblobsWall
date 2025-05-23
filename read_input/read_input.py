@@ -102,7 +102,7 @@ class ReadInput(object):
     self.diffusion_coefficient = float(self.options.get('diffusion_coefficient') or 1.0)
 
     # Parameters for SAOS
-    self.flow_magnitude = float(self.options.get('flow_magnitude') or 0)
+    self.shear_0 = float(self.options.get('shear_0') or 0)
     self.omega_0 = float(self.options.get('omega_0') or 1)
     self.omega_f = float(self.options.get('omega_f') or 10)
     self.delta = float(self.options.get('delta') or 1)

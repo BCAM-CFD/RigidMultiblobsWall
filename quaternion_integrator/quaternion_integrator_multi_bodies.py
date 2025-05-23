@@ -976,10 +976,11 @@ class QuaternionIntegrator(object):
                                                                               print_residual = self.print_residual)
       self.stoch_iterations_count += it_lanczos
 
-      # Solve deterministic rheology problem 
+
       step = kwargs.get('step')
       # if (step % self.n_save == 0) and (step >= 0):
       if (step % 1 == 0) and (step >= 0):
+        # Solve deterministic rheology problem zero particle force
 
         # Calculate slip on blobs
         if self.calc_slip is not None: 
@@ -996,6 +997,92 @@ class QuaternionIntegrator(object):
 
         # Solve mobility problem
         sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial)
+
+        # Get solution
+        velocities = sol_precond[self.Nblobs * 3:]
+        blob_forces = sol_precond[0:self.Nblobs * 3].reshape((self.Nblobs, 3))
+
+        # Save velocity
+        if (step % self.n_save == 0) and (step >= 0):
+          name = self.output_name + '.bodies_velocities_deterministic_no_force.dat'
+          mode = 'w' if kwargs.get('step') == 0 else 'a'
+          with open(name, mode) as f_handle:
+            f_handle.write(str(len(self.bodies)) + '\n')
+            np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
+
+        # Extract blob forces and blob positions 
+        r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
+
+        # Compute stress symmetric
+        stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
+
+        # Save stress    
+        name = self.output_name + '.stress_symmetric_deterministic_no_force.dat'
+        mode = 'w' if kwargs.get('step') == 0 else 'a'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
+
+
+      if (step % 1 == 0) and (step >= 0):
+        # Solve deterministic rheology problem with particles force 
+
+        # Calculate slip on blobs
+        if self.calc_slip is not None: 
+          slip = self.calc_slip(self.bodies, self.Nblobs, t = kwargs.get('step') * dt)
+        else:
+          slip = np.zeros((self.Nblobs, 3))
+
+        # Extract blob forces and blob positions 
+        r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
+
+        # Calculate force-torque on bodies
+        force_torque = self.force_torque_calculator(self.bodies, r_vectors)
+
+        # Set right hand side
+        System_size = len(self.bodies) * 6 + self.Nblobs * 3
+        RHS = np.reshape(np.concatenate([slip.flatten(), -force_torque.flatten()]), System_size)
+
+        # Solve mobility problem
+        sol_precond = self.solve_mobility_problem(RHS = RHS, PC_partial = PC_partial)
+
+        # Get solution
+        velocities = sol_precond[self.Nblobs * 3:]
+        blob_forces = sol_precond[0:self.Nblobs * 3].reshape((self.Nblobs, 3))
+
+        # Save velocity
+        if (step % self.n_save == 0) and (step >= 0):
+          name = self.output_name + '.bodies_velocities_deterministic.dat'
+          mode = 'w' if kwargs.get('step') == 0 else 'a'
+          with open(name, mode) as f_handle:
+            f_handle.write(str(len(self.bodies)) + '\n')
+            np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
+
+        # Compute stress symmetric
+        stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
+
+        # Save stress    
+        name = self.output_name + '.stress_symmetric_deterministic.dat'
+        mode = 'w' if kwargs.get('step') == 0 else 'a'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
+
+        # Save stress    
+        name = self.output_name + '.stress_wang2019e_deterministic.dat'
+        mode = 'w' if kwargs.get('step') == 0 else 'a'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, stress_wang2019.reshape((1, 9)))
+
+
+      # Solve mobility problem
+      sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
+                                                x0 = self.first_guess, 
+                                                save_first_guess = True,
+                                                PC_partial = PC_partial,
+                                                step = kwargs.get('step'), 
+                                                dt = dt)
+
+      if (step % 1 == 0) and (step >= 0):
+        # Save stochastic stress
 
         # Get solution
         velocities = sol_precond[self.Nblobs * 3:]
@@ -1021,30 +1108,6 @@ class QuaternionIntegrator(object):
         with open(name, mode) as f_handle:
           np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
 
-        # Compute stress Wang2019
-        offset = 0
-        stress_wang2019 = np.zeros((3,3))
-        for k, b in enumerate(self.bodies):
-          stress_k = 0.5 * (np.einsum('bi, bj -> ij', r_vectors[offset:offset+b.Nblobs] - b.location, blob_forces[offset:offset+b.Nblobs]) + 
-                            np.einsum('bi, bj -> ij', blob_forces[offset:offset+b.Nblobs], r_vectors[offset:offset+b.Nblobs] - b.location))
-          fk = np.dot(b.calc_K_matrix().T, blob_forces[offset:offset+b.Nblobs].flatten())[0:3]
-          stress_wang2019 += stress_k + np.outer(b.location, fk)
-          offset += b.Nblobs
-
-        # Save stress    
-        name = self.output_name + '.stress_wang2019e.dat'
-        mode = 'w' if kwargs.get('step') == 0 else 'a'
-        with open(name, mode) as f_handle:
-          np.savetxt(f_handle, stress_wang2019.reshape((1, 9)))
-
-
-      # Solve mobility problem
-      sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
-                                                x0 = self.first_guess, 
-                                                save_first_guess = True,
-                                                PC_partial = PC_partial,
-                                                step = kwargs.get('step'), 
-                                                dt = dt)
       # Extract velocities
       velocities_1 = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
 
@@ -1587,10 +1650,10 @@ class QuaternionIntegrator(object):
 
       # Solve preconditioned linear system
       counter = gmres_counter(print_residual = self.print_residual)
-      (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
-      self.det_iterations_count += counter.niter
-      # (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, verbose=self.print_residual, convergence='presid')
-      # self.det_iterations_count += len(resnorms)
+      # (sol_precond, info_precond) = utils.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=1000, restart=60, callback=counter)
+      # self.det_iterations_count += counter.niter
+      (sol_precond, infos, resnorms) = gmres.gmres(A, RHS, x0=x0, tol=self.tolerance, M=PC, maxiter=300, restart=300, verbose=self.print_residual, convergence='presid')
+      self.det_iterations_count += len(resnorms)
     else:
       sol_precond = np.zeros_like(RHS)
 

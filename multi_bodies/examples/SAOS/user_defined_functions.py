@@ -41,7 +41,7 @@ def flow_resolved_coord(r, q, t, *args, **kwargs):
   IMPORTANT: edit the variables flow_magnitude and radius_effect to the desired values.
   '''
   # Set slip options
-  flow_magnitude = kwargs.get('flow_magnitude')
+  shear_0 = kwargs.get('shear_0')
   omega_0 = kwargs.get('omega_0')
   omega_f = kwargs.get('omega_f')
   delta = kwargs.get('delta')
@@ -51,17 +51,24 @@ def flow_resolved_coord(r, q, t, *args, **kwargs):
   N = r.size // 3  
   background_flow = np.zeros((N, 3))
    
-  # time-dependent flow magnitude
-  flow = flow_magnitude * np.sin(t_f * omega_0 / np.log(omega_f / omega_0) * ((omega_f / omega_0)**(t / t_f) - 1))
+  # time-dependent shear and shear rate
+  K = t_f * omega_0 / np.log(omega_f / omega_0)
+  shear = shear_0 * np.sin(K * ((omega_f / omega_0)**(t / t_f) - 1))
+  shear_rate = (shear_0 * K * np.log(omega_f / omega_0) / t_f) * np.cos(K * ((omega_f / omega_0)**(t / t_f) - 1)) * (omega_f / omega_0)**(t / t_f)
+
+  # Chirp and chirp rate
   if t / t_f < 0.5 * delta:
     chirp = 0.5 + 0.5 * np.cos(2 * np.pi / delta * (t / t_f - 0.5 * delta))
+    chirp_rate = -(np.pi / (delta * t_f)) * np.sin(2 * np.pi / delta * (t / t_f - 0.5 * delta))
   elif t / t_f < 1 - 0.5 * delta:
     chirp = 1
+    chirp_rate = 0
   else:
     chirp = 0.5 + 0.5 * np.cos(2 * np.pi / delta * (t / t_f - 1 + 0.5 * delta))
+    chirp_rate = -(np.pi / (delta * t_f)) * np.sin(2 * np.pi / delta * (t / t_f - 1 + 0.5 * delta))
 
   # Set background flow along z-axis
-  background_flow[:,0] = chirp * flow * (r[:,2] - q[2])
+  background_flow[:,0] = (chirp * shear_rate + chirp_rate * shear) * (r[:,2] - q[2])
     
   return background_flow
 

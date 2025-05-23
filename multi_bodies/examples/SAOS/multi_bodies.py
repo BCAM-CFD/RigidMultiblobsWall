@@ -1275,7 +1275,7 @@ if __name__ == '__main__':
       blobs_offset += b.Nblobs
       multi_bodies_functions.set_slip_by_ID(b, 
                                             slip, 
-                                            flow_magnitude=read.flow_magnitude, 
+                                            shear_0=read.shear_0, 
                                             omega_0= 2 * np.pi / (read.n_steps * read.dt), 
                                             omega_f=read.omega_f, 
                                             delta=read.delta, 
