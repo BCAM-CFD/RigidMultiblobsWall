@@ -1279,7 +1279,8 @@ if __name__ == '__main__':
                                             omega_0= 2 * np.pi / (read.n_steps * read.dt), 
                                             omega_f=read.omega_f, 
                                             delta=read.delta, 
-                                            t_f=read.n_steps * read.dt)
+                                            t_f=read.n_steps * read.dt, 
+                                            periodic_length = read.periodic_length)
       # If structure is an obstacle
       if ID >= read.num_free_bodies:
         b.prescribed_kinematics = True
@@ -1418,6 +1419,8 @@ if __name__ == '__main__':
     integrator.C_matrix_vector_prod = C_matrix_vector_prod 
     integrator.first_guess = np.zeros(num_bodies*6 + len(constraints)*3)
 
+
+  print('read.periodic_length = ', read.periodic_length)
   integrator.n_save = n_save 
   integrator.calc_slip = partial(calc_slip,
                                  implementation = read.mobility_vector_prod_implementation, 
@@ -1445,7 +1448,14 @@ if __name__ == '__main__':
                                                repulsion_strength = read.repulsion_strength, 
                                                debye_length = read.debye_length, 
                                                periodic_length = read.periodic_length,
-                                               omega_one_roller = read.omega_one_roller) 
+                                               omega_one_roller = read.omega_one_roller,
+                                               mu = read.mu,
+                                               B0 = read.B0,
+                                               omega = read.omega,
+                                               phi = read.phi,
+                                               quaternion_B = Quaternion(read.quaternion_B / np.linalg.norm(read.quaternion_B)),
+                                               vacuum_permeability = read.vacuum_permeability)
+
   integrator.calc_K_matrix_bodies = calc_K_matrix_bodies
   integrator.calc_K_matrix = calc_K_matrix
 
@@ -1472,6 +1482,7 @@ if __name__ == '__main__':
   integrator.plot_velocity_field = read.plot_velocity_field
   integrator.output_name = read.output_name
   integrator.mobility_vector_prod_implementation = read.mobility_vector_prod_implementation
+  integrator.dipole_dipole = read.dipole_dipole
   try:
     integrator.plot_velocity_field_shell = multi_bodies_functions.plot_velocity_field_shell
   except:

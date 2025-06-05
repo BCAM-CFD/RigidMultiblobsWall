@@ -107,6 +107,15 @@ class ReadInput(object):
     self.omega_f = float(self.options.get('omega_f') or 10)
     self.delta = float(self.options.get('delta') or 1)
 
+    # Some extra inputs for dipole interactions
+    self.dipole_dipole = str(self.options.get('dipole_dipole') or 'True')
+    self.mu = np.fromstring(self.options.get('mu') or '1 0 0', sep=' ')
+    self.B0 = np.fromstring(self.options.get('B0') or '0 0 0', sep=' ')
+    self.omega = np.fromstring(self.options.get('omega') or '0 0 0', sep=' ')
+    self.phi = np.fromstring(self.options.get('phi') or '0 0 0', sep=' ')    
+    self.quaternion_B = np.fromstring(self.options.get('quaternion_B') or '1 0 0 0', sep=' ')
+    self.vacuum_permeability = float(self.options.get('vacuum_permeability') or 1.25663706143592e+06)
+
     # CHANGE 8: add to read_input.py
     # Info for STKFMM
     self.stkfmm_mult_order = int(self.options.get('stkfmm_mult_order') or 8)

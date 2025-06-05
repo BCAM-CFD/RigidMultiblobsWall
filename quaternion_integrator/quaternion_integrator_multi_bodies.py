@@ -1022,6 +1022,15 @@ class QuaternionIntegrator(object):
         with open(name, mode) as f_handle:
           np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
 
+        # Compute stress 
+        stress = np.einsum('bi, bj -> ij', r_vectors, blob_forces) 
+
+        # Save stress    
+        name = self.output_name + '.stress_deterministic_no_force.dat'
+        mode = 'w' if kwargs.get('step') == 0 else 'a'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, stress.reshape((1, 9)))
+
 
       if (step % 1 == 0) and (step >= 0):
         # Solve deterministic rheology problem with particles force 
@@ -1036,7 +1045,7 @@ class QuaternionIntegrator(object):
         r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
 
         # Calculate force-torque on bodies
-        force_torque = self.force_torque_calculator(self.bodies, r_vectors)
+        force_torque = self.force_torque_calculator(self.bodies, r_vectors, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = dt)
 
         # Set right hand side
         System_size = len(self.bodies) * 6 + self.Nblobs * 3
@@ -1066,6 +1075,14 @@ class QuaternionIntegrator(object):
         with open(name, mode) as f_handle:
           np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
 
+        # Compute stress 
+        stress = np.einsum('bi, bj -> ij', r_vectors, blob_forces) 
+
+        # Save stress    
+        name = self.output_name + '.stress_deterministic.dat'
+        mode = 'w' if kwargs.get('step') == 0 else 'a'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, stress.reshape((1, 9)))
 
       # Solve mobility problem
       sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
@@ -1101,6 +1118,16 @@ class QuaternionIntegrator(object):
         mode = 'w' if kwargs.get('step') == 0 else 'a'
         with open(name, mode) as f_handle:
           np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
+
+        # Compute stress 
+        stress = np.einsum('bi, bj -> ij', r_vectors, blob_forces) 
+
+        # Save stress    
+        name = self.output_name + '.stress.dat'
+        mode = 'w' if kwargs.get('step') == 0 else 'a'
+        with open(name, mode) as f_handle:
+          np.savetxt(f_handle, stress.reshape((1, 9)))
+
 
       # Extract velocities
       velocities_1 = np.reshape(sol_precond[3*self.Nblobs: 3*self.Nblobs + 6*len(self.bodies)], (len(self.bodies) * 6))
@@ -1579,12 +1606,13 @@ class QuaternionIntegrator(object):
     # If RHS = None set RHS = [slip, -force_torque, B ]
     if RHS is None:
       # Calculate slip on blobs
-      if self.calc_slip is not None: 
+      step = kwargs.get('step')
+      if self.calc_slip is not None and step >= 0: 
         slip = self.calc_slip(self.bodies, self.Nblobs, t = kwargs.get('step') * kwargs.get('dt'))
       else:
         slip = np.zeros((self.Nblobs, 3))
       # Calculate force-torque on bodies
-      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = kwargs.get('dt'))
       # Add noise to the force/torque
       if noise_FT is not None:
         force_torque += noise_FT
@@ -1696,7 +1724,7 @@ class QuaternionIntegrator(object):
       resistance_blobs = np.linalg.inv(mobility_blobs)
 
       # Calculate force-torque on bodies
-      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = kwargs.get('dt'))
 
       # Calculate block-diagonal matrix K
       K = self.calc_K_matrix(self.bodies, self.Nblobs)
@@ -1744,7 +1772,7 @@ class QuaternionIntegrator(object):
       force_slip = np.dot(K.T,np.dot(resistance_blobs, np.reshape(slip, (3*self.Nblobs,1))))
       
       # Calculate force-torque on bodies
-      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs)
+      force_torque = self.force_torque_calculator(self.bodies, r_vectors_blobs, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = kwargs.get('dt'))
       
       # Calculate RHS
       FT = np.reshape(force_torque, 6*len(self.bodies))
