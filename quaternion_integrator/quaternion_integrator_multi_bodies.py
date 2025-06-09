@@ -1011,7 +1011,7 @@ class QuaternionIntegrator(object):
             np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
 
         # Extract blob forces and blob positions 
-        r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
+        r_vectors = self.project_to_periodic_image(self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3)), self.periodic_length)
 
         # Compute stress symmetric
         stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
@@ -1042,7 +1042,7 @@ class QuaternionIntegrator(object):
           slip = np.zeros((self.Nblobs, 3))
 
         # Extract blob forces and blob positions 
-        r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
+        r_vectors = self.project_to_periodic_image(self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3)), self.periodic_length)
 
         # Calculate force-torque on bodies
         force_torque = self.force_torque_calculator(self.bodies, r_vectors, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = dt)
@@ -1108,8 +1108,8 @@ class QuaternionIntegrator(object):
             np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
 
         # Extract blob forces and blob positions 
-        r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
-
+        r_vectors = self.project_to_periodic_image(self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3)), self.periodic_length)
+        
         # Compute stress symmetric
         stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
 
@@ -1972,6 +1972,27 @@ class QuaternionIntegrator(object):
 
     # Return true or false
     return valid_configuration
+
+
+  def project_to_periodic_image(self, r, L):
+    '''
+    Project a vector r to the minimal image representation
+    of size L=(Lx, Ly, Lz) and with a corner at (0,0,0). If 
+    any dimension of L is equal or smaller than zero the 
+    box is assumed to be infinite in that direction.
+    
+    If one dimension is not periodic shift all coordinates by min(r[:,i]) value.
+    '''
+    if L is not None:
+      for i in range(3):
+        if(L[i] > 0):
+          r[:,i] = r[:,i] - (r[:,i] // L[i]) * L[i]
+        else:
+          ri_min =  np.min(r[:,i])
+          if ri_min < 0:
+            r[:,i] -= ri_min
+    return r
+
 
 
 class gmres_counter(object):
