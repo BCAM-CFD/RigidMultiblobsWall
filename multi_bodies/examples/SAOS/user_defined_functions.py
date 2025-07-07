@@ -245,7 +245,7 @@ def flow_resolved(body, t, *args, **kwargs):
   r_configuration = body.get_r_vectors()
   
   # Flow along x, gradiend along z
-  return  flow_resolved_coord_constant(r_configuration, body.location, t, *args, **kwargs)
+  return  flow_resolved_coord(r_configuration, body.location, t, *args, **kwargs)
 
 
 def flow_resolved_coord(r, q, t, *args, **kwargs):

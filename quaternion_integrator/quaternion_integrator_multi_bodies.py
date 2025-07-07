@@ -1009,21 +1009,16 @@ class QuaternionIntegrator(object):
           with open(name, mode) as f_handle:
             f_handle.write(str(len(self.bodies)) + '\n')
             np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
-
-        # Extract blob forces and blob positions 
-        r_vectors = self.project_to_periodic_image(self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3)), self.periodic_length)
-
-        # Compute stress symmetric
-        stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
-
-        # Save stress    
-        name = self.output_name + '.stress_symmetric_deterministic_no_force.dat'
-        mode = 'w' if kwargs.get('step') == 0 else 'a'
-        with open(name, mode) as f_handle:
-          np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
-
+              
         # Compute stress 
-        stress = np.einsum('bi, bj -> ij', r_vectors, blob_forces) 
+        stress = np.zeros((3,3))
+        offset = 0
+        for k, b in enumerate(self.bodies):
+          q = self.project_to_periodic_image(np.copy(b.location.reshape((1,3))), self.periodic_length)
+          blob_forces_k = blob_forces[offset : offset + b.Nblobs]
+          f_k = np.sum(blob_forces_k, axis=0)
+          stress += np.einsum('bi, bj -> ij', b.get_r_vectors(location=np.zeros(3)), blob_forces_k) + np.outer(q, f_k)
+          offset += b.Nblobs
 
         # Save stress    
         name = self.output_name + '.stress_deterministic_no_force.dat'
@@ -1042,7 +1037,7 @@ class QuaternionIntegrator(object):
           slip = np.zeros((self.Nblobs, 3))
 
         # Extract blob forces and blob positions 
-        r_vectors = self.project_to_periodic_image(self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3)), self.periodic_length)
+        r_vectors = self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3))
 
         # Calculate force-torque on bodies
         force_torque = self.force_torque_calculator(self.bodies, r_vectors, dipole_dipole = self.dipole_dipole, step = kwargs.get('step'), dt = dt)
@@ -1066,23 +1061,22 @@ class QuaternionIntegrator(object):
             f_handle.write(str(len(self.bodies)) + '\n')
             np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
 
-        # Compute stress symmetric
-        stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
-
-        # Save stress    
-        name = self.output_name + '.stress_symmetric_deterministic.dat'
-        mode = 'w' if kwargs.get('step') == 0 else 'a'
-        with open(name, mode) as f_handle:
-          np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
-
         # Compute stress 
-        stress = np.einsum('bi, bj -> ij', r_vectors, blob_forces) 
+        stress = np.zeros((3,3))
+        offset = 0
+        for k, b in enumerate(self.bodies):
+          q = self.project_to_periodic_image(np.copy(b.location.reshape((1,3))), self.periodic_length)
+          blob_forces_k = blob_forces[offset : offset + b.Nblobs]
+          f_k = np.sum(blob_forces_k, axis=0)
+          stress += np.einsum('bi, bj -> ij', b.get_r_vectors(location=np.zeros(3)), blob_forces_k) + np.outer(q, f_k)
+          offset += b.Nblobs
 
         # Save stress    
         name = self.output_name + '.stress_deterministic.dat'
         mode = 'w' if kwargs.get('step') == 0 else 'a'
         with open(name, mode) as f_handle:
           np.savetxt(f_handle, stress.reshape((1, 9)))
+
 
       # Solve mobility problem
       sol_precond = self.solve_mobility_problem(noise = velocities_noise_W1, 
@@ -1107,20 +1101,15 @@ class QuaternionIntegrator(object):
             f_handle.write(str(len(self.bodies)) + '\n')
             np.savetxt(f_handle, velocities.reshape((len(self.bodies), 6)))
 
-        # Extract blob forces and blob positions 
-        r_vectors = self.project_to_periodic_image(self.get_blobs_r_vectors(self.bodies, self.Nblobs).reshape((self.Nblobs, 3)), self.periodic_length)
-        
-        # Compute stress symmetric
-        stress_symmetric = 0.5 * (np.einsum('bi, bj -> ij', r_vectors, blob_forces) + np.einsum('bi, bj -> ij', blob_forces, r_vectors))
-
-        # Save stress    
-        name = self.output_name + '.stress_symmetric.dat'
-        mode = 'w' if kwargs.get('step') == 0 else 'a'
-        with open(name, mode) as f_handle:
-          np.savetxt(f_handle, stress_symmetric.reshape((1, 9)))
-
         # Compute stress 
-        stress = np.einsum('bi, bj -> ij', r_vectors, blob_forces) 
+        stress = np.zeros((3,3))
+        offset = 0
+        for k, b in enumerate(self.bodies):
+          q = self.project_to_periodic_image(np.copy(b.location.reshape((1,3))), self.periodic_length)
+          blob_forces_k = blob_forces[offset : offset + b.Nblobs]
+          f_k = np.sum(blob_forces_k, axis=0)
+          stress += np.einsum('bi, bj -> ij', b.get_r_vectors(location=np.zeros(3)), blob_forces_k) + np.outer(q, f_k)
+          offset += b.Nblobs
 
         # Save stress    
         name = self.output_name + '.stress.dat'
