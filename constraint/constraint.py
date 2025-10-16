@@ -37,8 +37,6 @@ class Constraint(object):
     self.constraint_extra = constraint_extra
     self.links_deriv = np.zeros(6)
     self.links_deriv_updated = np.zeros(6)
-
-    print('AAA self.articulated_body = ', self.articulated_body)
     
 
   def calc_rot_link_matrix(self):

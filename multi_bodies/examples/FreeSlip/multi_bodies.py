@@ -802,6 +802,8 @@ def build_block_diagonal_preconditioners_det_identity_stoch(bodies, r_vectors, N
 @utils.static_var('C_art_bodies', [])
 @utils.static_var('res_art_bodies', [])
 @utils.static_var('mobility_inv_blobs', [])
+@utils.static_var('P_bodies', [])
+@utils.static_var('xi_vec_bodies', [])
 def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, eta, a, *args, **kwargs):
   '''
   build the block diagonal preconditioner for articulated rigid bodies.
@@ -828,7 +830,7 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
         K_bodies.append(build_block_diagonal_preconditioner.K_bodies[k])
         slip_l.append(build_block_diagonal_preconditioner.slip_l[k]) 
       else:
-        # 1. compute blobs mobility and invert it xxxx
+        # 1. compute blobs mobility and invert it 
         xi = b.slip_lengths / (eta * b.weights)
         xi_vec = np.zeros(3 * b.Nblobs)
         xi_vec[0::3] = xi
@@ -876,7 +878,9 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
     build_block_diagonal_preconditioner.K_bodies = K_bodies
     build_block_diagonal_preconditioner.C_art_bodies = C_art_bodies
     build_block_diagonal_preconditioner.res_art_bodies = res_art_bodies
-    build_block_diagonal_preconditioner.mobility_inv_blobs = mobility_inv_blobs
+    build_block_diagonal_preconditioner.mobility_inv_blobs = mobility_inv_blobs 
+    build_block_diagonal_preconditioner.P_bodies = P_bodies
+    build_block_diagonal_preconditioner.xi_vec_bodies = xi_vec_bodies
 
     # the function is initialized
     build_block_diagonal_preconditioner.initialized.append(1)
@@ -886,7 +890,9 @@ def build_block_diagonal_preconditioner(bodies, articulated, r_vectors, Nblobs, 
     K_bodies = build_block_diagonal_preconditioner.K_bodies
     C_art_bodies = build_block_diagonal_preconditioner.C_art_bodies
     res_art_bodies = build_block_diagonal_preconditioner.res_art_bodies
-    mobility_inv_blobs = build_block_diagonal_preconditioner.mobility_inv_blobs 
+    mobility_inv_blobs = build_block_diagonal_preconditioner.mobility_inv_blobs
+    P_bodies = build_block_diagonal_preconditioner.P_bodies
+    xi_vec_bodies = build_block_diagonal_preconditioner.xi_vec_bodies 
 
   def block_diagonal_preconditioner(vector, bodies = None, articulated = None, mobility_bodies = None, mobility_inv_blobs = None, K_bodies = None, P_bodies = None,
                                     xi_vec_bodies = None, Nblobs = None):
